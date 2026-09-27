@@ -16,6 +16,10 @@ export function TextField({ label, hint, style, ...rest }: Props) {
         placeholderTextColor={colors.textSecondary}
         autoCapitalize="none"
         autoCorrect={false}
+        // One line, scrolling sideways: a long token or secret must never
+        // wrap and grow the field.
+        multiline={false}
+        numberOfLines={1}
         style={[
           styles.input,
           typeScale.body,
@@ -36,7 +40,7 @@ export function TextField({ label, hint, style, ...rest }: Props) {
 const styles = StyleSheet.create({
   container: { gap: spacing.xs },
   input: {
-    minHeight: minTapTarget,
+    height: minTapTarget,
     borderRadius: radius.sm,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: spacing.sm + 4,

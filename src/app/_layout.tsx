@@ -35,10 +35,17 @@ function RootStack() {
   if (!ready) return null;
 
   return (
-    <Stack>
+    <Stack
+      screenOptions={{
+        // The back button otherwise shows the previous route's name, and the
+        // tabs route is called "(tabs)". A chevron alone is the iOS norm.
+        headerBackButtonDisplayMode: 'minimal',
+      }}>
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="collection" options={{ title: 'Collection' }} />
+        <Stack.Screen name="card/[id]" options={{ title: '' }} />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />

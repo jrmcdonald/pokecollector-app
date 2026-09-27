@@ -25,6 +25,8 @@ MCP code to refactor. It does not, and most of its Phase 0 has gone as a result.
 - Set checklists (owned/missing)
 - Binders and wishlist (view, basic edits)
 - Scan a card with the camera, confirm the match, and add it to the collection
+- Switch between several PokeCollector accounts on the same server, such as a
+  household's collections (§7.4)
 
 **Non-goals (for now):** push notifications, widgets, Siri/App Intents, App
 Store release, account administration, Android. Decks, trades and sealed
@@ -345,15 +347,15 @@ a revoked service token.
 
 ### 7.1 Screens
 
-- [ ] **Home:** total value, card count, unique cards, recent additions and
+- [x] **Home:** total value, card count, unique cards, recent additions and
       quick links (`/api/dashboard/`, `/api/collection/stats/summary`).
-- [ ] **Collection:** grid/list toggle, search, filters (set, rarity, variant)
+- [x] **Collection:** grid/list toggle, search, filters (set, rarity, variant)
       and sort (value, recent, name, set number), all client-side over the cached
       collection. Tapping a card opens its detail.
-- [ ] **Card detail:** large image, set and number, prices, owned entries with
+- [x] **Card detail:** large image, set and number, prices, owned entries with
       a quantity stepper and variant and condition pickers. Buttons for "Add to
       collection", "Add to wishlist" and "Add to binder". Price history can wait.
-- [ ] **Search (catalogue):** debounced (≥ 400 ms, given the rate limit),
+- [x] **Search (catalogue):** debounced (≥ 400 ms, given the rate limit),
       `page`/`page_size` infinite scroll, an owned badge computed against the
       cached collection rather than an extra request per tile.
 - [ ] **Sets:** list with a completion bar; the checklist shows owned vs
@@ -383,6 +385,46 @@ a revoked service token.
 
 **Done when:** the collection, wishlist and binders can be browsed and edited
 daily without opening the web UI, and a normal session never hits a 429.
+
+### 7.4 Multiple accounts
+
+PokeCollector keeps a separate collection, wishlist and binders per account,
+and there is no shared or read-only view. A household with several collectors
+on one server needs one login each. The app holds several accounts **on one
+server** and switches between them; `pokecollector-mcp`'s `additional_accounts`
+solves the same problem the same way.
+
+- [ ] **Stored model.** One server entry (the two addresses and the service
+      token) and a list of accounts (username, password, opaque cache ID, and
+      a display name that defaults to the username), plus which one is active.
+      All of it lives in the Keychain, as now; the stored format gets a
+      version bump and the existing single account is migrated into the list.
+- [ ] **One client per account.** Each account has its own client with its
+      own JWT and login latch, over the shared route choice (primary or
+      fallback is a property of the server, not the account). Logins stay lazy:
+      an account signs in the first time it is used, not at launch, because
+      five logins a minute are shared with every browser behind the tunnel.
+- [ ] **Switching.** From Home (tap the account name) and from Settings. The
+      switch is instant: query keys already start with the account's cache ID,
+      so each account's persisted data is shown straight away and refreshed in
+      the background. No cache is cleared on a switch.
+- [ ] **Adding an account.** Settings → Accounts → Add: username and password
+      only, tested against the server already configured. Removing one wipes
+      its Keychain entry and its cached queries.
+- [ ] **Always visible.** The active account's name shows on Home and in any
+      edit confirmation, so a card is never added to the wrong collection by
+      accident.
+- [ ] **Tests.** Migration from the single-account format; per-account token
+      isolation; switching keeps each account's cache; removing an account
+      clears only its data.
+
+Out of scope: several **servers** (the addresses and service token stay
+single), a combined view across accounts, and anything that needs an admin
+login (creating accounts stays in the web UI).
+
+**Done when:** two accounts can be added, switched between from Home in one
+tap without a spinner for cached screens, and edits land in the active
+account's collection.
 
 ---
 

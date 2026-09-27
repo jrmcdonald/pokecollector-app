@@ -1,0 +1,55 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices", "helpers:pinGitHubActionDigestsToSemver"],
+  "minimumReleaseAge": "3 days",
+  "minimumReleaseAgeBehaviour": "timestamp-optional",
+  "platformAutomerge": true,
+  "labels": ["dependencies"],
+  "prCreation": "not-pending",
+  "rebaseWhen": "behind-base-branch",
+  "lockFileMaintenance": {
+    "description": "Off: a lock file refresh can move an Expo-managed native module to a new patch release, which silently needs a new dev client build",
+    "enabled": false
+  },
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+      "automerge": true
+    },
+    {
+      "description": "The workflows pin every action to a digest, so one upstream release fans out into a digest update per action; land them together",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest"],
+      "groupName": "github-actions digests"
+    },
+    {
+      "description": "Expo decides these versions: each Expo SDK pins the React, React Native and native module versions it supports, and `npx expo install --fix` is what moves them. Most carry native code, so any change means a new iOS build and an AltStore reinstall. One group, raised only on request from the Dependency Dashboard, never automerged",
+      "matchPackageNames": [
+        "expo",
+        "expo-*",
+        "@expo/**",
+        "react",
+        "react-dom",
+        "react-native",
+        "react-native-*",
+        "@react-native/**",
+        "@react-native-community/**",
+        "@react-native-async-storage/**",
+        "@shopify/flash-list",
+        "jest-expo",
+        "eslint-config-expo",
+        "typescript",
+        "@types/react"
+      ],
+      "groupName": "Expo SDK",
+      "dependencyDashboardApproval": true,
+      "automerge": false,
+      "commitMessageSuffix": "(native: needs an iOS build)"
+    },
+    {
+      "description": "Majors of everything else get a review, not an automerge",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ]
+}

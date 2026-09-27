@@ -99,12 +99,16 @@ export function ConnectionForm({ initial, submitTitle, onVerified }: Props) {
       />
       <TextField
         label="Service token client ID"
+        textContentType="none"
+        autoComplete="off"
         hint="From Cloudflare Zero Trust → Access → Service credentials. Leave both blank if the server has no Access in front. Sent to both addresses; a proxy without Access ignores it."
         value={values.accessClientId}
         onChangeText={set('accessClientId')}
       />
       <TextField
         label="Service token client secret"
+        textContentType="none"
+        autoComplete="off"
         secureTextEntry
         value={values.accessClientSecret}
         onChangeText={set('accessClientSecret')}

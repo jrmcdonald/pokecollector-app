@@ -58,17 +58,20 @@ export default function Collection() {
       <Stack.Screen
         options={{
           title: 'Collection',
-          headerRight: () => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={layout === 'grid' ? 'Show as list' : 'Show as grid'}
-              onPress={() => setLayout((l) => (l === 'grid' ? 'list' : 'grid'))}
-              style={styles.headerButton}>
-              <ThemedText variant="label" color="accent">
-                {layout === 'grid' ? 'List' : 'Grid'}
-              </ThemedText>
-            </Pressable>
-          ),
+          // A native bar button rather than a custom view: iOS lays it out
+          // (and gives it the system background) the way it expects.
+          unstable_headerRightItems: () => [
+            {
+              type: 'button',
+              label: layout === 'grid' ? 'List' : 'Grid',
+              accessibilityLabel: layout === 'grid' ? 'Show as list' : 'Show as grid',
+              icon: {
+                type: 'sfSymbol',
+                name: layout === 'grid' ? 'list.bullet' : 'square.grid.3x3',
+              },
+              onPress: () => setLayout((l) => (l === 'grid' ? 'list' : 'grid')),
+            },
+          ],
         }}
       />
       <View style={styles.controls}>
@@ -235,7 +238,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   list: { padding: spacing.sm },
-  headerButton: { minWidth: minTapTarget, minHeight: minTapTarget, justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.sm },
   rowImage: { width: 48 },
   rowText: { flex: 1, gap: 2 },

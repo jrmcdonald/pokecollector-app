@@ -176,3 +176,13 @@ From the review of the first PR:
 - **Quantity changes are optimistic** and roll back with an alert on failure;
   taking an entry to zero asks first. Adding copies is not optimistic, since
   upstream decides whether it merges into an existing entry.
+
+## 2026-09-27 — Multiple accounts: several logins, one server
+
+Planned in `PLAN.md` §7.4. Upstream collections are per account, with no
+shared view, so a household needs a login each. The app will hold several
+accounts against one configured server rather than several servers: that is
+the case that exists, and it keeps the addresses, service token and route
+choice single. Each account gets its own client and token, logging in lazily,
+and switching relies on the per-account cache IDs already in place, so it
+costs no requests for cached screens.

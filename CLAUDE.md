@@ -36,6 +36,17 @@ runs the same, plus a check that `src/api/generated.ts` matches the spec.
 `EXPO_OFFLINE=1` matters in Claude Code on the web: the network policy blocks
 `api.expo.dev`, and without it `expo install` fails. Offline, it uses the
 version map bundled in the `expo` package, which is what it should use anyway.
+The SessionStart hook (`.claude/hooks/session-start.sh`) sets it, with
+`EXPO_NO_TELEMETRY`, and runs `npm install` at the start of every web session.
+
+## Dependencies
+
+Renovate (`renovate.json`) automerges minor and patch updates of ordinary
+JavaScript dependencies and action digests. Everything Expo decides the
+version of (React, React Native, `expo-*`, native modules) is one "Expo SDK"
+group that Renovate raises only when asked from its Dependency Dashboard. An
+SDK upgrade is `npx expo install expo@^<next> && npx expo install --fix`, then
+an iOS build.
 
 ## Layout
 

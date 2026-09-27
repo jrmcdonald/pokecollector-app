@@ -10,7 +10,9 @@ import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useDashboard, useIsOnline } from '@/hooks/queries';
+import { useAccountMenu } from '@/hooks/use-account-menu';
 import { useMe } from '@/hooks/use-me';
+import { useSession } from '@/session/session';
 import { minTapTarget, radius, spacing, useColors } from '@/theme';
 import { formatPrice, formatTotal } from '@/utils/pricing';
 
@@ -22,7 +24,11 @@ export default function Home() {
   const dashboard = useDashboard();
   const online = useIsOnline();
   const d = dashboard.data;
-  const name = me.data?.username;
+  const { session } = useSession();
+  // The saved username until /api/auth/me answers, e.g. just after a switch.
+  const name =
+    me.data?.username ?? (session.status === 'signedIn' ? session.credentials.username : undefined);
+  const openAccountMenu = useAccountMenu();
 
   return (
     <ThemedView style={styles.fill}>
@@ -39,12 +45,16 @@ export default function Home() {
           <View style={styles.header}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={name ? `Signed in as ${name}. Settings` : 'Settings'}
-              onPress={() => router.push('/settings')}
+              accessibilityLabel={name ? `Signed in as ${name}` : 'Account'}
+              accessibilityHint="Switch account, add one, or open Settings"
+              onPress={openAccountMenu}
               style={({ pressed }) => [styles.account, pressed && styles.pressed]}>
               <Avatar name={name} />
               <ThemedText variant="heading" numberOfLines={1} style={styles.name}>
                 {name ?? 'PokeCollector'}
+              </ThemedText>
+              <ThemedText color="textSecondary" style={styles.caret}>
+                ⌄
               </ThemedText>
             </Pressable>
             {!online ? (
@@ -153,6 +163,7 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.7 },
   name: { flexShrink: 1 },
+  caret: { fontSize: 18, lineHeight: 20, marginTop: -6 },
   offline: {
     borderWidth: 1,
     borderRadius: radius.sm,

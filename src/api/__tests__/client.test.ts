@@ -462,6 +462,23 @@ describe('primary and fallback addresses', () => {
     expect(calls.filter((c) => c.url === `${HOME}/api/auth/mode`)).toHaveLength(2);
   });
 
+  it('takes a route from another client without probing', async () => {
+    const { fetch, calls } = server({ current: new Set([HOME]) });
+    const first = new PokeCollectorClient(BOTH, fetch);
+    await first.request('/api/auth/me');
+    const second = new PokeCollectorClient({ ...BOTH, username: 'misty' }, fetch);
+    second.adoptRoute(first.activeRoute);
+    calls.length = 0;
+    await second.request('/api/auth/me');
+    expect(hosts(calls)).toEqual([`POST ${PUBLIC}/api/auth/login`, `GET ${PUBLIC}/api/auth/me`]);
+  });
+
+  it('ignores an adopted fallback when it has none', () => {
+    const client = new PokeCollectorClient(CREDENTIALS, server({ current: new Set() }).fetch);
+    client.adoptRoute('fallback');
+    expect(client.activeRoute).toBeNull();
+  });
+
   it('shares one probe between concurrent requests', async () => {
     const { fetch, calls } = server({ current: new Set() });
     const client = new PokeCollectorClient(BOTH, fetch);

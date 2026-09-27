@@ -167,6 +167,7 @@ function Prices({ card }: { card: Card }) {
 function Owned({ entries, disabled }: { entries: CollectionItem[]; disabled: boolean }) {
   const setQuantity = useSetQuantity();
   const colors = useColors();
+  const owner = useOwnerLabel();
   if (entries.length === 0) return null;
 
   const change = (item: CollectionItem, quantity: number) => {
@@ -174,14 +175,18 @@ function Owned({ entries, disabled }: { entries: CollectionItem[]; disabled: boo
       setQuantity.mutate({ item, quantity });
       return;
     }
-    Alert.alert('Remove from collection?', `${item.variant ?? 'Normal'}, ${item.condition}`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () => setQuantity.mutate({ item, quantity }),
-      },
-    ]);
+    Alert.alert(
+      owner ? `Remove from ${owner}?` : 'Remove from collection?',
+      `${item.variant ?? 'Normal'}, ${item.condition}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => setQuantity.mutate({ item, quantity }),
+        },
+      ],
+    );
   };
 
   return (
@@ -228,10 +233,18 @@ function AddCopies({ card, disabled }: { card: Card; disabled: boolean }) {
   const [quantity, setQuantity] = useState(1);
   const add = useAddToCollection();
   const wishlist = useAddToWishlist();
+  const owner = useOwnerLabel();
 
   return (
     <View style={styles.add}>
-      <ThemedText variant="heading">Add copies</ThemedText>
+      <View>
+        <ThemedText variant="heading">Add copies</ThemedText>
+        {owner ? (
+          <ThemedText variant="caption" color="textSecondary">
+            To {owner}
+          </ThemedText>
+        ) : null}
+      </View>
       <Chips<Variant>
         label="Variant"
         options={variants.map((v) => ({ value: v, label: v }))}
@@ -333,6 +346,16 @@ function AddToBinder({
       onPress={choose}
     />
   );
+}
+
+/**
+ * "ash's collection" when more than one account is saved, so an edit never
+ * lands in the wrong one unnoticed; null with a single account.
+ */
+function useOwnerLabel(): string | null {
+  const { session } = useSession();
+  if (session.status !== 'signedIn' || session.accounts.length < 2) return null;
+  return `${session.credentials.username}’s collection`;
 }
 
 const styles = StyleSheet.create({

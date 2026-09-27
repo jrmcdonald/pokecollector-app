@@ -231,3 +231,27 @@ collector's binder, night holo).
 - **Every collection change marks sets, checklists and binders stale.** Only
   the screen on show refetches straight away, so a change costs one or two
   requests rather than one per cached list.
+
+## 2026-09-27 — Multiple accounts, as built
+
+Follows the plan in `PLAN.md` §7.4, with these details:
+
+- **Keychain format v4:** `{ server, accounts, activeId }` in one item. The
+  v3 single-account item is migrated on first launch, keeping its cache id as
+  the account's id, so nothing cached is lost; the new item is written before
+  the old one is deleted.
+- **The rules live in `src/auth/accounts.ts` as pure functions** and the
+  per-account clients in `src/session/client-pool.ts`, both unit-tested; the
+  React provider only wires them up.
+- **The connection form still edits the current account's login.** A new
+  primary address replaces every account (they belonged to the old server); a
+  username that is already saved switches to it; a new one replaces the
+  current account. A change to the addresses or service token retires every
+  account's client, since each carries them.
+- **Switching adopts the route** the previous account's client had picked,
+  so it costs no probe, and reuses that account's client (and token) if it
+  has one, so it costs no login either.
+- **Removing an account removes only its queries** (`removeQueries` on its
+  id); signing out still clears everything.
+- **Edits name the account** ("To ash's collection") only when more than one
+  is saved.

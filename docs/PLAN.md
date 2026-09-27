@@ -396,27 +396,28 @@ on one server needs one login each. The app holds several accounts **on one
 server** and switches between them; `pokecollector-mcp`'s `additional_accounts`
 solves the same problem the same way.
 
-- [ ] **Stored model.** One server entry (the two addresses and the service
-      token) and a list of accounts (username, password, opaque cache ID, and
-      a display name that defaults to the username), plus which one is active.
+- [x] **Stored model.** One server entry (the two addresses and the service
+      token) and a list of accounts (username, password and an opaque cache
+      ID), plus which one is active. A display name separate from the username
+      can come later if usernames turn out to be unfriendly.
       All of it lives in the Keychain, as now; the stored format gets a
       version bump and the existing single account is migrated into the list.
-- [ ] **One client per account.** Each account has its own client with its
+- [x] **One client per account.** Each account has its own client with its
       own JWT and login latch, over the shared route choice (primary or
       fallback is a property of the server, not the account). Logins stay lazy:
       an account signs in the first time it is used, not at launch, because
       five logins a minute are shared with every browser behind the tunnel.
-- [ ] **Switching.** From Home (tap the account name) and from Settings. The
+- [x] **Switching.** From Home (tap the account name) and from Settings. The
       switch is instant: query keys already start with the account's cache ID,
       so each account's persisted data is shown straight away and refreshed in
       the background. No cache is cleared on a switch.
-- [ ] **Adding an account.** Settings → Accounts → Add: username and password
+- [x] **Adding an account.** Settings → Accounts → Add: username and password
       only, tested against the server already configured. Removing one wipes
       its Keychain entry and its cached queries.
-- [ ] **Always visible.** The active account's name shows on Home and in any
+- [x] **Always visible.** The active account's name shows on Home and in any
       edit confirmation, so a card is never added to the wrong collection by
       accident.
-- [ ] **Tests.** Migration from the single-account format; per-account token
+- [x] **Tests.** Migration from the single-account format; per-account token
       isolation; switching keeps each account's cache; removing an account
       clears only its data.
 

@@ -80,17 +80,19 @@ cache; edits need a connection.
 
 ## 2026-09-27 — Every native module in the first dev build
 
-Each native change is a CI build (macOS minutes at 10× on a private repo) and
-an AltStore reinstall. The first dev client therefore carries the camera,
+Each native change is a CI build (fifteen minutes or more on a macOS runner)
+and an AltStore reinstall. The first dev client therefore carries the camera,
 secure store, image manipulator, haptics, NetInfo and `react-native-svg` for
 the later charts, so everything after it is JavaScript and hot-reloads.
 
-## 2026-09-27 — Bundle IDs under `io.github.jrmcdonald`
+## 2026-09-27 — Bundle IDs under `io.github.jrmcdonald`, overridable
 
-`io.github.jrmcdonald.pokecollector` and `io.github.jrmcdonald.pokecollector.dev`, from the domain
-the rest of this setup already uses. With AltStore, the ID Apple registers has
-the team ID appended, so the prefix only has to be stable, not owned. Changing
-it later costs App IDs (10 a week), so it is fixed now.
+`io.github.jrmcdonald.pokecollector` and `…pokecollector.dev`, the repository's
+own GitHub namespace, rather than a domain of the owner's: the repository is
+public, and a personal domain in the app config says more about where the
+server lives than it needs to. `BUNDLE_ID_PREFIX` overrides it for forks. With
+AltStore, the ID Apple registers has the team ID appended, so the prefix only
+has to be stable, not owned. Changing it later costs App IDs (10 a week).
 
 ## 2026-09-27 — `expo-camera` for capture, not vision-camera
 
@@ -108,3 +110,31 @@ costs then is accepted.
 The SDK 57 template puts Expo Router's routes in `src/app/` rather than
 `app/`, keeping all source under `src/`. The plan's layout follows the
 template.
+
+## 2026-09-27 — The repository is public; nothing about the server is in it
+
+Public, for free standard macOS runners. So no server address, hostname,
+token or credential appears in code, config or docs; everything that
+identifies a server is entered on the phone and kept in the Keychain. Docs use
+`example.com` names and placeholders such as `$PUBLIC_HOST`.
+
+## 2026-09-27 — A primary and an optional fallback address
+
+At home the server is best reached on a LAN name (no tunnel, its own
+rate-limit budget, and no Cloudflare body or timeout limits); everywhere else,
+only the public hostname works. Rather than a toggle the user has to remember,
+the app takes both and picks by probing `GET /api/auth/mode`, primary first
+with a 3 s allowance, and re-picks when the network changes or when it
+returns to the foreground on the fallback. `PLAN.md` §2.0 has the rules.
+
+Considered and rejected: trying the primary on every request and falling back
+per request (every request away from home would pay the timeout), and
+switching on the Wi-Fi network name (reading the SSID on iOS needs location
+permission, and a name does not prove the server is reachable).
+
+## 2026-09-27 — The Unlicense
+
+The code is dedicated to the public domain under the Unlicense, with no
+warranty, and the README says plainly that it is vibe coded and unsupported.
+The exception is the OpenAPI spec and the types generated from it, which are
+derived from PokeCollector's AGPL-3.0 source; the README says so.

@@ -9,7 +9,7 @@ export function useMe() {
   return useQuery({
     queryKey: [
       'me',
-      signedIn ? session.credentials.baseUrl : null,
+      signedIn ? session.credentials.primaryUrl : null,
       signedIn ? session.credentials.username : null,
     ],
     queryFn: () => {

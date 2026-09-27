@@ -9,8 +9,10 @@
  * the three apps a free Apple ID allows. Don't change these IDs casually: each
  * new one uses one of the ten App IDs a free account may register a week.
  *
- * Nothing secret belongs here. This file is committed and ends up in the
- * app bundle; the server and credentials are entered on the phone.
+ * Nothing secret or personal belongs here: this repository is public. The
+ * server addresses and credentials are entered on the phone. The bundle ID
+ * prefix defaults to this repository's GitHub namespace; a fork sets
+ * BUNDLE_ID_PREFIX (locally, or as an Actions variable of the same name).
  */
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
@@ -24,17 +26,21 @@ function variant(): Variant {
   return value;
 }
 
+function bundleIdPrefix(): string {
+  const value = process.env.BUNDLE_ID_PREFIX?.trim() || 'io.github.jrmcdonald';
+  if (!/^[A-Za-z][A-Za-z0-9-]*(\.[A-Za-z0-9-]+)+$/.test(value)) {
+    throw new Error(`BUNDLE_ID_PREFIX must be reverse-DNS, like com.example, not ${value}`);
+  }
+  return value;
+}
+
 const VARIANTS = {
   development: {
     name: 'PokeCollector Dev',
-    bundleIdentifier: 'io.github.jrmcdonald.pokecollector.dev',
+    suffix: 'pokecollector.dev',
     scheme: 'pokecollector-dev',
   },
-  production: {
-    name: 'PokeCollector',
-    bundleIdentifier: 'io.github.jrmcdonald.pokecollector',
-    scheme: 'pokecollector',
-  },
+  production: { name: 'PokeCollector', suffix: 'pokecollector', scheme: 'pokecollector' },
 } as const;
 
 export default ({ config }: ConfigContext): ExpoConfig => {
@@ -50,7 +56,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     userInterfaceStyle: 'automatic',
     platforms: ['ios'],
     ios: {
-      bundleIdentifier: v.bundleIdentifier,
+      bundleIdentifier: `${bundleIdPrefix()}.${v.suffix}`,
       supportsTablet: false,
       icon: './assets/expo.icon',
       infoPlist: {

@@ -7,13 +7,14 @@ import { ConnectionForm } from '@/components/connection-form';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { clearQueryCache } from '@/session/query';
-import { useSession } from '@/session/session';
+import { useActiveRoute, useSession } from '@/session/session';
 import { spacing } from '@/theme';
 
 export default function Settings() {
   const { session, signIn, signOut } = useSession();
   const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
+  const { route, url } = useActiveRoute();
   if (session.status !== 'signedIn') return null;
 
   function confirmSignOut() {
@@ -35,13 +36,26 @@ export default function Settings() {
       <KeyboardAvoidingView behavior="padding" style={styles.fill}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <ThemedText variant="heading">Connection</ThemedText>
+          <ThemedText>
+            {route && url ? `Using the ${route} address, ${url}.` : 'Not connected yet.'}
+          </ThemedText>
+          {session.credentials.fallbackUrl ? (
+            <Button
+              title="Re-check which address to use"
+              variant="secondary"
+              onPress={async () => {
+                session.client.invalidateRoute();
+                await queryClient.invalidateQueries({ queryKey: ['me'] });
+              }}
+            />
+          ) : null}
           <ThemedText color="textSecondary">Changes are tested before they are saved.</ThemedText>
           <ConnectionForm
             initial={session.credentials}
             submitTitle={saved ? 'Saved — test again' : 'Test and save'}
             onVerified={async (credentials) => {
               const accountChanged =
-                credentials.baseUrl !== session.credentials.baseUrl ||
+                credentials.primaryUrl !== session.credentials.primaryUrl ||
                 credentials.username !== session.credentials.username;
               if (accountChanged) await clearQueryCache();
               await signIn(credentials);

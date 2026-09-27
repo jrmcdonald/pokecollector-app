@@ -20,6 +20,12 @@ Requests are sent with `redirect: 'manual'` via `expo/fetch`. Access rejects a
 bad service token with a redirect or an HTML page, never JSON; the client
 treats any non-JSON response other than a 5xx or 429 as an `AccessError`.
 
+## Which address
+
+Every request goes to the active address: the primary, or the fallback when
+the primary does not answer. `GET /api/auth/mode` doubles as the probe that
+decides, because it needs no login. See `PLAN.md` §2.0.
+
 ## Endpoints in use
 
 | Endpoint               | Auth | Used for                      | Notes                                                                                                                        |

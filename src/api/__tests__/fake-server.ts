@@ -1,7 +1,8 @@
 import type { FetchLike, ResponseLike, ServerCredentials } from '../client';
 
 export const CREDENTIALS: ServerCredentials = {
-  baseUrl: 'https://pc.example.com',
+  primaryUrl: 'https://pc.example.com',
+  fallbackUrl: null,
   accessClientId: 'id.access',
   accessClientSecret: 'secret',
   username: 'ash',

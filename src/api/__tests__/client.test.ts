@@ -1,4 +1,4 @@
-import { buildUrl, PokeCollectorClient } from '../client';
+import { buildUrl, PokeCollectorClient, PRIMARY_PROBE_TIMEOUT_MS } from '../client';
 import {
   AccessError,
   AuthError,
@@ -10,7 +10,7 @@ import {
   ValidationError,
 } from '../errors';
 import { UserSchema } from '../schemas';
-import { CREDENTIALS, fakeFetch, loginOk } from './fake-server';
+import { CREDENTIALS, fakeFetch, loginOk, type Call } from './fake-server';
 
 const ME = { id: 1, username: 'ash', role: 'user', must_change_password: false };
 
@@ -232,6 +232,166 @@ describe('PokeCollectorClient', () => {
     await expect(client.requestAnonymous('/x', { timeoutMs: 10 })).rejects.toThrow(
       'The server did not answer in time.',
     );
+  });
+});
+
+describe('primary and fallback addresses', () => {
+  const HOME = 'https://home.example.com';
+  const PUBLIC = 'https://pc.example.com';
+  const BOTH = { ...CREDENTIALS, primaryUrl: HOME, fallbackUrl: PUBLIC };
+
+  // A working server at both addresses unless `down` says otherwise.
+  function server(down: { current: Set<string> }) {
+    return fakeFetch((call: Call) => {
+      const host = call.url.startsWith(HOME) ? HOME : PUBLIC;
+      if (down.current.has(host)) throw new TypeError('Network request failed');
+      if (call.url.endsWith('/mode')) return { status: 200, body: { multi_user: true } };
+      if (call.url.endsWith('/login')) return loginOk('t');
+      return { status: 200, body: ME };
+    });
+  }
+
+  const hosts = (calls: Call[]) => calls.map((c) => `${c.method} ${c.url}`);
+
+  it('does not probe when there is only one address', async () => {
+    const { fetch, calls } = server({ current: new Set() });
+    const client = new PokeCollectorClient(CREDENTIALS, fetch);
+    await client.request('/api/auth/me');
+    expect(calls.some((c) => c.url.endsWith('/mode'))).toBe(false);
+    expect(client.activeRoute).toBe('primary');
+  });
+
+  it('prefers the primary when it answers, and remembers the choice', async () => {
+    const { fetch, calls } = server({ current: new Set() });
+    const client = new PokeCollectorClient(BOTH, fetch);
+    await client.request('/api/auth/me');
+    await client.request('/api/auth/me');
+    expect(hosts(calls)).toEqual([
+      `GET ${HOME}/api/auth/mode`,
+      `POST ${HOME}/api/auth/login`,
+      `GET ${HOME}/api/auth/me`,
+      `GET ${HOME}/api/auth/me`,
+    ]);
+    expect(client.activeRoute).toBe('primary');
+    expect(client.activeBaseUrl).toBe(HOME);
+  });
+
+  it('uses the fallback when the primary does not answer', async () => {
+    const { fetch, calls } = server({ current: new Set([HOME]) });
+    const client = new PokeCollectorClient(BOTH, fetch);
+    await expect(client.request('/api/auth/me')).resolves.toEqual(ME);
+    expect(client.activeRoute).toBe('fallback');
+    expect(calls.filter((c) => c.url.startsWith(HOME))).toHaveLength(1);
+  });
+
+  it('gives the primary only a short time to answer the probe', async () => {
+    const seen: number[] = [];
+    const client = new PokeCollectorClient(BOTH, (url, init) => {
+      if (url.startsWith(HOME)) {
+        return new Promise((_resolve, reject) => {
+          const started = Date.now();
+          init.signal.addEventListener('abort', () => {
+            seen.push(Date.now() - started);
+            reject(new Error('aborted'));
+          });
+        });
+      }
+      return server({ current: new Set() }).fetch(url, init);
+    });
+    jest.useFakeTimers();
+    try {
+      const request = client.request('/api/auth/me');
+      await jest.advanceTimersByTimeAsync(PRIMARY_PROBE_TIMEOUT_MS);
+      await expect(request).resolves.toEqual(ME);
+    } finally {
+      jest.useRealTimers();
+    }
+    expect(seen).toEqual([PRIMARY_PROBE_TIMEOUT_MS]);
+    expect(client.activeRoute).toBe('fallback');
+  });
+
+  it('prefers a fallback that works over a primary that answers wrongly', async () => {
+    const { fetch } = fakeFetch((call) => {
+      if (call.url.startsWith(HOME)) {
+        return { status: 200, body: '<html>captive portal</html>', contentType: 'text/html' };
+      }
+      if (call.url.endsWith('/mode')) return { status: 200, body: { multi_user: true } };
+      if (call.url.endsWith('/login')) return loginOk('t');
+      return { status: 200, body: ME };
+    });
+    const client = new PokeCollectorClient(BOTH, fetch);
+    await expect(client.request('/api/auth/me')).resolves.toEqual(ME);
+    expect(client.activeRoute).toBe('fallback');
+  });
+
+  it("surfaces the primary's error when nothing works but the primary answered", async () => {
+    const { fetch } = fakeFetch((call) => {
+      if (call.url.startsWith(HOME)) return { status: 302 };
+      throw new TypeError('Network request failed');
+    });
+    const client = new PokeCollectorClient(BOTH, fetch);
+    await expect(client.request('/api/auth/me')).rejects.toBeInstanceOf(AccessError);
+  });
+
+  it('reports both unreachable as a NetworkError', async () => {
+    const { fetch } = server({ current: new Set([HOME, PUBLIC]) });
+    const client = new PokeCollectorClient(BOTH, fetch);
+    await expect(client.request('/api/auth/me')).rejects.toThrow(
+      'Neither the primary nor the fallback server answered.',
+    );
+  });
+
+  it('switches route and retries a GET when the current address stops answering', async () => {
+    const down = { current: new Set<string>() };
+    const { fetch } = server(down);
+    const client = new PokeCollectorClient(BOTH, fetch);
+    await client.request('/api/auth/me');
+    expect(client.activeRoute).toBe('primary');
+
+    down.current.add(HOME); // left home
+    await expect(client.request('/api/auth/me')).resolves.toEqual(ME);
+    expect(client.activeRoute).toBe('fallback');
+  });
+
+  it('does not retry anything but a GET, but still re-picks for next time', async () => {
+    const down = { current: new Set<string>() };
+    const { fetch, calls } = server(down);
+    const client = new PokeCollectorClient(BOTH, fetch);
+    await client.request('/api/auth/me');
+
+    down.current.add(HOME);
+    await expect(
+      client.request('/api/collection/', { method: 'POST', json: { card_id: 'x' } }),
+    ).rejects.toBeInstanceOf(NetworkError);
+    expect(
+      calls.filter((c) => c.method === 'POST' && c.url.endsWith('/api/collection/')),
+    ).toHaveLength(1);
+    expect(client.activeRoute).toBeNull();
+
+    await client.request('/api/auth/me');
+    expect(client.activeRoute).toBe('fallback');
+  });
+
+  it('probes again after invalidateRoute, and tells listeners', async () => {
+    const down = { current: new Set([HOME]) };
+    const { fetch } = server(down);
+    const client = new PokeCollectorClient(BOTH, fetch);
+    const changes: (string | null)[] = [];
+    client.subscribeToRoute(() => changes.push(client.activeRoute));
+
+    await client.request('/api/auth/me');
+    down.current.clear(); // arrived home
+    client.invalidateRoute();
+    await client.request('/api/auth/me');
+
+    expect(changes).toEqual(['fallback', null, 'primary']);
+  });
+
+  it('shares one probe between concurrent requests', async () => {
+    const { fetch, calls } = server({ current: new Set() });
+    const client = new PokeCollectorClient(BOTH, fetch);
+    await Promise.all([1, 2, 3].map(() => client.request('/api/auth/me')));
+    expect(calls.filter((c) => c.url.endsWith('/mode'))).toHaveLength(1);
   });
 });
 

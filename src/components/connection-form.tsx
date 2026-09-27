@@ -3,12 +3,12 @@
  * pass before anything is saved. Used by onboarding and by Settings.
  */
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import type { ServerCredentials } from '@/api/client';
 import type { User } from '@/api/schemas';
 import { verifyConnection } from '@/api/verify';
-import { normaliseCredentials } from '@/auth/credentials';
+import { normaliseCredentials, toInput, type CredentialsInput } from '@/auth/credentials';
 import { createClient } from '@/session/session';
 import { spacing } from '@/theme';
 
@@ -17,8 +17,9 @@ import { TextField } from './text-field';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-const EMPTY: ServerCredentials = {
-  baseUrl: '',
+const EMPTY: CredentialsInput = {
+  primaryUrl: '',
+  fallbackUrl: '',
   accessClientId: '',
   accessClientSecret: '',
   username: '',
@@ -32,11 +33,11 @@ type Props = {
 };
 
 export function ConnectionForm({ initial, submitTitle, onVerified }: Props) {
-  const [values, setValues] = useState<ServerCredentials>(initial ?? EMPTY);
+  const [values, setValues] = useState<CredentialsInput>(initial ? toInput(initial) : EMPTY);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
 
-  const set = (key: keyof ServerCredentials) => (text: string) =>
+  const set = (key: keyof CredentialsInput) => (text: string) =>
     setValues((current) => ({ ...current, [key]: text }));
 
   async function submit() {
@@ -48,15 +49,21 @@ export function ConnectionForm({ initial, submitTitle, onVerified }: Props) {
     }
     setBusy(true);
     try {
-      const result = await verifyConnection(createClient(normalised.value));
+      const result = await verifyConnection(normalised.value, createClient);
       if (!result.ok) {
+        const where = result.route ? ` (${result.route} address)` : '';
         setError({
           title:
-            result.step === 'access' ? 'Could not get through Cloudflare' : 'Could not sign in',
+            result.step === 'access'
+              ? `Could not get through Cloudflare${where}`
+              : result.step === 'account'
+                ? `Could not sign in${where}`
+                : 'Could not reach the server',
           message: result.message,
         });
         return;
       }
+      if (result.notes.length) Alert.alert('Connected', result.notes.join('\n\n'));
       await onVerified(normalised.value, result.user);
     } finally {
       setBusy(false);
@@ -66,16 +73,26 @@ export function ConnectionForm({ initial, submitTitle, onVerified }: Props) {
   return (
     <View style={styles.form}>
       <TextField
-        label="Server"
+        label="Primary address"
+        hint="Tried first. Usually the one that only works at home, such as a LAN reverse proxy."
+        placeholder="https://pokecollector.home.example"
+        keyboardType="url"
+        textContentType="URL"
+        value={values.primaryUrl}
+        onChangeText={set('primaryUrl')}
+      />
+      <TextField
+        label="Fallback address (optional)"
+        hint="Used whenever the primary does not answer, such as the public Cloudflare hostname."
         placeholder="https://pokecollector.example.com"
         keyboardType="url"
         textContentType="URL"
-        value={values.baseUrl}
-        onChangeText={set('baseUrl')}
+        value={values.fallbackUrl}
+        onChangeText={set('fallbackUrl')}
       />
       <TextField
         label="Service token client ID"
-        hint="From Cloudflare Zero Trust → Access → Service credentials."
+        hint="From Cloudflare Zero Trust → Access → Service credentials. Sent to both addresses; a proxy without Access ignores it."
         value={values.accessClientId}
         onChangeText={set('accessClientId')}
       />

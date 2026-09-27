@@ -1,6 +1,7 @@
 # CLAUDE.md
 
-Context for Claude Code sessions working on this repo.
+Context for Claude Code sessions working on this repo. It is public, and
+licensed under the Unlicense.
 
 ## What this repo is
 
@@ -54,11 +55,13 @@ version map bundled in the `expo` package, which is what it should use anyway.
   validates the fields the app depends on, with loose objects so new upstream
   fields never break it.
 - Screens never call `fetch`. Everything goes through `src/api` and hooks.
-- **Never commit** a service token, username or password, and never build a
-  server URL into the app's code or config. Nothing secret goes in
-  `app.config.ts` or `.env`: the server and credentials are entered on the
-  phone and live in the Keychain. (Hostnames in the docs are fine; they are in
-  public DNS anyway.)
+- **This repository is public.** Never commit a server address or hostname,
+  service token, username or password — not in code, config, tests or docs.
+  Use `example.com` names and placeholders. The primary and fallback addresses
+  and the credentials are entered on the phone and live in the Keychain.
+- Anything that talks to the server takes its origin from the client
+  (`client.activeBaseUrl`), never from the credentials directly: the active
+  address changes between primary and fallback.
 - Be frugal with requests. The backend allows 60 a minute per client IP, and
   every client behind the Cloudflare tunnel shares one IP. Prefer long
   `staleTime`s and the persisted cache, never per-tile requests, and load card

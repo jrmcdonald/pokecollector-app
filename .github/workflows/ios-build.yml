@@ -1,9 +1,12 @@
 # Builds an unsigned IPA for AltStore to sign with a free Apple ID.
 #
-# Manual only. This repository is private, so macOS minutes come out of the
-# account's allowance at ten times the Linux rate, and a build is only needed
-# when native code changes: a new native dependency, an Expo SDK bump, or
-# app.config.ts. JavaScript changes reach the dev build over Metro.
+# Manual only. Standard runners cost nothing on a public repository, but a
+# build is still only needed when native code changes: a new native
+# dependency, an Expo SDK bump, or app.config.ts. JavaScript changes reach the
+# dev build over Metro.
+#
+# Nothing about the server goes into the build. Set the BUNDLE_ID_PREFIX
+# Actions variable to build under your own reverse-DNS prefix.
 name: iOS build
 
 on:
@@ -28,6 +31,7 @@ jobs:
     timeout-minutes: 60
     env:
       APP_VARIANT: ${{ inputs.variant }}
+      BUNDLE_ID_PREFIX: ${{ vars.BUNDLE_ID_PREFIX }}
       EXPO_NO_TELEMETRY: 1
       # The dev client needs Debug for its launcher; production is a Release build.
       CONFIGURATION: ${{ inputs.variant == 'production' && 'Release' || 'Debug' }}

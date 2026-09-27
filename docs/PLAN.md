@@ -65,10 +65,33 @@ Card images: TCGdex CDN directly (the URLs the API returns); /api/images/* only
 for custom cards that have no TCGdex image.
 ```
 
-At home the app can use `pokecollector.home.example` instead, which goes
-through Nginx Proxy Manager with no Access in front. The app sends the Access
-headers either way, and NPM ignores them. That is a later nicety; the external
-name works from everywhere.
+### 2.0 Two addresses: primary and fallback
+
+The same server is usually reachable two ways: a LAN-only name at home
+(through a reverse proxy such as Nginx Proxy Manager, no Access in front) and
+the public hostname behind Cloudflare. The app takes a **primary** address,
+tried first, and an optional **fallback**, both entered on the phone. Nothing
+about either is in the code or config; the repository is public.
+
+- The first request probes `GET /api/auth/mode` on the primary, allowing it
+  3 s (a LAN name away from home often resolves to a private address that
+  hangs rather than refusing). If it answers correctly the primary is used;
+  otherwise the fallback is probed. If neither works, the error from whichever
+  address actually answered is shown, so a rejected service token is not
+  misreported as "unreachable".
+- The choice is remembered until the network changes (NetInfo: connection
+  type or IP address), or the app returns to the foreground while on the
+  fallback, which is when arriving home should switch back. Re-probing is lazy:
+  the next request does it.
+- If the current address stops answering mid-session, the route is dropped and
+  re-probed, and a GET is retried once on the new route. Writes are not
+  retried: the request may have landed before the connection failed.
+- The Access headers go to both addresses; a proxy without Access ignores them.
+  One JWT serves both, since it is the same backend. Each path has its own
+  rate-limit budget, which is a small bonus at home.
+- The connection test checks each address separately. One that does not answer
+  from the current network is accepted, with a note, as long as the other
+  passes; one that answers wrongly is an error.
 
 ### 2.1 What the upstream API gives us, and what it does not
 
@@ -220,10 +243,10 @@ empty app, and neither depends on the screens.
 
   ```sh
   # No headers: Access login redirect, never PokeCollector
-  curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://pokecollector.example.com/api/auth/mode
+  curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' "https://$PUBLIC_HOST/api/auth/mode"
   # Service token: through Access to the origin
   curl -sS -H "CF-Access-Client-Id: $ID" -H "CF-Access-Client-Secret: $SECRET" \
-    https://pokecollector.example.com/api/auth/mode
+    "https://$PUBLIC_HOST/api/auth/mode"
   # {"multi_user":true,"locked":true}
   ```
 
@@ -232,8 +255,9 @@ empty app, and neither depends on the screens.
 - [x] Scaffold with `create-expo-app` (SDK 57, TypeScript), then add every
       dependency from §3.
 - [x] `app.config.ts` with two variants driven by `APP_VARIANT`:
-  - `development` → `io.github.jrmcdonald.pokecollector.dev`, "PokeCollector Dev", dev client
-  - `production` → `io.github.jrmcdonald.pokecollector`, "PokeCollector"
+  - `development` → `<prefix>.pokecollector.dev`, "PokeCollector Dev", dev client
+  - `production` → `<prefix>.pokecollector`, "PokeCollector"
+  - `<prefix>` is `BUNDLE_ID_PREFIX`, defaulting to `io.github.jrmcdonald`
 - [x] Camera usage description (through `expo-camera`'s config plugin).
 - [x] `ci.yml` on every push/PR: lint, typecheck, tests.
 - [x] `ios-build.yml`, manual (`workflow_dispatch`) with a `variant` input:
@@ -247,10 +271,10 @@ empty app, and neither depends on the screens.
      `CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""`
   6. Package `Payload/*.app` into `PokeCollector-<variant>.ipa` and upload it
      as an artifact (short retention)
-- [ ] **Runner minutes:** this repo is private, so macOS minutes are drawn
-      from the account's allowance at a 10× multiplier. A 15–20 minute build costs
-      150–200 minutes. Either make the repo public (nothing secret is in it by
-      design) or build only when native code changes, which is the plan anyway.
+- [x] **Runner minutes:** the repository is public, so standard macOS
+      runners are free. Nothing secret or personal may be committed as a
+      result: no server addresses, tokens or credentials, in code, config or
+      docs.
 
 ### 0.3 Sideload and connect (user, on Windows)
 
@@ -277,7 +301,8 @@ bundle IDs: each new one uses one of the 10 App IDs a week.
 
 ### 6.1 Onboarding and settings
 
-- [x] Onboarding asks for the base URL, the service token's client ID and
+- [x] Onboarding asks for the primary and optional fallback addresses (§2.0),
+      the service token's client ID and
       secret, and a PokeCollector username and password. Manual entry; a QR code
       is not worth it for one phone.
 - [x] Store all of it in `expo-secure-store`. Test in two steps so errors are
@@ -300,8 +325,10 @@ bundle IDs: each new one uses one of the 10 App IDs a week.
 - [x] 429: no automatic retry storm; TanStack Query retries honour
       `retryAfter`, and mutations surface it.
 - [x] Image source helper: `card.images_small` / `images_large` when present
-      (TCGdex CDN, no auth); otherwise `/api/images/card/{id}/small|large` with the
-      Access headers; otherwise a placeholder.
+      (TCGdex CDN, no auth); otherwise `/api/images/card/{id}/small|large` on the
+      active address with the Access headers; otherwise a placeholder.
+- [x] Primary and fallback addresses, chosen by probe and re-chosen on network
+      changes (§2.0). Settings and Home show which is in use.
 
 ### 6.3 Theme and shell
 
@@ -409,9 +436,8 @@ versioned. So:
 
 - Decks, trades and sealed product screens
 - Price history charts and top movers
-- Auto-capture and batch "rip mode" scanning (on the LAN name: the batch body
-  can exceed Cloudflare's 100 MB)
-- LAN-first routing: use `pokecollector.home.example` when it answers
+- Auto-capture and batch "rip mode" scanning (only on the primary address when
+  that is the LAN one: the batch body can exceed Cloudflare's 100 MB)
 - Upstream PRs for API tokens or cursor pagination, if their absence starts to
   hurt
 - Revisit native Swift or a paid Apple account if widgets start to matter

@@ -5,6 +5,7 @@
  * in memory for the session and hands every screen the same client, so the
  * single in-flight login in PokeCollectorClient is actually shared.
  */
+import NetInfo from '@react-native-community/netinfo';
 import { fetch as expoFetch } from 'expo/fetch';
 import {
   createContext,
@@ -13,10 +14,17 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from 'react';
+import { AppState } from 'react-native';
 
-import { PokeCollectorClient, type FetchLike, type ServerCredentials } from '@/api/client';
+import {
+  PokeCollectorClient,
+  type FetchLike,
+  type Route,
+  type ServerCredentials,
+} from '@/api/client';
 import { clearCredentials, loadCredentials, saveCredentials } from '@/auth/credentials';
 
 // expo/fetch rather than React Native's global fetch: the global one is built
@@ -73,6 +81,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSession({ status: 'signedOut' });
   }, []);
 
+  const client = session.status === 'signedIn' ? session.client : null;
+  useEffect(() => (client ? watchNetwork(client) : undefined), [client]);
+
   const value = useMemo(() => ({ session, signIn, signOut }), [session, signIn, signOut]);
   return <SessionContext value={value}>{children}</SessionContext>;
 }
@@ -90,4 +101,41 @@ export function useClient(): PokeCollectorClient {
     throw new Error('useClient called while signed out; the router guard should prevent this');
   }
   return session.client;
+}
+
+/**
+ * Re-picks between the primary and fallback addresses when it might now be
+ * wrong: on any change of network (leaving home Wi-Fi for cellular, or
+ * arriving back), and on returning to the foreground while on the fallback,
+ * in case home came back while the app was suspended. Re-picking is lazy:
+ * the next request probes, so this costs nothing when nothing is fetched.
+ */
+function watchNetwork(client: PokeCollectorClient): () => void {
+  let lastNetwork: string | null = null;
+  const unsubscribeNetInfo = NetInfo.addEventListener((state) => {
+    // Type and address, not the whole details object: signal strength and the
+    // like fluctuate without the route changing.
+    const address = state.details && 'ipAddress' in state.details ? state.details.ipAddress : null;
+    const network = `${state.type}:${state.isConnected}:${address}`;
+    if (lastNetwork !== null && network !== lastNetwork) client.invalidateRoute();
+    lastNetwork = network;
+  });
+  const appState = AppState.addEventListener('change', (next) => {
+    if (next === 'active' && client.activeRoute === 'fallback') client.invalidateRoute();
+  });
+  return () => {
+    unsubscribeNetInfo();
+    appState.remove();
+  };
+}
+
+/** Which address requests are going to, for display. Null until the first request. */
+export function useActiveRoute(): { route: Route | null; url: string | null } {
+  const { session } = useSession();
+  const client = session.status === 'signedIn' ? session.client : null;
+  const route = useSyncExternalStore(
+    (listener) => (client ? client.subscribeToRoute(listener) : () => undefined),
+    () => client?.activeRoute ?? null,
+  );
+  return { route, url: client && route ? client.activeBaseUrl : null };
 }

@@ -10,6 +10,11 @@
  * logins a minute per IP, and behind the tunnel every external client is one
  * IP. Several queries seeing a 401 at once must converge on one login, so each
  * hands back the token it used and only the first to arrive replaces it.
+ *
+ * A server can have two addresses: a primary, tried first (typically the one
+ * that only works on the home network), and a fallback (typically the public
+ * one behind Cloudflare). Both reach the same backend, so one JWT serves both.
+ * See `resolveBaseUrl` for how the client picks between them.
  */
 import type { z } from 'zod';
 
@@ -25,16 +30,20 @@ import {
   ServerError,
   ValidationError,
 } from './errors';
-import { TokenResponseSchema } from './schemas';
+import { AuthModeSchema, TokenResponseSchema } from './schemas';
 
 export interface ServerCredentials {
-  /** Origin only, e.g. https://pokecollector.example.com — no trailing path. */
-  baseUrl: string;
+  /** Origin only, e.g. https://pokecollector.home.example — tried first. */
+  primaryUrl: string;
+  /** Origin only, or null. Used when the primary does not answer. */
+  fallbackUrl: string | null;
   accessClientId: string;
   accessClientSecret: string;
   username: string;
   password: string;
 }
+
+export type Route = 'primary' | 'fallback';
 
 /** The subset of fetch the client uses, so tests can supply their own. */
 export type FetchLike = (
@@ -67,17 +76,49 @@ export interface RequestOptions<T> {
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 
+/**
+ * How long the primary gets to answer a probe before the fallback is tried.
+ * Away from home a LAN-only name often resolves to a private address that
+ * nothing answers, and the connection hangs rather than failing, so this is
+ * what the user waits on when the app starts outside.
+ */
+export const PRIMARY_PROBE_TIMEOUT_MS = 3_000;
+
 export class PokeCollectorClient {
   private token: string | null = null;
   private login: Promise<string> | null = null;
+  private route: Route | null = null;
+  private resolving: Promise<Route> | null = null;
+  private readonly routeListeners = new Set<() => void>();
 
   constructor(
     private readonly credentials: ServerCredentials,
     private readonly fetchImpl: FetchLike,
   ) {}
 
-  get baseUrl(): string {
-    return this.credentials.baseUrl;
+  /** The route in use, or null before the first request has picked one. */
+  get activeRoute(): Route | null {
+    return this.route;
+  }
+
+  /** The origin requests currently go to; the primary until a probe says otherwise. */
+  get activeBaseUrl(): string {
+    return this.urlFor(this.route ?? 'primary');
+  }
+
+  /** Notified whenever the route changes, including to null. */
+  subscribeToRoute(listener: () => void): () => void {
+    this.routeListeners.add(listener);
+    return () => this.routeListeners.delete(listener);
+  }
+
+  /**
+   * Forget the chosen route, so the next request probes again. Called when the
+   * network changes, and when the app returns to the foreground on the
+   * fallback, so arriving home switches back to the primary.
+   */
+  invalidateRoute(): void {
+    this.setRoute(null);
   }
 
   /** The Access headers alone, for image requests that go through the proxy. */
@@ -90,20 +131,114 @@ export class PokeCollectorClient {
 
   /** A request that needs no PokeCollector login, only Access. */
   async requestAnonymous<T>(path: string, options: RequestOptions<T> = {}): Promise<T> {
-    return this.send(path, options, null);
+    return this.onRoute(options, (base) => this.send(base, path, options, null));
   }
 
   async request<T>(path: string, options: RequestOptions<T> = {}): Promise<T> {
-    let token = this.token ?? (await this.authenticate(null));
+    return this.onRoute(options, (base) => this.authenticated(base, path, options));
+  }
+
+  /**
+   * Runs `attempt` against the current route. If the server stops answering
+   * mid-session (the phone left the home network, say), the route is dropped
+   * and re-probed, and a GET is retried once on whatever the probe picks.
+   * Anything else is not retried: the request may have arrived before the
+   * connection failed, and adding a card twice is worse than an error.
+   */
+  private async onRoute<T>(
+    options: RequestOptions<T>,
+    attempt: (base: string) => Promise<T>,
+  ): Promise<T> {
+    const route = await this.resolveRoute();
     try {
-      return await this.send(path, options, token);
+      return await attempt(this.urlFor(route));
+    } catch (error) {
+      if (!(error instanceof NetworkError) || !this.credentials.fallbackUrl) throw error;
+      this.invalidateRoute();
+      if ((options.method ?? 'GET') !== 'GET') throw error;
+      const next = await this.resolveRoute();
+      if (next === route) throw error;
+      return attempt(this.urlFor(next));
+    }
+  }
+
+  private async resolveRoute(): Promise<Route> {
+    if (this.route) return this.route;
+    if (!this.credentials.fallbackUrl) {
+      this.setRoute('primary');
+      return 'primary';
+    }
+    if (!this.resolving) {
+      this.resolving = this.probe().finally(() => {
+        this.resolving = null;
+      });
+    }
+    const route = await this.resolving;
+    this.setRoute(route);
+    return route;
+  }
+
+  /**
+   * Picks a route with the one request that needs neither a login nor any
+   * particular state, GET /api/auth/mode. In order of preference: the primary
+   * if it works, the fallback if it works, then whichever answered at all, so
+   * a real error (a rejected service token, say) reaches the user rather than
+   * being reported as "unreachable".
+   */
+  private async probe(): Promise<Route> {
+    const primary = await this.probeOne('primary', PRIMARY_PROBE_TIMEOUT_MS);
+    if (primary === 'ok') return 'primary';
+    const fallback = await this.probeOne('fallback', DEFAULT_TIMEOUT_MS);
+    if (fallback === 'ok') return 'fallback';
+    if (primary === 'answered') return 'primary';
+    if (fallback === 'answered') return 'fallback';
+    throw new NetworkError('Neither the primary nor the fallback server answered.');
+  }
+
+  private async probeOne(
+    route: Route,
+    timeoutMs: number,
+  ): Promise<'ok' | 'answered' | 'unreachable'> {
+    try {
+      await this.send(
+        this.urlFor(route),
+        '/api/auth/mode',
+        { schema: AuthModeSchema, timeoutMs },
+        null,
+      );
+      return 'ok';
+    } catch (error) {
+      return error instanceof NetworkError ? 'unreachable' : 'answered';
+    }
+  }
+
+  private setRoute(route: Route | null): void {
+    if (route === this.route) return;
+    this.route = route;
+    for (const listener of this.routeListeners) listener();
+  }
+
+  private urlFor(route: Route): string {
+    return route === 'fallback' && this.credentials.fallbackUrl
+      ? this.credentials.fallbackUrl
+      : this.credentials.primaryUrl;
+  }
+
+  private async authenticated<T>(
+    base: string,
+    path: string,
+    options: RequestOptions<T>,
+  ): Promise<T> {
+    let token = this.token ?? (await this.authenticate(base, null));
+    try {
+      return await this.send(base, path, options, token);
     } catch (error) {
       // A 401 on an authenticated call means the JWT is stale: expired, or the
       // backend's signing key changed. Log in once more and retry once.
       if (!(error instanceof AuthError) || error.status !== 401) throw error;
-      token = await this.authenticate(token);
+      token = await this.authenticate(base, token);
       try {
-        return await this.send(path, options, token);
+        return await this.send(base, path, options, token);
       } catch (retryError) {
         if (retryError instanceof AuthError && retryError.status === 401) {
           throw new AuthError(
@@ -121,17 +256,17 @@ export class PokeCollectorClient {
    * A token, replacing `stale` if it is still the current one. Concurrent
    * callers share one in-flight login.
    */
-  private async authenticate(stale: string | null): Promise<string> {
+  private async authenticate(base: string, stale: string | null): Promise<string> {
     if (this.token !== null && this.token !== stale) return this.token;
     if (!this.login) {
-      this.login = this.performLogin().finally(() => {
+      this.login = this.performLogin(base).finally(() => {
         this.login = null;
       });
     }
     return this.login;
   }
 
-  private async performLogin(): Promise<string> {
+  private async performLogin(base: string): Promise<string> {
     const form = new URLSearchParams({
       username: this.credentials.username,
       password: this.credentials.password,
@@ -139,13 +274,11 @@ export class PokeCollectorClient {
     let body: z.infer<typeof TokenResponseSchema>;
     try {
       body = await this.send(
+        base,
         '/api/auth/login',
         { method: 'POST', schema: TokenResponseSchema },
         null,
-        {
-          body: form,
-          contentType: 'application/x-www-form-urlencoded',
-        },
+        { body: form, contentType: 'application/x-www-form-urlencoded' },
       );
     } catch (error) {
       if (error instanceof AuthError) {
@@ -158,6 +291,7 @@ export class PokeCollectorClient {
   }
 
   private async send<T>(
+    base: string,
     path: string,
     options: RequestOptions<T>,
     token: string | null,
@@ -165,6 +299,7 @@ export class PokeCollectorClient {
   ): Promise<T> {
     const method = options.method ?? 'GET';
     const headers: Record<string, string> = {
+      // Sent to both routes. A LAN reverse proxy without Access ignores them.
       ...this.accessHeaders,
       Accept: 'application/json',
     };
@@ -186,7 +321,7 @@ export class PokeCollectorClient {
     let response: ResponseLike;
     let text: string;
     try {
-      response = await this.fetchImpl(buildUrl(this.credentials.baseUrl, path, options.query), {
+      response = await this.fetchImpl(buildUrl(base, path, options.query), {
         method,
         headers,
         body,

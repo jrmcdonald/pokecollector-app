@@ -1,7 +1,9 @@
 {
   "name": "pokecollector-app",
-  "main": "expo-router/entry",
   "version": "1.0.0",
+  "private": true,
+  "license": "Unlicense",
+  "main": "expo-router/entry",
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/netinfo": "12.0.1",
@@ -57,7 +59,6 @@
     "test": "jest",
     "generate:api": "openapi-typescript openapi/pokecollector-1.51.0.json -o src/api/generated.ts && prettier --write src/api/generated.ts"
   },
-  "private": true,
   "overrides": {
     "openapi-typescript": {
       "typescript": "$typescript"

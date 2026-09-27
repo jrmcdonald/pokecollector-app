@@ -29,7 +29,7 @@ const EMPTY: CredentialsInput = {
 type Props = {
   initial?: ServerCredentials;
   submitTitle: string;
-  onVerified(credentials: ServerCredentials, user: User): Promise<void>;
+  onVerified(credentials: ServerCredentials, user: User, token: string | null): Promise<void>;
 };
 
 export function ConnectionForm({ initial, submitTitle, onVerified }: Props) {
@@ -64,7 +64,14 @@ export function ConnectionForm({ initial, submitTitle, onVerified }: Props) {
         return;
       }
       if (result.notes.length) Alert.alert('Connected', result.notes.join('\n\n'));
-      await onVerified(normalised.value, result.user);
+      await onVerified(normalised.value, result.user, result.token);
+    } catch (error) {
+      // The test passed but saving did not: the Keychain write, or clearing
+      // the old cache. Say so rather than leave the button looking finished.
+      setError({
+        title: 'Could not save',
+        message: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setBusy(false);
     }
@@ -92,7 +99,7 @@ export function ConnectionForm({ initial, submitTitle, onVerified }: Props) {
       />
       <TextField
         label="Service token client ID"
-        hint="From Cloudflare Zero Trust → Access → Service credentials. Sent to both addresses; a proxy without Access ignores it."
+        hint="From Cloudflare Zero Trust → Access → Service credentials. Leave both blank if the server has no Access in front. Sent to both addresses; a proxy without Access ignores it."
         value={values.accessClientId}
         onChangeText={set('accessClientId')}
       />

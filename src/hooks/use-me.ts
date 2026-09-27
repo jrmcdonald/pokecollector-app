@@ -4,18 +4,11 @@ import { getMe } from '@/api/endpoints';
 import { useSession } from '@/session/session';
 
 export function useMe() {
-  const { session } = useSession();
-  const signedIn = session.status === 'signedIn';
+  const { session, getClient } = useSession();
+  const cacheId = session.status === 'signedIn' ? session.cacheId : null;
   return useQuery({
-    queryKey: [
-      'me',
-      signedIn ? session.credentials.primaryUrl : null,
-      signedIn ? session.credentials.username : null,
-    ],
-    queryFn: () => {
-      if (!signedIn) throw new Error('Not signed in');
-      return getMe(session.client);
-    },
-    enabled: signedIn,
+    queryKey: [cacheId, 'me'],
+    queryFn: () => getMe(getClient()),
+    enabled: cacheId !== null,
   });
 }

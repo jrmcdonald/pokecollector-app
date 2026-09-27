@@ -13,6 +13,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -25,26 +26,48 @@ import {
   type Route,
   type ServerCredentials,
 } from '@/api/client';
-import { clearCredentials, loadCredentials, saveCredentials } from '@/auth/credentials';
+import {
+  clearCredentials,
+  loadSession,
+  newCacheId,
+  sameAccount,
+  saveSession,
+} from '@/auth/credentials';
 
 // expo/fetch rather than React Native's global fetch: the global one is built
 // on XMLHttpRequest and ignores `redirect: 'manual'`, which is how the client
 // tells an Access login redirect apart from a real response.
 const nativeFetch: FetchLike = (url, init) => expoFetch(url, init);
 
-export function createClient(credentials: ServerCredentials): PokeCollectorClient {
-  return new PokeCollectorClient(credentials, nativeFetch);
+export function createClient(credentials: ServerCredentials, token?: string): PokeCollectorClient {
+  return new PokeCollectorClient(credentials, nativeFetch, { token });
 }
 
 type Session =
   | { status: 'loading' }
   | { status: 'signedOut' }
-  | { status: 'signedIn'; credentials: ServerCredentials; client: PokeCollectorClient };
+  | {
+      status: 'signedIn';
+      credentials: ServerCredentials;
+      client: PokeCollectorClient;
+      /** Opaque, stable per server and account: the root of every query key. */
+      cacheId: string;
+    };
 
 interface SessionContextValue {
   session: Session;
-  /** Saves verified credentials to the Keychain and starts using them. */
-  signIn(credentials: ServerCredentials): Promise<void>;
+  /**
+   * The current client, read at call time. Query functions use this rather
+   * than a client captured at render: TanStack Query swaps in a new queryFn
+   * only after a render, so a refetch started straight after signIn would
+   * otherwise run with the old credentials.
+   */
+  getClient(): PokeCollectorClient;
+  /**
+   * Saves verified credentials to the Keychain and starts using them. Pass
+   * the token the connection test obtained, to save a login.
+   */
+  signIn(credentials: ServerCredentials, token?: string): Promise<void>;
   /** Wipes the Keychain entry. The caller clears cached data. */
   signOut(): Promise<void>;
 }
@@ -53,38 +76,74 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session>({ status: 'loading' });
+  const clientRef = useRef<PokeCollectorClient | null>(null);
+  const sessionRef = useRef<Session>(session);
+
+  const apply = useCallback((next: Session) => {
+    clientRef.current = next.status === 'signedIn' ? next.client : null;
+    sessionRef.current = next;
+    setSession(next);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    loadCredentials()
+    loadSession()
       .catch(() => null)
-      .then((credentials) => {
+      .then((stored) => {
         if (cancelled) return;
-        setSession(
-          credentials
-            ? { status: 'signedIn', credentials, client: createClient(credentials) }
+        apply(
+          stored
+            ? {
+                status: 'signedIn',
+                credentials: stored.credentials,
+                client: createClient(stored.credentials),
+                cacheId: stored.cacheId,
+              }
             : { status: 'signedOut' },
         );
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [apply]);
 
-  const signIn = useCallback(async (credentials: ServerCredentials) => {
-    await saveCredentials(credentials);
-    setSession({ status: 'signedIn', credentials, client: createClient(credentials) });
-  }, []);
+  const signIn = useCallback(
+    async (credentials: ServerCredentials, token?: string) => {
+      const current = sessionRef.current;
+      // Same account on the same server keeps its cached data; anything else
+      // starts a fresh cache.
+      const cacheId =
+        current.status === 'signedIn' && sameAccount(current.credentials, credentials)
+          ? current.cacheId
+          : newCacheId();
+      await saveSession({ credentials, cacheId });
+      apply({
+        status: 'signedIn',
+        credentials,
+        client: createClient(credentials, token),
+        cacheId,
+      });
+    },
+    [apply],
+  );
 
   const signOut = useCallback(async () => {
     await clearCredentials();
-    setSession({ status: 'signedOut' });
+    apply({ status: 'signedOut' });
+  }, [apply]);
+
+  const getClient = useCallback(() => {
+    if (!clientRef.current) throw new Error('Not signed in');
+    return clientRef.current;
   }, []);
 
   const client = session.status === 'signedIn' ? session.client : null;
   useEffect(() => (client ? watchNetwork(client) : undefined), [client]);
 
-  const value = useMemo(() => ({ session, signIn, signOut }), [session, signIn, signOut]);
+  const value = useMemo(
+    () => ({ session, getClient, signIn, signOut }),
+    [session, getClient, signIn, signOut],
+  );
   return <SessionContext value={value}>{children}</SessionContext>;
 }
 
@@ -92,15 +151,6 @@ export function useSession(): SessionContextValue {
   const value = use(SessionContext);
   if (!value) throw new Error('useSession must be used inside SessionProvider');
   return value;
-}
-
-/** The client, for screens that only render when signed in. */
-export function useClient(): PokeCollectorClient {
-  const { session } = useSession();
-  if (session.status !== 'signedIn') {
-    throw new Error('useClient called while signed out; the router guard should prevent this');
-  }
-  return session.client;
 }
 
 /**
@@ -133,9 +183,10 @@ function watchNetwork(client: PokeCollectorClient): () => void {
 export function useActiveRoute(): { route: Route | null; url: string | null } {
   const { session } = useSession();
   const client = session.status === 'signedIn' ? session.client : null;
-  const route = useSyncExternalStore(
-    (listener) => (client ? client.subscribeToRoute(listener) : () => undefined),
-    () => client?.activeRoute ?? null,
+  const subscribe = useCallback(
+    (listener: () => void) => (client ? client.subscribeToRoute(listener) : () => undefined),
+    [client],
   );
+  const route = useSyncExternalStore(subscribe, () => client?.activeRoute ?? null);
   return { route, url: client && route ? client.activeBaseUrl : null };
 }

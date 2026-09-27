@@ -10,7 +10,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import type { ServerCredentials } from '@/api/client';
 
-const KEY = 'pokecollector.credentials.v2';
+const KEY = 'pokecollector.credentials.v3';
 
 const OPTIONS: SecureStore.SecureStoreOptions = {
   // Readable once the phone has been unlocked after boot, so background
@@ -18,20 +18,37 @@ const OPTIONS: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
 };
 
-export async function loadCredentials(): Promise<ServerCredentials | null> {
+/**
+ * What is saved: the credentials, plus an opaque id for this server and
+ * account. Query keys use the id, never the address or username, because the
+ * query cache is persisted to AsyncStorage, which is neither encrypted nor
+ * kept out of backups.
+ */
+export interface StoredSession {
+  credentials: ServerCredentials;
+  cacheId: string;
+}
+
+export async function loadSession(): Promise<StoredSession | null> {
   const raw = await SecureStore.getItemAsync(KEY, OPTIONS);
   if (!raw) return null;
   try {
-    const value = JSON.parse(raw) as Partial<ServerCredentials>;
+    const value = JSON.parse(raw) as {
+      credentials?: Partial<ServerCredentials>;
+      cacheId?: unknown;
+    };
+    const c = value.credentials;
     if (
-      typeof value.primaryUrl === 'string' &&
-      (value.fallbackUrl === null || typeof value.fallbackUrl === 'string') &&
-      typeof value.accessClientId === 'string' &&
-      typeof value.accessClientSecret === 'string' &&
-      typeof value.username === 'string' &&
-      typeof value.password === 'string'
+      c &&
+      typeof value.cacheId === 'string' &&
+      typeof c.primaryUrl === 'string' &&
+      (c.fallbackUrl === null || typeof c.fallbackUrl === 'string') &&
+      typeof c.accessClientId === 'string' &&
+      typeof c.accessClientSecret === 'string' &&
+      typeof c.username === 'string' &&
+      typeof c.password === 'string'
     ) {
-      return value as ServerCredentials;
+      return { credentials: c as ServerCredentials, cacheId: value.cacheId };
     }
   } catch {
     // Fall through: unreadable credentials are no credentials.
@@ -39,12 +56,22 @@ export async function loadCredentials(): Promise<ServerCredentials | null> {
   return null;
 }
 
-export async function saveCredentials(credentials: ServerCredentials): Promise<void> {
-  await SecureStore.setItemAsync(KEY, JSON.stringify(credentials), OPTIONS);
+export async function saveSession(session: StoredSession): Promise<void> {
+  await SecureStore.setItemAsync(KEY, JSON.stringify(session), OPTIONS);
 }
 
 export async function clearCredentials(): Promise<void> {
   await SecureStore.deleteItemAsync(KEY, OPTIONS);
+}
+
+/** Whether two sets of credentials are the same account on the same server. */
+export function sameAccount(a: ServerCredentials, b: ServerCredentials): boolean {
+  return a.primaryUrl === b.primaryUrl && a.username === b.username;
+}
+
+/** A fresh opaque id. Not a secret, only a cache key, so Math.random is enough. */
+export function newCacheId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 /** What the connection form holds: every field as typed, the fallback possibly blank. */
@@ -69,8 +96,13 @@ export function normaliseCredentials(
   const accessClientId = input.accessClientId.trim();
   const accessClientSecret = input.accessClientSecret.trim();
   const username = input.username.trim();
-  if (!accessClientId || !accessClientSecret) {
-    return { ok: false, error: 'Both parts of the Cloudflare service token are required.' };
+  // Optional, for a server without Cloudflare Access in front; but half a
+  // token is always a mistake.
+  if (!accessClientId !== !accessClientSecret) {
+    return {
+      ok: false,
+      error: 'Enter both parts of the Cloudflare service token, or neither.',
+    };
   }
   if (!username || !input.password) {
     return { ok: false, error: 'A PokeCollector username and password are required.' };

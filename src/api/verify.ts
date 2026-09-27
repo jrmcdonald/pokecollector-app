@@ -17,10 +17,12 @@ const VERIFY_TIMEOUT_MS = 8_000;
 
 type Step = 'unreachable' | 'access' | 'account';
 
-type AddressResult = { ok: true; user: User } | { ok: false; step: Step; message: string };
+type AddressResult =
+  { ok: true; user: User; token: string | null } | { ok: false; step: Step; message: string };
 
 export type VerifyResult =
-  | { ok: true; user: User; notes: string[] }
+  /** `token` is the JWT from the test's login, valid on either address, so the app need not log in again. */
+  | { ok: true; user: User; token: string | null; notes: string[] }
   | { ok: false; route: Route | null; step: Step; message: string };
 
 export async function verifyConnection(
@@ -65,7 +67,7 @@ export async function verifyConnection(
         `The ${route} address did not answer from this network. It is saved anyway, ` +
         'and the app will use it whenever it can reach it.',
     );
-  return { ok: true, user: passed[1].user, notes };
+  return { ok: true, user: passed[1].user, token: passed[1].token, notes };
 }
 
 async function verifyAddress(client: PokeCollectorClient): Promise<AddressResult> {
@@ -100,7 +102,7 @@ async function verifyAddress(client: PokeCollectorClient): Promise<AddressResult
           'PokeCollector requires a new password for this account. Change it in the web UI first.',
       };
     }
-    return { ok: true, user };
+    return { ok: true, user, token: client.sessionToken };
   } catch (error) {
     return { ok: false, step: 'account', message: describe(error) };
   }

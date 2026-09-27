@@ -1,4 +1,4 @@
-import { normaliseCredentials, toInput } from '../credentials';
+import { newCacheId, normaliseCredentials, sameAccount, toInput } from '../credentials';
 
 const valid = {
   primaryUrl: ' https://home.example.com/some/path/ ',
@@ -52,9 +52,25 @@ describe('normaliseCredentials', () => {
     });
   });
 
-  it('requires both halves of the service token and the account', () => {
-    expect(normaliseCredentials({ ...valid, accessClientSecret: ' ' }).ok).toBe(false);
+  it('takes both halves of the service token or neither, and requires the account', () => {
+    expect(normaliseCredentials({ ...valid, accessClientSecret: ' ' })).toEqual({
+      ok: false,
+      error: 'Enter both parts of the Cloudflare service token, or neither.',
+    });
+    expect(
+      normaliseCredentials({ ...valid, accessClientId: '', accessClientSecret: '' }),
+    ).toMatchObject({ ok: true, value: { accessClientId: '', accessClientSecret: '' } });
     expect(normaliseCredentials({ ...valid, password: '' }).ok).toBe(false);
+  });
+
+  it('keeps a cache id only for the same account on the same server', () => {
+    const saved = normaliseCredentials(valid);
+    if (!saved.ok) throw new Error('expected valid');
+    const a = saved.value;
+    expect(sameAccount(a, { ...a, password: 'new', accessClientSecret: 'rotated' })).toBe(true);
+    expect(sameAccount(a, { ...a, username: 'misty' })).toBe(false);
+    expect(sameAccount(a, { ...a, primaryUrl: 'https://other.example.com' })).toBe(false);
+    expect(newCacheId()).not.toBe(newCacheId());
   });
 
   it('round-trips saved credentials through the form', () => {

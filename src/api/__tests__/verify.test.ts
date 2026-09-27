@@ -28,7 +28,7 @@ const unreachableAt =
 
 describe('verifyConnection', () => {
   it('passes when Access and the account both work', async () => {
-    expect(await verify(healthy)).toEqual({ ok: true, user: ME, notes: [] });
+    expect(await verify(healthy)).toEqual({ ok: true, user: ME, token: 't', notes: [] });
   });
 
   it('blames Access when the anonymous check is redirected', async () => {
@@ -73,7 +73,7 @@ describe('verifyConnection', () => {
     it('tests both', async () => {
       const { fetch, calls } = fakeFetch(healthy);
       const result = await verifyConnection(both, (c) => new PokeCollectorClient(c, fetch));
-      expect(result).toEqual({ ok: true, user: ME, notes: [] });
+      expect(result).toEqual({ ok: true, user: ME, token: 't', notes: [] });
       expect(calls.some((c) => c.url.startsWith(HOME))).toBe(true);
       expect(calls.some((c) => c.url.startsWith(PUBLIC))).toBe(true);
     });

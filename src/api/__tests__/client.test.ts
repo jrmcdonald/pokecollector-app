@@ -40,6 +40,50 @@ describe('PokeCollectorClient', () => {
     expect(me?.headers.Authorization).toBe('Bearer t1');
   });
 
+  it('never sends or stores cookies', async () => {
+    const { fetch, calls } = fakeFetch(({ url }) =>
+      url.endsWith('/login') ? loginOk('t1') : { status: 200, body: ME },
+    );
+    await new PokeCollectorClient(CREDENTIALS, fetch).request('/api/auth/me');
+    expect(calls.every((c) => c.credentials === 'omit')).toBe(true);
+  });
+
+  it('sends no Access headers when no service token is configured', async () => {
+    const { fetch, calls } = fakeFetch(() => ({ status: 200, body: { multi_user: true } }));
+    const client = new PokeCollectorClient(
+      { ...CREDENTIALS, accessClientId: '', accessClientSecret: '' },
+      fetch,
+    );
+    await client.requestAnonymous('/api/auth/mode');
+    expect(Object.keys(calls[0]?.headers ?? {})).not.toContain('CF-Access-Client-Id');
+    expect(client.accessHeaders).toEqual({});
+  });
+
+  it('uses a token it is given instead of logging in', async () => {
+    const { fetch, calls } = fakeFetch(() => ({ status: 200, body: ME }));
+    const client = new PokeCollectorClient(CREDENTIALS, fetch, { token: 'seeded' });
+    await client.request('/api/auth/me');
+    expect(calls.map((c) => c.url)).toEqual(['https://pc.example.com/api/auth/me']);
+    expect(calls[0]?.headers.Authorization).toBe('Bearer seeded');
+  });
+
+  it('stops trying to log in once the password is rejected', async () => {
+    const { fetch, calls } = fakeFetch(({ url }) =>
+      url.endsWith('/login')
+        ? { status: 401, body: { detail: 'Incorrect username or password' } }
+        : { status: 401, body: { detail: 'expired' } },
+    );
+    // A stale token, as if the password changed after the last login.
+    const client = new PokeCollectorClient(CREDENTIALS, fetch, { token: 'stale' });
+    for (let i = 0; i < 3; i += 1) {
+      await expect(client.request('/api/auth/me')).rejects.toThrow(
+        'PokeCollector rejected the username or password.',
+      );
+    }
+    expect(calls.filter((c) => c.url.endsWith('/login'))).toHaveLength(1);
+    expect(client.sessionToken).toBeNull();
+  });
+
   it('reuses the token across requests', async () => {
     const { fetch, calls } = fakeFetch(({ url }) =>
       url.endsWith('/login') ? loginOk('t1') : { status: 200, body: ME },
@@ -385,6 +429,37 @@ describe('primary and fallback addresses', () => {
     await client.request('/api/auth/me');
 
     expect(changes).toEqual(['fallback', null, 'primary']);
+  });
+
+  it('does not let a probe started before invalidateRoute set the route after it', async () => {
+    let releaseHomeProbe: () => void = () => undefined;
+    let homeUp = true;
+    const { fetch, calls } = fakeFetch(async (call) => {
+      const home = call.url.startsWith(HOME);
+      if (home && call.url.endsWith('/mode') && releaseHomeProbe === noop) {
+        // Hold the first probe until the test says so.
+        await new Promise<void>((resolve) => {
+          releaseHomeProbe = resolve;
+        });
+      }
+      if (home && !homeUp) throw new TypeError('Network request failed');
+      if (call.url.endsWith('/mode')) return { status: 200, body: { multi_user: true } };
+      if (call.url.endsWith('/login')) return loginOk('t');
+      return { status: 200, body: ME };
+    });
+    const noop = releaseHomeProbe;
+    const client = new PokeCollectorClient(BOTH, fetch);
+
+    const first = client.request('/api/auth/me');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // The phone leaves home while the first probe is still out.
+    homeUp = false;
+    client.invalidateRoute();
+    releaseHomeProbe();
+
+    await expect(first).resolves.toEqual(ME);
+    expect(client.activeRoute).toBe('fallback');
+    expect(calls.filter((c) => c.url === `${HOME}/api/auth/mode`)).toHaveLength(2);
   });
 
   it('shares one probe between concurrent requests', async () => {

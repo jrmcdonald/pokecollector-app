@@ -14,6 +14,7 @@ export interface Call {
   method: string;
   headers: Record<string, string>;
   body?: string | FormData;
+  credentials: string;
 }
 
 type Reply = {
@@ -28,7 +29,13 @@ type Reply = {
 export function fakeFetch(route: (call: Call) => Reply | Promise<Reply>) {
   const calls: Call[] = [];
   const fetch: FetchLike = async (url, init) => {
-    const call = { url, method: init.method, headers: init.headers, body: init.body };
+    const call = {
+      url,
+      method: init.method,
+      headers: init.headers,
+      body: init.body,
+      credentials: init.credentials,
+    };
     calls.push(call);
     const reply = await route(call);
     const contentType = reply.contentType ?? (reply.body === undefined ? '' : 'application/json');

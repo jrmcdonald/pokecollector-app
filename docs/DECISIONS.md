@@ -138,3 +138,24 @@ The code is dedicated to the public domain under the Unlicense, with no
 warranty, and the README says plainly that it is vibe coded and unsupported.
 The exception is the OpenAPI spec and the types generated from it, which are
 derived from PokeCollector's AGPL-3.0 source; the README says so.
+
+## 2026-09-27 — No cookies, opaque cache keys, one login per connection test
+
+From the review of the first PR:
+
+- Requests go out with `credentials: 'omit'`. Access answers a service-token
+  request with a `CF_Authorization` cookie, and `expo/fetch` would keep it in
+  the shared cookie store: across launches, past sign-out, and past a revoked
+  token. The headers are sent on every request anyway.
+- Query keys start with an opaque id stored alongside the credentials in the
+  Keychain, never the address or username, because the query cache is
+  persisted to AsyncStorage. The id survives a password or token change and
+  is replaced when the server or account changes.
+- A rejected password latches: the client fails every later request at once
+  rather than trying to log in again, because the five-a-minute login budget
+  is shared with every browser behind the tunnel. Saving new credentials
+  builds a new client.
+- The connection test's JWT is handed to the session, so saving does not log
+  in a second time.
+- The Cloudflare service token is optional (both halves or neither), for a
+  server with no Access in front.

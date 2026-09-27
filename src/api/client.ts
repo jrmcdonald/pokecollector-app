@@ -53,6 +53,7 @@ export type FetchLike = (
     headers: Record<string, string>;
     body?: string | FormData;
     redirect: 'manual';
+    credentials: 'omit';
     signal: AbortSignal;
   },
 ) => Promise<ResponseLike>;
@@ -85,16 +86,34 @@ const DEFAULT_TIMEOUT_MS = 20_000;
 export const PRIMARY_PROBE_TIMEOUT_MS = 3_000;
 
 export class PokeCollectorClient {
-  private token: string | null = null;
+  private token: string | null;
   private login: Promise<string> | null = null;
+  /**
+   * Set when the server rejects the password. Every later request fails with
+   * it at once instead of trying again: upstream allows five logins a minute
+   * per IP, and behind the tunnel that budget is shared with every browser.
+   * Fixing the password in Settings builds a new client, which clears it.
+   */
+  private authFailure: AuthError | null = null;
   private route: Route | null = null;
   private resolving: Promise<Route> | null = null;
+  /** Bumped by invalidateRoute, so a probe started before it cannot set the route after it. */
+  private generation = 0;
   private readonly routeListeners = new Set<() => void>();
 
   constructor(
     private readonly credentials: ServerCredentials,
     private readonly fetchImpl: FetchLike,
-  ) {}
+    /** A token already obtained for these credentials, e.g. by the connection test. */
+    options: { token?: string } = {},
+  ) {
+    this.token = options.token ?? null;
+  }
+
+  /** The current PokeCollector JWT, if signed in. Never persisted by this class. */
+  get sessionToken(): string | null {
+    return this.token;
+  }
 
   /** The route in use, or null before the first request has picked one. */
   get activeRoute(): Route | null {
@@ -118,11 +137,17 @@ export class PokeCollectorClient {
    * fallback, so arriving home switches back to the primary.
    */
   invalidateRoute(): void {
+    this.generation += 1;
+    this.resolving = null;
     this.setRoute(null);
   }
 
-  /** The Access headers alone, for image requests that go through the proxy. */
+  /**
+   * The Access headers alone, for image requests that go through the proxy.
+   * Empty when no service token is configured, for a server without Access.
+   */
   get accessHeaders(): Record<string, string> {
+    if (!this.credentials.accessClientId && !this.credentials.accessClientSecret) return {};
     return {
       'CF-Access-Client-Id': this.credentials.accessClientId,
       'CF-Access-Client-Secret': this.credentials.accessClientSecret,
@@ -168,12 +193,23 @@ export class PokeCollectorClient {
       this.setRoute('primary');
       return 'primary';
     }
+    const generation = this.generation;
     if (!this.resolving) {
-      this.resolving = this.probe().finally(() => {
-        this.resolving = null;
+      const probe: Promise<Route> = this.probe().finally(() => {
+        if (this.resolving === probe) this.resolving = null;
       });
+      this.resolving = probe;
     }
-    const route = await this.resolving;
+    let route: Route;
+    try {
+      route = await this.resolving;
+    } catch (error) {
+      if (generation !== this.generation) return this.resolveRoute();
+      throw error;
+    }
+    // The network changed while this probe ran, so its answer (or failure)
+    // may already be wrong. Follow the probe the invalidation asked for.
+    if (generation !== this.generation) return this.resolveRoute();
     this.setRoute(route);
     return route;
   }
@@ -257,7 +293,10 @@ export class PokeCollectorClient {
    * callers share one in-flight login.
    */
   private async authenticate(base: string, stale: string | null): Promise<string> {
+    if (this.authFailure) throw this.authFailure;
     if (this.token !== null && this.token !== stale) return this.token;
+    // Never hand the rejected token out again, even if the login below fails.
+    if (this.token === stale) this.token = null;
     if (!this.login) {
       this.login = this.performLogin(base).finally(() => {
         this.login = null;
@@ -282,7 +321,11 @@ export class PokeCollectorClient {
       );
     } catch (error) {
       if (error instanceof AuthError) {
-        throw new AuthError('PokeCollector rejected the username or password.', error.status);
+        this.authFailure = new AuthError(
+          'PokeCollector rejected the username or password.',
+          error.status,
+        );
+        throw this.authFailure;
       }
       throw error;
     }
@@ -328,6 +371,10 @@ export class PokeCollectorClient {
         // Access answers a bad service token with a redirect to its login page.
         // Followed, that is a 200 of HTML; not followed, it is unmistakable.
         redirect: 'manual',
+        // No cookies. Access sets CF_Authorization after a service-token
+        // request, and a stored cookie would keep the app in after the token
+        // is revoked, and outlive sign-out. The headers go on every request.
+        credentials: 'omit',
         signal: controller.signal,
       });
       text = await response.text();

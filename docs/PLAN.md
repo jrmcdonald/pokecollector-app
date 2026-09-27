@@ -420,10 +420,10 @@ the top 3 most of the time, and adding it takes 2 taps or fewer after the scan.
 The addon's upstream version moves with Renovate, and the API is not
 versioned. So:
 
-- [ ] `scripts/export-openapi.sh <version>` exports the spec for a given
+- [x] `scripts/export-openapi.sh <version>` exports the spec for a given
       upstream release. It pulls the backend image and calls FastAPI's own
       `app.openapi()`, with no database needed.
-- [ ] `ci.yml` regenerates the TypeScript types from the committed spec and
+- [x] `ci.yml` regenerates the TypeScript types from the committed spec and
       fails if they differ from what is committed.
 - [ ] When the addon's upstream pin moves: export the new spec, commit it, and
       let the type diff show what the app has to handle. Zod at the boundary

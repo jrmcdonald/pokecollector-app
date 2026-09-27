@@ -21,7 +21,7 @@ export default function Onboarding() {
             </ThemedText>
             <ConnectionForm
               submitTitle="Connect"
-              onVerified={(credentials) => signIn(credentials)}
+              onVerified={(credentials, _user, token) => signIn(credentials, token ?? undefined)}
             />
           </ScrollView>
         </KeyboardAvoidingView>

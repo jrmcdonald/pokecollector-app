@@ -6,6 +6,7 @@ import { Button } from '@/components/button';
 import { ConnectionForm } from '@/components/connection-form';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { sameAccount } from '@/auth/credentials';
 import { clearQueryCache } from '@/session/query';
 import { useActiveRoute, useSession } from '@/session/session';
 import { spacing } from '@/theme';
@@ -45,7 +46,7 @@ export default function Settings() {
               variant="secondary"
               onPress={async () => {
                 session.client.invalidateRoute();
-                await queryClient.invalidateQueries({ queryKey: ['me'] });
+                await queryClient.invalidateQueries({ queryKey: [session.cacheId] });
               }}
             />
           ) : null}
@@ -53,12 +54,12 @@ export default function Settings() {
           <ConnectionForm
             initial={session.credentials}
             submitTitle={saved ? 'Saved — test again' : 'Test and save'}
-            onVerified={async (credentials) => {
-              const accountChanged =
-                credentials.primaryUrl !== session.credentials.primaryUrl ||
-                credentials.username !== session.credentials.username;
-              if (accountChanged) await clearQueryCache();
-              await signIn(credentials);
+            onVerified={async (credentials, _user, token) => {
+              // Another account's data has no business staying on disk.
+              if (!sameAccount(credentials, session.credentials)) await clearQueryCache();
+              await signIn(credentials, token ?? undefined);
+              // Safe straight after signIn: queries read the client through
+              // getClient, so these refetch with the new credentials.
               await queryClient.invalidateQueries();
               setSaved(true);
             }}

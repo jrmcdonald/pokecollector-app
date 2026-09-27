@@ -16,7 +16,7 @@ Pinned upstream version: **1.51.0** (match `ha-addons/pokecollector/Dockerfile`)
 | `CF-Access-Client-Secret` | service token secret    | 〃                                                            |
 | `Authorization`           | `Bearer <JWT>`          | PokeCollector's session, except on login and `/api/auth/mode` |
 
-Requests are sent with `redirect: 'manual'` via `expo/fetch`. Access rejects a
+Requests are sent with `redirect: 'manual'` and `credentials: 'omit'` via `expo/fetch`. No cookies: Access sets `CF_Authorization` after a service-token request, and a stored cookie would keep the app in after the token is revoked. Both Access headers are omitted when no service token is configured. Access rejects a
 bad service token with a redirect or an HTML page, never JSON; the client
 treats any non-JSON response other than a 5xx or 429 as an `AccessError`.
 

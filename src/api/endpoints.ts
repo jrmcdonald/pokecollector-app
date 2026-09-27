@@ -1,21 +1,31 @@
 import type { PokeCollectorClient } from './client';
 import {
   AuthModeSchema,
+  BinderCardsSchema,
+  BindersSchema,
   CardSchema,
+  ChecklistSchema,
   CollectionItemSchema,
   CollectionSchema,
   DashboardSchema,
   SearchResponseSchema,
+  SetsSchema,
   UserSchema,
   WishlistItemSchema,
+  WishlistSchema,
   type AuthMode,
+  type Binder,
+  type BinderCards,
   type Card,
+  type CardSet,
+  type Checklist,
   type CollectionItem,
   type Condition,
   type Dashboard,
   type SearchResponse,
   type User,
   type Variant,
+  type WishlistItem,
 } from './schemas';
 
 export function getAuthMode(
@@ -104,4 +114,72 @@ export function addToWishlist(client: PokeCollectorClient, cardId: string): Prom
     json: { card_id: cardId, quantity: 1 },
     schema: WishlistItemSchema,
   });
+}
+
+export function getWishlist(client: PokeCollectorClient): Promise<WishlistItem[]> {
+  return client.request('/api/wishlist/', { schema: WishlistSchema });
+}
+
+export function removeFromWishlist(client: PokeCollectorClient, id: number): Promise<unknown> {
+  return client.request(`/api/wishlist/${id}`, { method: 'DELETE' });
+}
+
+/** Every set in the account's catalogue language, newest first. */
+export function getSets(client: PokeCollectorClient): Promise<CardSet[]> {
+  return client.request('/api/sets/', { schema: SetsSchema });
+}
+
+/**
+ * A set's cards with what this account owns of each. Upstream may fetch the
+ * set from TCGdex the first time, so this can be slow once.
+ */
+export function getSetChecklist(client: PokeCollectorClient, setId: string): Promise<Checklist> {
+  return client.request(`/api/sets/${encodeURIComponent(setId)}/checklist`, {
+    schema: ChecklistSchema,
+    timeoutMs: 60_000,
+  });
+}
+
+/** Binders and decks together; the screens filter decks out. */
+export function getBinders(client: PokeCollectorClient): Promise<Binder[]> {
+  return client.request('/api/binders/', { schema: BindersSchema });
+}
+
+export function getBinderCards(
+  client: PokeCollectorClient,
+  binderId: number,
+): Promise<BinderCards> {
+  return client.request(`/api/binders/${binderId}/cards`, { schema: BinderCardsSchema });
+}
+
+/** Puts one owned copy (an exact collection entry) into a collection binder. */
+export function addCollectionItemToBinder(
+  client: PokeCollectorClient,
+  binderId: number,
+  collectionItemId: number,
+): Promise<unknown> {
+  return client.request(`/api/binders/${binderId}/collection-items`, {
+    method: 'POST',
+    query: { collection_item_id: collectionItemId, quantity: 1 },
+  });
+}
+
+/** Plans a card in a planned ("wishlist") binder, owned or not. */
+export function addCardToPlannedBinder(
+  client: PokeCollectorClient,
+  binderId: number,
+  cardId: string,
+): Promise<unknown> {
+  return client.request(`/api/binders/${binderId}/cards`, {
+    method: 'POST',
+    query: { card_id: cardId, required_quantity: 1 },
+  });
+}
+
+export function removeBinderEntry(
+  client: PokeCollectorClient,
+  binderId: number,
+  binderCardId: number,
+): Promise<unknown> {
+  return client.request(`/api/binders/${binderId}/entries/${binderCardId}`, { method: 'DELETE' });
 }

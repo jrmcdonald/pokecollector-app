@@ -1,5 +1,13 @@
 import { PokeCollectorClient } from '../client';
-import { removeFromCollection, searchCards, updateCollectionItem } from '../endpoints';
+import {
+  addCardToPlannedBinder,
+  addCollectionItemToBinder,
+  removeBinderEntry,
+  removeFromCollection,
+  removeFromWishlist,
+  searchCards,
+  updateCollectionItem,
+} from '../endpoints';
 import { CREDENTIALS, fakeFetch, loginOk } from './fake-server';
 
 describe('endpoints', () => {
@@ -29,5 +37,23 @@ describe('endpoints', () => {
       'DELETE https://pc.example.com/api/collection/7',
     ]);
     expect(calls[1]?.body).toBe('{"quantity":3}');
+  });
+
+  it('sends binder changes as query parameters, the way upstream reads them', async () => {
+    const { fetch, calls } = fakeFetch(({ url }) =>
+      url.endsWith('/login') ? loginOk('t') : { status: 200, body: { message: 'ok' } },
+    );
+    const client = new PokeCollectorClient(CREDENTIALS, fetch);
+    await addCollectionItemToBinder(client, 4, 17);
+    await addCardToPlannedBinder(client, 5, 'sv1-025_en');
+    await removeBinderEntry(client, 4, 90);
+    await removeFromWishlist(client, 3);
+    expect(calls.slice(1).map((c) => `${c.method} ${c.url}`)).toEqual([
+      'POST https://pc.example.com/api/binders/4/collection-items?collection_item_id=17&quantity=1',
+      'POST https://pc.example.com/api/binders/5/cards?card_id=sv1-025_en&required_quantity=1',
+      'DELETE https://pc.example.com/api/binders/4/entries/90',
+      'DELETE https://pc.example.com/api/wishlist/3',
+    ]);
+    expect(calls[1]?.body).toBeUndefined();
   });
 });

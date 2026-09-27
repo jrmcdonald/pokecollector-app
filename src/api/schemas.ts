@@ -149,8 +149,113 @@ export const DashboardSchema = z.looseObject({
 });
 export type Dashboard = z.infer<typeof DashboardSchema>;
 
+// ---------------------------------------------------------------------------
+// Wishlist, sets and binders. Shapes follow upstream 1.51.0's routers
+// (`api/wishlist.py`, `api/sets.py`, `api/binders.py`); the checklist and
+// binder cards are untyped dicts in the spec.
+// ---------------------------------------------------------------------------
+
 export const WishlistItemSchema = z.looseObject({
   id: z.number(),
   card_id: z.string(),
   quantity: z.number(),
+  created_at: z.string().nullish(),
+  card: CardSchema.nullish(),
 });
+export type WishlistItem = z.infer<typeof WishlistItemSchema>;
+
+export const WishlistSchema = z.array(WishlistItemSchema);
+
+/** GET /api/sets/: every visible set, with how many of its cards this account owns. */
+export const SetSchema = z.looseObject({
+  id: z.string(),
+  name: z.string(),
+  series: z.string().nullish(),
+  release_date: z.string().nullish(),
+  total: z.number().nullish(),
+  printed_total: z.number().nullish(),
+  images_symbol: z.string().nullish(),
+  images_logo: z.string().nullish(),
+  abbreviation: z.string().nullish(),
+  lang: z.string().nullish(),
+  owned_count: z.number().nullish(),
+});
+export type CardSet = z.infer<typeof SetSchema>;
+
+export const SetsSchema = z.array(SetSchema);
+
+export const ChecklistCardSchema = CardSchema.extend({
+  owned: z.boolean().nullish(),
+  owned_quantity: z.number().nullish(),
+  wishlisted: z.boolean().nullish(),
+});
+export type ChecklistCard = z.infer<typeof ChecklistCardSchema>;
+
+/** GET /api/sets/{id}/checklist: every card in the set, owned or not, in number order. */
+export const ChecklistSchema = z.looseObject({
+  set: z.looseObject({
+    id: z.string(),
+    name: z.string(),
+    total: z.number().nullish(),
+  }),
+  cards: z.array(ChecklistCardSchema),
+  owned_count: z.number(),
+  total_count: z.number(),
+  progress: z.number().nullish(),
+});
+export type Checklist = z.infer<typeof ChecklistSchema>;
+
+/**
+ * Upstream's binder types. A "collection" binder holds exact collection
+ * entries, so it only ever shows owned cards; a "wishlist" (planned) binder
+ * lists cards to collect, owned or not. Decks share the endpoint and are
+ * left out of the Binders screen.
+ */
+export const DECK_TYPES = ['deck', 'physical_deck'] as const;
+
+export const BinderSchema = z.looseObject({
+  id: z.number(),
+  name: z.string(),
+  description: z.string().nullish(),
+  color: z.string().nullish(),
+  binder_type: z.string().nullish(),
+  card_count: z.number().nullish(),
+  unique_card_count: z.number().nullish(),
+});
+export type Binder = z.infer<typeof BinderSchema>;
+
+export const BindersSchema = z.array(BinderSchema);
+
+export const BinderCardSchema = z.looseObject({
+  /** The catalogue card's id. */
+  id: z.string(),
+  /** This entry's id in the binder, for removing it. */
+  binder_card_id: z.number(),
+  name: z.string(),
+  set_id: z.string().nullish(),
+  set_name: z.string().nullish(),
+  number: z.string().nullish(),
+  rarity: z.string().nullish(),
+  images_small: z.string().nullish(),
+  images_large: z.string().nullish(),
+  price_market: price,
+  owned: z.boolean().nullish(),
+  required_quantity: z.number().nullish(),
+  owned_quantity: z.number().nullish(),
+  missing_quantity: z.number().nullish(),
+  variant: z.string().nullish(),
+  condition: z.string().nullish(),
+});
+export type BinderCard = z.infer<typeof BinderCardSchema>;
+
+export const BinderCardsSchema = z.looseObject({
+  binder: BinderSchema,
+  cards: z.array(BinderCardSchema),
+  owned_count: z.number().nullish(),
+  total_count: z.number().nullish(),
+  missing_count: z.number().nullish(),
+  binder_value: z.number().nullish(),
+  current_value: z.number().nullish(),
+  cost_to_complete: z.number().nullish(),
+});
+export type BinderCards = z.infer<typeof BinderCardsSchema>;

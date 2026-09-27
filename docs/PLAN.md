@@ -360,28 +360,28 @@ a revoked service token.
 - [x] **Search (catalogue):** debounced (≥ 400 ms, given the rate limit),
       `page`/`page_size` infinite scroll, an owned badge computed against the
       cached collection rather than an extra request per tile.
-- [ ] **Sets:** list with a completion bar; the checklist shows owned vs
+- [x] **Sets:** list with a completion bar; the checklist shows owned vs
       missing (missing greyed out) with a "missing only" toggle.
-- [ ] **Binders:** list, then the binder's cards as a grid with owned/missing
+- [x] **Binders:** list, then the binder's cards as a grid with owned/missing
       state. Add a card from its detail screen; remove from the binder view.
-- [ ] **Wishlist:** list with prices and swipe to remove.
+- [x] **Wishlist:** list with prices and swipe to remove.
 
 ### 7.2 Offline and optimistic edits
 
 - [x] Persist the query cache so screens show last-known data offline.
-- [ ] Quantity, wishlist and binder edits update the UI at once and roll back
+- [x] Quantity, wishlist and binder edits update the UI at once and roll back
       with a toast if the request fails.
 - [ ] **Offline writes are out of scope for the MVP.** Edits need a
       connection; the UI disables them offline and says why. Queued offline
       mutations need each one registered with `setMutationDefaults` to survive a
       restart, plus conflict handling, which is not worth it for one user yet.
-- [ ] A small "offline" indicator.
+- [x] A small "offline" indicator.
 
 ### 7.3 UX quality bar
 
 - [ ] Skeleton loaders rather than spinners, pull-to-refresh everywhere.
 - [ ] A useful empty state for every list.
-- [ ] Haptic feedback on quantity change and on adding a card.
+- [x] Haptic feedback on quantity change and on adding a card.
 - [ ] Tap targets 44 pt or larger; Dynamic Type supported sensibly.
 - [ ] Smooth scrolling in 500+ card grids (FlashList, correctly sized images).
 

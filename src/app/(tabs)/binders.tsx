@@ -1,5 +1,83 @@
-import { PlaceholderScreen } from '@/components/placeholder-screen';
+import { FlashList } from '@shopify/flash-list';
+import { router } from 'expo-router';
+import { RefreshControl, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { ListRow } from '@/components/list-row';
+import { EmptyState, ErrorState, ListSkeleton } from '@/components/states';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { useBinders } from '@/hooks/queries';
+import { radius, spacing, useColors } from '@/theme';
+import { binderColor, binderKind, bindersOnly } from '@/utils/binders';
 
 export default function Binders() {
-  return <PlaceholderScreen title="Binders" description="Binders arrive in phase 2." />;
+  const colors = useColors();
+  const binders = useBinders();
+  const list = binders.data ? bindersOnly(binders.data) : null;
+
+  return (
+    <ThemedView style={styles.fill}>
+      <SafeAreaView edges={['top']} style={styles.fill}>
+        <ThemedText variant="title" style={styles.title}>
+          Binders
+        </ThemedText>
+        {list ? (
+          <FlashList
+            data={list}
+            keyExtractor={(b) => String(b.id)}
+            refreshControl={
+              <RefreshControl
+                refreshing={binders.isRefetching}
+                onRefresh={() => binders.refetch()}
+                tintColor={colors.textSecondary}
+              />
+            }
+            renderItem={({ item: binder }) => {
+              const count = binder.card_count ?? 0;
+              return (
+                <ListRow
+                  title={binder.name}
+                  subtitle={`${binderKind(binder)} · ${count === 1 ? '1 card' : `${count} cards`}`}
+                  leading={
+                    <View
+                      style={[
+                        styles.swatch,
+                        {
+                          backgroundColor: binderColor(binder, colors.accent),
+                          borderColor: colors.border,
+                        },
+                      ]}
+                    />
+                  }
+                  onPress={() =>
+                    router.push({
+                      pathname: '/binder/[id]',
+                      params: { id: String(binder.id), name: binder.name },
+                    })
+                  }
+                />
+              );
+            }}
+            ListEmptyComponent={
+              <EmptyState
+                title="No binders yet"
+                message="Create binders in the PokeCollector web UI; they show up here."
+              />
+            }
+          />
+        ) : binders.error ? (
+          <ErrorState error={binders.error} onRetry={() => binders.refetch()} />
+        ) : (
+          <ListSkeleton />
+        )}
+      </SafeAreaView>
+    </ThemedView>
+  );
 }
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  title: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm },
+  swatch: { width: 14, height: 40, borderRadius: radius.sm / 2, borderWidth: 1 },
+});

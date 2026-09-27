@@ -75,6 +75,21 @@ export function GridSkeleton({ columns = 3, rows = 3 }: { columns?: number; rows
   );
 }
 
+/** Grey rows while a list loads. */
+export function ListSkeleton({ rows = 8 }: { rows?: number }) {
+  const colors = useColors();
+  return (
+    <View style={styles.rows} accessibilityLabel="Loading">
+      {Array.from({ length: rows }, (_, i) => (
+        <View key={i} style={styles.rowBlock}>
+          <View style={[styles.line, styles.rowTitle, { backgroundColor: colors.surface }]} />
+          <View style={[styles.line, { backgroundColor: colors.surface }]} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   centered: {
     flex: 1,
@@ -88,4 +103,7 @@ const styles = StyleSheet.create({
   cell: { padding: spacing.xs },
   block: { aspectRatio: CARD_ASPECT, borderRadius: radius.sm },
   line: { height: 10, marginTop: spacing.xs, borderRadius: 4, width: '70%' },
+  rows: { padding: spacing.md, gap: spacing.lg },
+  rowBlock: { gap: spacing.xs },
+  rowTitle: { height: 14, width: '50%' },
 });

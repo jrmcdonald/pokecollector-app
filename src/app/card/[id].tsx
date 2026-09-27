@@ -21,8 +21,10 @@ import { ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
+  useAddToBinder,
   useAddToCollection,
   useAddToWishlist,
+  useBinders,
   useCard,
   useCollection,
   useIsOnline,
@@ -30,7 +32,9 @@ import {
 } from '@/hooks/queries';
 import { useSession } from '@/session/session';
 import { radius, spacing, useColors } from '@/theme';
+import { binderKind, bindersOnly, isPlanned } from '@/utils/binders';
 import { entriesForCard } from '@/utils/collection';
+import { pick } from '@/utils/pick';
 import { cardValue, formatPrice } from '@/utils/pricing';
 
 export default function CardDetail() {
@@ -80,6 +84,7 @@ export default function CardDetail() {
 
           <Owned entries={entries} disabled={!online} />
           <AddCopies card={c} disabled={!online} />
+          <AddToBinder card={c} entries={entries} disabled={!online} />
         </ScrollView>
       ) : card.error ? (
         <ErrorState error={card.error} onRetry={() => card.refetch()} />
@@ -269,6 +274,64 @@ function AddCopies({ card, disabled }: { card: Card; disabled: boolean }) {
         onPress={() => wishlist.mutate(card.id)}
       />
     </View>
+  );
+}
+
+/**
+ * Picks a binder, then, for a collection binder, which owned copy goes in:
+ * those hold exact collection entries, so a card not owned cannot go in one.
+ */
+function AddToBinder({
+  card,
+  entries,
+  disabled,
+}: {
+  card: Card;
+  entries: CollectionItem[];
+  disabled: boolean;
+}) {
+  const binders = useBinders();
+  const add = useAddToBinder();
+  const list = binders.data ? bindersOnly(binders.data) : [];
+  if (binders.data && list.length === 0) return null;
+
+  async function choose() {
+    const binderIndex = await pick(
+      'Add to which binder?',
+      list.map((b) => `${b.name} (${binderKind(b).toLowerCase()})`),
+    );
+    const binder = binderIndex === null ? undefined : list[binderIndex];
+    if (!binder) return;
+    if (isPlanned(binder)) {
+      add.mutate({ binderId: binder.id, cardId: card.id });
+      return;
+    }
+    if (entries.length === 0) {
+      Alert.alert(
+        'Not in your collection',
+        `“${binder.name}” holds cards you own. Add a copy first, or use a planned binder.`,
+      );
+      return;
+    }
+    let entry = entries[0];
+    if (entries.length > 1) {
+      const entryIndex = await pick(
+        'Which copy?',
+        entries.map((e) => `${e.variant ?? 'Normal'}, ${e.condition} (×${e.quantity})`),
+      );
+      entry = entryIndex === null ? undefined : entries[entryIndex];
+    }
+    if (entry) add.mutate({ binderId: binder.id, collectionItemId: entry.id });
+  }
+
+  return (
+    <Button
+      title={add.isSuccess ? 'Added — add to another binder' : 'Add to binder'}
+      variant="secondary"
+      busy={add.isPending || binders.isLoading}
+      disabled={disabled}
+      onPress={choose}
+    />
   );
 }
 

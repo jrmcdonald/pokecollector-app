@@ -1,6 +1,8 @@
 import { DarkTheme, Stack, ThemeProvider, type Theme } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { QueryProvider } from '@/session/query';
 import { SessionProvider, useSession } from '@/session/session';
@@ -24,13 +26,15 @@ export default function RootLayout() {
     },
   };
   return (
-    <ThemeProvider value={navigationTheme}>
-      <SessionProvider>
-        <QueryProvider>
-          <RootStack />
-        </QueryProvider>
-      </SessionProvider>
-    </ThemeProvider>
+    <GestureHandlerRootView style={styles.fill}>
+      <ThemeProvider value={navigationTheme}>
+        <SessionProvider>
+          <QueryProvider>
+            <RootStack />
+          </QueryProvider>
+        </SessionProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -65,6 +69,10 @@ function RootStack() {
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="collection" options={{ title: 'Collection' }} />
         <Stack.Screen name="card/[id]" options={{ title: '' }} />
+        <Stack.Screen name="wishlist" options={{ title: 'Wishlist' }} />
+        <Stack.Screen name="sets" options={{ title: 'Sets' }} />
+        <Stack.Screen name="set/[id]" options={{ title: '' }} />
+        <Stack.Screen name="binder/[id]" options={{ title: '' }} />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
@@ -72,3 +80,7 @@ function RootStack() {
     </Stack>
   );
 }
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+});

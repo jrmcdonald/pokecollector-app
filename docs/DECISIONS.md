@@ -211,3 +211,23 @@ collector's binder, night holo).
   committed (see `PLAN.md` §10).
 - **The address in use moved to Settings.** Home shows only an "Offline"
   marker; which address answered is a detail for Settings.
+
+## 2026-09-27 — Sets, binders and wishlist
+
+- **Sets and Wishlist live under More**, with Settings; Binders keeps its tab.
+  The Sets list defaults to the sets with a card owned, since the catalogue
+  has hundreds.
+- **Only binders, not decks.** Upstream serves decks from the binder
+  endpoints; they have their own rules (real decks allocate copies) and stay
+  in the web UI.
+- **Adding to a binder follows upstream's two kinds.** A collection binder
+  takes one exact owned copy, so the app asks which copy when there are
+  several and refuses when there is none; a planned binder takes the card
+  whether owned or not.
+- **Removing is a gesture with a confirmation or an undo.** Binder cards are
+  removed with a long press and a confirmation; wishlist rows with a swipe,
+  optimistically, restored if the server refuses. VoiceOver gets a "Remove"
+  action on the row.
+- **Every collection change marks sets, checklists and binders stale.** Only
+  the screen on show refetches straight away, so a change costs one or two
+  requests rather than one per cached list.

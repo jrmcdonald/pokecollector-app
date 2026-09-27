@@ -13,19 +13,23 @@ type Props = {
   detail?: string;
   /** Shown as a badge when above zero. */
   quantity?: number;
+  /** Greys the card out: not owned, in a checklist or planned binder. */
+  dimmed?: boolean;
+  onLongPress?(): void;
 };
 
 /** One card in a grid. Opens the card's detail screen. */
-export function CardTile({ card, detail, quantity = 0 }: Props) {
+export function CardTile({ card, detail, quantity = 0, dimmed = false, onLongPress }: Props) {
   const colors = useColors();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${card.name}${quantity > 0 ? `, ${quantity} owned` : ''}`}
+      accessibilityLabel={`${card.name}${quantity > 0 ? `, ${quantity} owned` : dimmed ? ', missing' : ''}`}
       onPress={() => router.push({ pathname: '/card/[id]', params: { id: card.id } })}
+      onLongPress={onLongPress}
       style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
       <View>
-        <CardImage card={card} size="small" />
+        <CardImage card={card} size="small" dimmed={dimmed} />
         {quantity > 0 ? (
           <View
             style={[

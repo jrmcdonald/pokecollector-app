@@ -227,19 +227,19 @@ empty app, and neither depends on the screens.
 
 ### 0.1 Cloudflare (Terraform in `jrmcdonald/cloudflare`)
 
-- [ ] **User, in the dashboard:** create a service token
+- [x] **User, in the dashboard:** create a service token
       `pokecollector-app` (Zero Trust → Access → Service credentials), duration one
       year. Copy the client ID and secret into a password manager; the secret is
       shown once. Send its **token ID** (not the secret) to Claude.
       It stays out of Terraform for the same reason the identity providers do: a
       secret Terraform creates lives in state, and nothing outside CI can read that
       state to hand the secret to a phone.
-- [ ] **Terraform PR:** a `non_identity` policy `PokeCollector app` including
+- [x] **Terraform PR:** a `non_identity` policy `PokeCollector app` including
       only that token, attached to the existing `pokecollector` application as
       precedence 2. Known Emails stays precedence 1, so the web UI is unaffected.
       The plan must show one policy created and one in-place application update,
       nothing else.
-- [ ] Verify:
+- [x] Verify (done from an iPhone: Safari in a private tab for the first, a Shortcuts "Get Contents of URL" action with the two headers for the second):
 
   ```sh
   # No headers: Access login redirect, never PokeCollector

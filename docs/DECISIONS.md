@@ -159,3 +159,20 @@ From the review of the first PR:
   in a second time.
 - The Cloudflare service token is optional (both halves or neither), for a
   server with no Access in front.
+
+## 2026-09-27 — Phase 2 screens: where things live
+
+- **Collection is a screen off Home, not a tab.** The five tabs are Home,
+  Search, Scan, Binders and More, as planned; Home carries the totals and a
+  "Browse your collection" button.
+- **Owned badges in search come from the search response.** Upstream's search
+  results already carry `owned_quantity`, so there is no need to match them
+  against the cached collection.
+- **Card detail reads ownership from the cached collection**, because the
+  card endpoint returns neither ownership nor the set's name. The set name
+  comes from the collection or an earlier search when either has it.
+- **Filters and sort are action sheets** (`ActionSheetIOS`), which need no
+  dependency and suit an iOS-only app.
+- **Quantity changes are optimistic** and roll back with an alert on failure;
+  taking an entry to zero asks first. Adding copies is not optimistic, since
+  upstream decides whether it merges into an existing entry.

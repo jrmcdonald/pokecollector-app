@@ -1,0 +1,49 @@
+import { Image } from 'expo-image';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+
+import { useSession } from '@/session/session';
+import { radius, useColors } from '@/theme';
+import { cardImageSource, type CardImageFields, type ImageSize } from '@/utils/images';
+
+/** A card's printed proportions, 63 × 88 mm. */
+export const CARD_ASPECT = 63 / 88;
+
+type Props = {
+  card: CardImageFields;
+  size: ImageSize;
+  style?: StyleProp<ViewStyle>;
+  /** Dims the image, for cards that are not owned in a checklist view. */
+  dimmed?: boolean;
+};
+
+export function CardImage({ card, size, style, dimmed = false }: Props) {
+  const colors = useColors();
+  const { session } = useSession();
+  const proxy =
+    session.status === 'signedIn'
+      ? { baseUrl: session.client.activeBaseUrl, headers: session.client.accessHeaders }
+      : { baseUrl: '', headers: {} };
+  const source = cardImageSource(card, size, proxy);
+
+  return (
+    <View
+      style={[styles.frame, { backgroundColor: colors.surface }, style]}
+      accessibilityIgnoresInvertColors>
+      {source ? (
+        <Image
+          source={source}
+          style={[StyleSheet.absoluteFill, dimmed && styles.dimmed]}
+          contentFit="contain"
+          transition={120}
+          recyclingKey={card.id}
+          cachePolicy="disk"
+        />
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  frame: { aspectRatio: CARD_ASPECT, borderRadius: radius.sm, overflow: 'hidden' },
+  dimmed: { opacity: 0.35 },
+});

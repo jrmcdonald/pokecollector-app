@@ -39,6 +39,8 @@ function RootStack() {
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="collection" options={{ title: 'Collection' }} />
+        <Stack.Screen name="card/[id]" options={{ title: '', headerBackTitle: 'Back' }} />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />

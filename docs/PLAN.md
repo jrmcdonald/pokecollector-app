@@ -345,15 +345,15 @@ a revoked service token.
 
 ### 7.1 Screens
 
-- [ ] **Home:** total value, card count, unique cards, recent additions and
+- [x] **Home:** total value, card count, unique cards, recent additions and
       quick links (`/api/dashboard/`, `/api/collection/stats/summary`).
-- [ ] **Collection:** grid/list toggle, search, filters (set, rarity, variant)
+- [x] **Collection:** grid/list toggle, search, filters (set, rarity, variant)
       and sort (value, recent, name, set number), all client-side over the cached
       collection. Tapping a card opens its detail.
-- [ ] **Card detail:** large image, set and number, prices, owned entries with
+- [x] **Card detail:** large image, set and number, prices, owned entries with
       a quantity stepper and variant and condition pickers. Buttons for "Add to
       collection", "Add to wishlist" and "Add to binder". Price history can wait.
-- [ ] **Search (catalogue):** debounced (≥ 400 ms, given the rate limit),
+- [x] **Search (catalogue):** debounced (≥ 400 ms, given the rate limit),
       `page`/`page_size` infinite scroll, an owned badge computed against the
       cached collection rather than an extra request per tile.
 - [ ] **Sets:** list with a completion bar; the checklist shows owned vs

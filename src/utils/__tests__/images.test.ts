@@ -1,0 +1,40 @@
+import { cardImageSource } from '../images';
+
+const proxy = { baseUrl: 'https://pc.example.com', headers: { 'CF-Access-Client-Id': 'id' } };
+
+describe('cardImageSource', () => {
+  it('uses the TCGdex URL directly, with no credentials', () => {
+    const card = {
+      id: 'sv1-001_en',
+      images_small: 'https://assets.tcgdex.net/en/sv/sv01/001/low.webp',
+      images_large: 'https://assets.tcgdex.net/en/sv/sv01/001/high.webp',
+    };
+    expect(cardImageSource(card, 'small', proxy)).toEqual({
+      uri: card.images_small,
+      cacheKey: card.images_small,
+    });
+    expect(cardImageSource(card, 'large', proxy)?.uri).toBe(card.images_large);
+  });
+
+  it('falls back to the other size before the proxy', () => {
+    const card = {
+      id: 'x',
+      images_small: null,
+      images_large: 'https://assets.tcgdex.net/x/high.webp',
+    };
+    expect(cardImageSource(card, 'small', proxy)?.uri).toBe(card.images_large);
+  });
+
+  it('sends custom cards through the proxy with the Access headers', () => {
+    const card = { id: 'custom/1', custom_image_url: 'https://example.com/a.png' };
+    expect(cardImageSource(card, 'large', proxy)).toEqual({
+      uri: 'https://pc.example.com/api/images/card/custom%2F1/large',
+      headers: proxy.headers,
+      cacheKey: 'https://pc.example.com/api/images/card/custom%2F1/large',
+    });
+  });
+
+  it('returns null when there is no image at all', () => {
+    expect(cardImageSource({ id: 'x' }, 'small', proxy)).toBeNull();
+  });
+});

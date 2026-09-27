@@ -14,9 +14,11 @@ type Props = {
   style?: StyleProp<ViewStyle>;
   /** Dims the image, for cards that are not owned in a checklist view. */
   dimmed?: boolean;
+  /** The teal "holo" edge. Off for cards that are dimmed or very small. */
+  edge?: boolean;
 };
 
-export function CardImage({ card, size, style, dimmed = false }: Props) {
+export function CardImage({ card, size, style, dimmed = false, edge = !dimmed }: Props) {
   const colors = useColors();
   const { session } = useSession();
   const proxy =
@@ -27,7 +29,12 @@ export function CardImage({ card, size, style, dimmed = false }: Props) {
 
   return (
     <View
-      style={[styles.frame, { backgroundColor: colors.surface }, style]}
+      style={[
+        styles.frame,
+        { backgroundColor: colors.surface },
+        edge && { borderWidth: 1.5, borderColor: colors.holo },
+        style,
+      ]}
       accessibilityIgnoresInvertColors>
       {source ? (
         <Image

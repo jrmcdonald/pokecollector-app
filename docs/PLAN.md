@@ -153,24 +153,24 @@ follows redirects by default, so without care an expired token looks like a
 
 ## 3. Tech stack
 
-| Concern          | Choice                                                                     | Notes                                                                                           |
-| ---------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Framework        | Expo SDK 57, TypeScript strict                                             | `expo-dev-client` for the custom dev build                                                      |
-| Navigation       | `expo-router`                                                              | Tab layout                                                                                      |
-| Server state     | TanStack Query v5                                                          | Cache persisted with `@tanstack/query-async-storage-persister`, so last-seen data works offline |
-| API types        | `openapi-typescript` over the committed spec                               | Generated, never hand-written                                                                   |
-| Validation       | `zod` at the boundary                                                      | For the fields the app relies on; the spec is the fuller description                            |
-| Lists            | `@shopify/flash-list`                                                      | Big card grids                                                                                  |
-| Images           | `expo-image`                                                               | Disk cache; `low.webp` in grids and `high.webp` in detail                                       |
-| Camera           | `expo-camera`                                                              | Shutter capture; version-matched to the SDK. See DECISIONS.md for why not vision-camera         |
-| Image processing | `expo-image-manipulator`                                                   | Crop and resize before upload                                                                   |
-| Secrets          | `expo-secure-store`                                                        | iOS Keychain                                                                                    |
-| Haptics          | `expo-haptics`                                                             |                                                                                                 |
-| Connectivity     | `@react-native-community/netinfo`                                          | Drives TanStack Query's `onlineManager`                                                         |
-| Charts (later)   | `react-native-gifted-charts` + `react-native-svg`                          | Chosen now so its native dependency ships in the first dev build                                |
-| Styling          | `StyleSheet` + a small theme (colors, spacing, type scale), light and dark | No UI kit                                                                                       |
-| Lint/format      | ESLint (`eslint-config-expo`) + Prettier                                   |                                                                                                 |
-| Tests            | Jest (`jest-expo`) + React Native Testing Library                          | API client and logic first                                                                      |
+| Concern          | Choice                                                                | Notes                                                                                           |
+| ---------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Framework        | Expo SDK 57, TypeScript strict                                        | `expo-dev-client` for the custom dev build                                                      |
+| Navigation       | `expo-router`                                                         | Tab layout                                                                                      |
+| Server state     | TanStack Query v5                                                     | Cache persisted with `@tanstack/query-async-storage-persister`, so last-seen data works offline |
+| API types        | `openapi-typescript` over the committed spec                          | Generated, never hand-written                                                                   |
+| Validation       | `zod` at the boundary                                                 | For the fields the app relies on; the spec is the fuller description                            |
+| Lists            | `@shopify/flash-list`                                                 | Big card grids                                                                                  |
+| Images           | `expo-image`                                                          | Disk cache; `low.webp` in grids and `high.webp` in detail                                       |
+| Camera           | `expo-camera`                                                         | Shutter capture; version-matched to the SDK. See DECISIONS.md for why not vision-camera         |
+| Image processing | `expo-image-manipulator`                                              | Crop and resize before upload                                                                   |
+| Secrets          | `expo-secure-store`                                                   | iOS Keychain                                                                                    |
+| Haptics          | `expo-haptics`                                                        |                                                                                                 |
+| Connectivity     | `@react-native-community/netinfo`                                     | Drives TanStack Query's `onlineManager`                                                         |
+| Charts (later)   | `react-native-gifted-charts` + `react-native-svg`                     | Chosen now so its native dependency ships in the first dev build                                |
+| Styling          | `StyleSheet` + a small theme (colors, spacing, type scale), dark only | No UI kit                                                                                       |
+| Lint/format      | ESLint (`eslint-config-expo`) + Prettier                              |                                                                                                 |
+| Tests            | Jest (`jest-expo`) + React Native Testing Library                     | API client and logic first                                                                      |
 
 **Every native module goes into the first dev-client build**, including the
 ones for later phases (camera, svg). Each native change means a CI rebuild and
@@ -330,11 +330,13 @@ bundle IDs: each new one uses one of the 10 App IDs a week.
       (TCGdex CDN, no auth); otherwise `/api/images/card/{id}/small|large` on the
       active address with the Access headers; otherwise a placeholder.
 - [x] Primary and fallback addresses, chosen by probe and re-chosen on network
-      changes (§2.0). Settings and Home show which is in use.
+      changes (§2.0). Settings shows which is in use; Home shows only an
+      "Offline" marker when there is no connection.
 
 ### 6.3 Theme and shell
 
-- [x] Theme (light and dark), base components, tab layout with placeholder
+- [x] Theme (dark only, "Night holo"; see `DECISIONS.md`), base components,
+      tab layout with placeholder
       screens.
 
 **Done when:** a fresh install onboards, survives an app restart, recovers from
@@ -482,6 +484,10 @@ versioned. So:
   that is the LAN one: the batch body can exceed Cloudflare's 100 MB)
 - Upstream PRs for API tokens or cursor pagination, if their absence starts to
   hurt
+- Pokémon artwork for account avatars instead of initials. The sprites and
+  artwork belong to Nintendo, Game Freak and The Pokémon Company, so this
+  public repo must never bundle them; loading them at runtime from a source
+  the user chooses keeps the repo clean, but is still their call to make
 - Revisit native Swift or a paid Apple account if widgets start to matter
 
 ---

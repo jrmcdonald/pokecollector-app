@@ -1,11 +1,17 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
-import { useColors } from '@/theme';
+import { fonts, useColors } from '@/theme';
 
 export default function TabLayout() {
   const colors = useColors();
   return (
-    <NativeTabs tintColor={colors.accent}>
+    <NativeTabs
+      tintColor={colors.accent}
+      iconColor={{ default: colors.textSecondary, selected: colors.accent }}
+      labelStyle={{
+        default: { fontFamily: fonts.medium, color: colors.textSecondary },
+        selected: { fontFamily: fonts.semibold, color: colors.accent },
+      }}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} />

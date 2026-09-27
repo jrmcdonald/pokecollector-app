@@ -59,9 +59,15 @@ export default function CardDetail() {
           <CardImage card={c} size="large" style={styles.image} />
           <View style={styles.heading}>
             <ThemedText variant="title">{c.name}</ThemedText>
-            <ThemedText color="textSecondary">
-              {[setName ?? c.set_id?.toUpperCase(), c.number, c.rarity].filter(Boolean).join(' · ')}
-            </ThemedText>
+            <View style={styles.tags}>
+              {[setName ?? c.set_id?.toUpperCase(), c.number, c.rarity]
+                .filter((t): t is string => !!t)
+                .map((tag, i) => (
+                  <ThemedView key={`${i}-${tag}`} background="surfaceRaised" style={styles.tag}>
+                    <ThemedText variant={i === 1 ? 'figureSmall' : 'caption'}>{tag}</ThemedText>
+                  </ThemedView>
+                ))}
+            </View>
           </View>
 
           <Prices card={c} />
@@ -107,24 +113,45 @@ function useSetName(cardId: string, entries: CollectionItem[]): string | null {
 }
 
 function Prices({ card }: { card: Card }) {
+  const colors = useColors();
   const rows: [string, number | null | undefined][] = [
-    ['Trend', card.price_trend],
     ['Market', card.price_market],
     ['Low', card.price_low],
-    ['30-day average', card.price_avg30],
+    ['30-day', card.price_avg30],
   ];
   if (card.variants_reverse || card.price_trend_holo) {
-    rows.push(['Reverse holo trend', card.price_trend_holo]);
+    rows.push(['Reverse', card.price_trend_holo]);
   }
   return (
-    <ThemedView background="surface" style={styles.panel}>
-      <ThemedText variant="heading">Prices</ThemedText>
-      {rows.map(([label, value]) => (
-        <View key={label} style={styles.priceRow}>
-          <ThemedText color="textSecondary">{label}</ThemedText>
-          <ThemedText>{formatPrice(value)}</ThemedText>
-        </View>
-      ))}
+    <ThemedView background="surface" style={[styles.panel, { borderColor: colors.border }]}>
+      <View
+        style={styles.trend}
+        accessible
+        accessibilityLabel={`Trend price: ${formatPrice(card.price_trend)}`}>
+        <ThemedText variant="overline" color="textSecondary">
+          Trend
+        </ThemedText>
+        <ThemedText variant="figure" style={[styles.trendValue, { color: colors.accent }]}>
+          {formatPrice(card.price_trend)}
+        </ThemedText>
+      </View>
+      <View style={styles.priceTiles}>
+        {rows.map(([label, value]) => (
+          <ThemedView
+            key={label}
+            background="surfaceRaised"
+            style={styles.priceTile}
+            accessible
+            accessibilityLabel={`${label}: ${formatPrice(value)}`}>
+            <ThemedText variant="caption" color="textSecondary">
+              {label}
+            </ThemedText>
+            <ThemedText variant="figureSmall" numberOfLines={1} adjustsFontSizeToFit>
+              {formatPrice(value)}
+            </ThemedText>
+          </ThemedView>
+        ))}
+      </View>
       <ThemedText variant="caption" color="textSecondary">
         Cardmarket, in euros.
       </ThemedText>
@@ -134,6 +161,7 @@ function Prices({ card }: { card: Card }) {
 
 function Owned({ entries, disabled }: { entries: CollectionItem[]; disabled: boolean }) {
   const setQuantity = useSetQuantity();
+  const colors = useColors();
   if (entries.length === 0) return null;
 
   const change = (item: CollectionItem, quantity: number) => {
@@ -152,8 +180,10 @@ function Owned({ entries, disabled }: { entries: CollectionItem[]; disabled: boo
   };
 
   return (
-    <ThemedView background="surface" style={styles.panel}>
-      <ThemedText variant="heading">In your collection</ThemedText>
+    <ThemedView background="surface" style={[styles.panel, { borderColor: colors.border }]}>
+      <ThemedText variant="overline" color="textSecondary">
+        In your collection
+      </ThemedText>
       {entries.map((item) => (
         <View key={item.id} style={styles.ownedRow}>
           <View style={styles.ownedText}>
@@ -195,7 +225,7 @@ function AddCopies({ card, disabled }: { card: Card; disabled: boolean }) {
   const wishlist = useAddToWishlist();
 
   return (
-    <ThemedView background="surface" style={styles.panel}>
+    <View style={styles.add}>
       <ThemedText variant="heading">Add copies</ThemedText>
       <Chips<Variant>
         label="Variant"
@@ -238,17 +268,27 @@ function AddCopies({ card, disabled }: { card: Card; disabled: boolean }) {
         disabled={disabled || wishlist.isSuccess}
         onPress={() => wishlist.mutate(card.id)}
       />
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   content: { padding: spacing.lg, gap: spacing.lg },
-  image: { width: '75%', alignSelf: 'center', borderRadius: radius.md },
-  heading: { gap: spacing.xs },
-  panel: { padding: spacing.md, borderRadius: radius.md, gap: spacing.sm },
-  priceRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  image: { width: '65%', alignSelf: 'center', borderRadius: radius.md, borderWidth: 2 },
+  heading: { gap: spacing.sm },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2 },
+  tag: { borderRadius: radius.sm, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs },
+  panel: { padding: spacing.md, borderRadius: radius.lg - 2, borderWidth: 1, gap: spacing.sm + 4 },
+  add: { gap: spacing.sm + 4 },
+  trend: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+  },
+  trendValue: { fontSize: 30, lineHeight: 36 },
+  priceTiles: { flexDirection: 'row', gap: spacing.sm },
+  priceTile: { flex: 1, borderRadius: radius.sm + 2, padding: spacing.sm, gap: 2 },
   ownedRow: {
     flexDirection: 'row',
     alignItems: 'center',

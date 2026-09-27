@@ -27,18 +27,22 @@ export function CardTile({ card, detail, quantity = 0 }: Props) {
       <View>
         <CardImage card={card} size="small" />
         {quantity > 0 ? (
-          <View style={[styles.badge, { backgroundColor: colors.accent }]}>
-            <ThemedText variant="caption" style={{ color: colors.onAccent, fontWeight: '700' }}>
+          <View
+            style={[
+              styles.badge,
+              { backgroundColor: colors.background, borderColor: colors.holo },
+            ]}>
+            <ThemedText variant="figureSmall" style={styles.badgeText}>
               ×{quantity}
             </ThemedText>
           </View>
         ) : null}
       </View>
-      <ThemedText variant="caption" numberOfLines={1} style={styles.name}>
+      <ThemedText variant="label" numberOfLines={1} style={styles.name}>
         {card.name}
       </ThemedText>
       {detail ? (
-        <ThemedText variant="caption" color="textSecondary" numberOfLines={1}>
+        <ThemedText variant="figureSmall" color="textSecondary" numberOfLines={1}>
           {detail}
         </ThemedText>
       ) : null}
@@ -49,13 +53,14 @@ export function CardTile({ card, detail, quantity = 0 }: Props) {
 const styles = StyleSheet.create({
   tile: { flex: 1, padding: spacing.xs },
   pressed: { opacity: 0.7 },
-  name: { marginTop: spacing.xs, fontWeight: '600' },
+  name: { marginTop: spacing.sm },
   badge: {
     position: 'absolute',
-    top: spacing.xs,
-    right: spacing.xs,
+    bottom: -spacing.sm,
+    right: spacing.sm,
     borderRadius: radius.sm,
+    borderWidth: 1,
     paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 1,
   },
+  badgeText: { fontSize: 11, lineHeight: 16 },
 });

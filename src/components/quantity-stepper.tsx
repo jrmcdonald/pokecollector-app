@@ -49,7 +49,7 @@ export function QuantityStepper({
   return (
     <View style={styles.row} accessibilityLabel={`${label}: ${value}`}>
       {button('−', -1, value - 1 <= 0 && min === 0 ? 'Remove one of' : 'Decrease', value <= min)}
-      <ThemedText variant="heading" style={styles.value}>
+      <ThemedText variant="figure" style={styles.value}>
         {value}
       </ThemedText>
       {button('+', 1, 'Increase', value >= max)}

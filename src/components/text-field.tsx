@@ -41,8 +41,8 @@ const styles = StyleSheet.create({
   container: { gap: spacing.xs },
   input: {
     height: minTapTarget,
-    borderRadius: radius.sm,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.md,
+    borderWidth: 1,
     paddingHorizontal: spacing.sm + 4,
   },
 });

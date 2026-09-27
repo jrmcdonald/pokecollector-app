@@ -186,3 +186,28 @@ the case that exists, and it keeps the addresses, service token and route
 choice single. Each account gets its own client and token, logging in lazily,
 and switching relies on the per-account cache IDs already in place, so it
 costs no requests for cached screens.
+
+## 2026-09-27 — The "Night holo" look, dark only
+
+Chosen from three directions mocked up in Claude Design (clean native,
+collector's binder, night holo).
+
+- **Dark only.** `Appearance.setColorScheme('dark')` at launch makes the native
+  headers, tab bar, alerts and keyboards dark whatever the phone is set to. It
+  is a JavaScript call, so the change needs no native build; the splash
+  screen's colors, which are native, stay as they are until the next build
+  touches `app.config.ts`.
+- **Colors:** near-black background, two raised surfaces, a yellow accent with
+  dark text on it, and a teal "holo" edge on card art.
+- **Fonts:** Space Grotesk for text and JetBrains Mono for prices, counts and
+  collector numbers, both under the SIL Open Font License, from the
+  `@expo-google-fonts` packages. They load at runtime from the bundle with
+  `useFonts`, one file per weight, and each weight is its own family name, so
+  styles set `fontFamily` and never `fontWeight`. A failed load falls back to
+  the system font rather than holding the splash screen.
+- **Avatars are initials.** The account's picture is the first letter of its
+  name on the accent color. Pokémon artwork is a possible later option, but it
+  is not ours to redistribute, so it would be loaded at runtime and never
+  committed (see `PLAN.md` §10).
+- **The address in use moved to Settings.** Home shows only an "Offline"
+  marker; which address answered is a detail for Settings.

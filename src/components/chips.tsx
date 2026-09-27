@@ -60,8 +60,8 @@ const styles = StyleSheet.create({
   chip: {
     minHeight: minTapTarget - 8,
     paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.sm + 2,
+    borderWidth: 1,
     justifyContent: 'center',
   },
 });

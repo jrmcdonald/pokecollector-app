@@ -110,7 +110,7 @@ export default function Collection() {
           />
         </View>
         {items ? (
-          <ThemedText variant="caption" color="textSecondary">
+          <ThemedText variant="figureSmall" color="textSecondary">
             {filtered ? `${shown.length} of ${items.length} entries` : `${items.length} entries`}
           </ThemedText>
         ) : null}
@@ -216,8 +216,8 @@ function CollectionRow({ item }: { item: CollectionItem }) {
         </ThemedText>
       </View>
       <View style={styles.rowRight}>
-        <ThemedText variant="label">×{item.quantity}</ThemedText>
-        <ThemedText variant="caption" color="textSecondary">
+        <ThemedText variant="figureSmall">×{item.quantity}</ThemedText>
+        <ThemedText variant="figureSmall" color="textSecondary">
           {formatPrice(value * item.quantity)}
         </ThemedText>
       </View>
@@ -233,8 +233,8 @@ const styles = StyleSheet.create({
     minHeight: minTapTarget - 8,
     maxWidth: '48%',
     paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.sm + 2,
+    borderWidth: 1,
     justifyContent: 'center',
   },
   list: { padding: spacing.sm },

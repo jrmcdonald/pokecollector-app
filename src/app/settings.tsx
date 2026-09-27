@@ -1,21 +1,25 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet } from 'react-native';
+import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
 
+import { Avatar } from '@/components/avatar';
 import { Button } from '@/components/button';
 import { ConnectionForm } from '@/components/connection-form';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { sameAccount } from '@/auth/credentials';
+import { useMe } from '@/hooks/use-me';
 import { clearQueryCache } from '@/session/query';
 import { useActiveRoute, useSession } from '@/session/session';
-import { spacing } from '@/theme';
+import { radius, spacing, useColors } from '@/theme';
 
 export default function Settings() {
   const { session, signIn, signOut } = useSession();
   const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
   const { route, url } = useActiveRoute();
+  const me = useMe();
+  const colors = useColors();
   if (session.status !== 'signedIn') return null;
 
   function confirmSignOut() {
@@ -36,10 +40,42 @@ export default function Settings() {
     <ThemedView style={styles.fill}>
       <KeyboardAvoidingView behavior="padding" style={styles.fill}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <View style={styles.account}>
+            <Avatar name={me.data?.username ?? session.credentials.username} size={48} />
+            <View style={styles.accountText}>
+              <ThemedText variant="heading" numberOfLines={1}>
+                {me.data?.username ?? session.credentials.username}
+              </ThemedText>
+              <ThemedText variant="caption" color="textSecondary">
+                Signed in
+              </ThemedText>
+            </View>
+          </View>
+
           <ThemedText variant="heading">Connection</ThemedText>
-          <ThemedText>
-            {route && url ? `Using the ${route} address, ${url}.` : 'Not connected yet.'}
-          </ThemedText>
+          <ThemedView
+            background="surface"
+            style={[styles.panel, { borderColor: colors.border }]}
+            accessible
+            accessibilityLabel={
+              route && url ? `Using the ${route} address, ${url}` : 'Not connected yet'
+            }>
+            <ThemedText variant="overline" color="textSecondary">
+              Address in use
+            </ThemedText>
+            {route && url ? (
+              <>
+                <ThemedText variant="label">
+                  {route === 'primary' ? 'Primary' : 'Fallback'}
+                </ThemedText>
+                <ThemedText variant="figureSmall" color="textSecondary" numberOfLines={1}>
+                  {url}
+                </ThemedText>
+              </>
+            ) : (
+              <ThemedText>Not connected yet.</ThemedText>
+            )}
+          </ThemedView>
           {session.credentials.fallbackUrl ? (
             <Button
               title="Re-check which address to use"
@@ -84,4 +120,7 @@ export default function Settings() {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   content: { padding: spacing.lg, gap: spacing.md },
+  account: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  accountText: { flex: 1, gap: 2 },
+  panel: { borderWidth: 1, borderRadius: radius.md, padding: spacing.md, gap: 2 },
 });

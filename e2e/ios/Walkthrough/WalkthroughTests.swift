@@ -269,10 +269,43 @@ final class WalkthroughTests: XCTestCase {
     element.tap()
   }
 
+  /// Types into a field and checks it took. On a fresh simulator the first
+  /// characters can be lost while the keyboard is still appearing (one run
+  /// typed "halhost:8443" for "https://localhost:8443"), so it waits for the
+  /// keyboard, and retypes a character at a time if the value is wrong. A
+  /// secure field's value cannot be read back; it is typed slowly from the
+  /// start.
   private func type(_ text: String, into field: XCUIElement) {
-    tap(field)
+    let secure = field.elementType == .secureTextField
+    for attempt in 1...3 {
+      tap(field)
+      _ = app.keyboards.firstMatch.waitForExistence(timeout: 5)
+      clear(field)
+      if attempt == 1 && !secure {
+        field.typeText(text)
+      } else {
+        for character in text {
+          field.typeText(String(character))
+          Thread.sleep(forTimeInterval: 0.05)
+        }
+      }
+      if secure || (field.value as? String) == text { break }
+      if attempt == 3 {
+        diagnose("Typing into \(field) gave \(field.value ?? "nothing")")
+        XCTFail("Could not type into \(field)")
+      }
+    }
     // Return closes the keyboard, so it cannot cover the next field.
-    field.typeText(text + "\n")
+    field.typeText("\n")
+  }
+
+  /// Deletes what a field holds. An empty field reports its placeholder as
+  /// its value, which is left alone.
+  private func clear(_ field: XCUIElement) {
+    guard let current = field.value as? String, !current.isEmpty,
+      current != field.placeholderValue
+    else { return }
+    field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
   }
 
   private func tab(_ name: String) {

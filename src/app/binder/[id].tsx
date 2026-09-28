@@ -84,7 +84,7 @@ export default function BinderDetail() {
                   Take out of binder
                 </Link.MenuAction>
               }
-              accessibilityActions={[
+              actions={[
                 {
                   name: 'remove',
                   label: 'Take out of binder',

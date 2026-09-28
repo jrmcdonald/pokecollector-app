@@ -127,7 +127,9 @@ export default function Settings() {
           <ListRow
             title="Server and login"
             subtitle={
-              route ? `Using the ${route === 'primary' ? 'primary' : 'fallback'} address` : undefined
+              route
+                ? `Using the ${route === 'primary' ? 'primary' : 'fallback'} address`
+                : undefined
             }
             onPress={() => router.push('/connection')}
           />

@@ -514,12 +514,16 @@ that keep it there. In order:
 - [x] **Automated checks that run in CI:** a WCAG 2.2 AA contrast test over
       the theme, accessibility lint, and component tests that find controls
       by role and accessible name.
-- [ ] **The review** against Apple's Human Interface Guidelines, WCAG 2.2 AA
+- [x] **The review** against Apple's Human Interface Guidelines, WCAG 2.2 AA
       (with the W3C's guidance on applying it to mobile apps), Apple's
       Accessibility Nutrition Labels criteria (VoiceOver, Voice Control,
       Larger Text, Dark Interface, Differentiate Without Color, Sufficient
       Contrast, Reduced Motion) and the BBC Mobile Accessibility Guidelines.
-      Findings ranked by severity, with screenshots.
+      Findings ranked by severity, with screenshots. All fixed but one; see
+      `DECISIONS.md`, "Design review fixes".
+- [ ] **Larger Text**, left from the review: check every screen at the
+      largest Dynamic Type sizes and replace the fixed heights that clip.
+      Best done with the screenshot tests below.
 - [ ] **Screenshot tests on the iOS simulator**, once the review has settled
       what the screens should look like: a macOS CI job builds for the
       simulator, runs the app against a fake server with made-up data, walks

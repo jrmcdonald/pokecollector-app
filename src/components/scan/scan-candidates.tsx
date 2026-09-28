@@ -69,7 +69,9 @@ export function ScanCandidates({
               {numberMatches ? (
                 <View style={[styles.matchMark, { backgroundColor: colors.success }]}>
                   <Icon name="checkmark" size={10} color="onAccent" weight="bold" />
-                  <ThemedText variant="caption" style={[styles.matchText, { color: colors.onAccent }]}>
+                  <ThemedText
+                    variant="caption"
+                    style={[styles.matchText, { color: colors.onAccent }]}>
                     Matches {readNumber}
                   </ThemedText>
                 </View>

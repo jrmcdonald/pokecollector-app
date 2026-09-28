@@ -255,9 +255,7 @@ function CollectionRow({ item }: { item: CollectionItem }) {
         </ThemedText>
       </View>
       <View style={styles.rowRight}>
-        {item.quantity > 1 ? (
-          <ThemedText variant="figureSmall">×{item.quantity}</ThemedText>
-        ) : null}
+        {item.quantity > 1 ? <ThemedText variant="figureSmall">×{item.quantity}</ThemedText> : null}
         <ThemedText variant="figureSmall" color="textSecondary">
           {formatPrice(value * item.quantity)}
         </ThemedText>

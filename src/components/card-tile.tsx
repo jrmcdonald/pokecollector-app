@@ -25,7 +25,7 @@ type Props = {
    * elements, and the same actions for VoiceOver's Actions rotor.
    */
   menu?: ReactNode;
-  accessibilityActions?: { name: string; label: string; onAction(): void }[];
+  actions?: { name: string; label: string; onAction(): void }[];
 };
 
 /** One card in a grid. Opens the card's detail screen. */
@@ -37,7 +37,7 @@ export function CardTile({
   variant,
   photoItemId,
   menu,
-  accessibilityActions = [],
+  actions = [],
 }: Props) {
   const colors = useColors();
   const href = { pathname: '/card/[id]', params: { id: card.id } } as const;
@@ -47,9 +47,9 @@ export function CardTile({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityActions={accessibilityActions.map(({ name, label: l }) => ({ name, label: l }))}
+      accessibilityActions={actions.map(({ name, label: l }) => ({ name, label: l }))}
       onAccessibilityAction={(event: AccessibilityActionEvent) =>
-        accessibilityActions.find((a) => a.name === event.nativeEvent.actionName)?.onAction()
+        actions.find((a) => a.name === event.nativeEvent.actionName)?.onAction()
       }
       // Inside a Link the Link supplies onPress; on its own the tile navigates.
       onPress={menu ? undefined : () => router.push(href)}

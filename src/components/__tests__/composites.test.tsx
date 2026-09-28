@@ -94,7 +94,7 @@ describe('CardTile', () => {
     await render(
       <CardTile
         card={card}
-        accessibilityActions={[{ name: 'remove', label: 'Take out of binder', onAction }]}
+        actions={[{ name: 'remove', label: 'Take out of binder', onAction }]}
       />,
     );
     const tile = screen.getByRole('button', { name: 'Pikachu' });
@@ -108,7 +108,9 @@ describe('CardTile', () => {
 
 describe('ListRow kinds', () => {
   it('names a row by its title and subtitle when given no label', async () => {
-    await render(<ListRow title="Clear cached data" subtitle="Refetch" kind="action" onPress={jest.fn()} />);
+    await render(
+      <ListRow title="Clear cached data" subtitle="Refetch" kind="action" onPress={jest.fn()} />,
+    );
     expect(screen.getByRole('button', { name: 'Clear cached data, Refetch' })).toBeOnTheScreen();
   });
 

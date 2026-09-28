@@ -36,10 +36,11 @@ final class WalkthroughTests: XCTestCase {
     app = XCUIApplication(bundleIdentifier: bundleId)
     outputDir = URL(fileURLWithPath: output, isDirectory: true)
     try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
+    try "screen\ttype\tissue\telement\tframe\n"
+      .write(to: auditFile, atomically: true, encoding: .utf8)
   }
 
   func testWalkthrough() throws {
-    defer { reportFindings() }
     app.launch()
     signIn()
 
@@ -66,8 +67,7 @@ final class WalkthroughTests: XCTestCase {
     let field = app.textFields["Search the catalogue"]
     wait(for: field, "Search")
     capture("search")
-    tap(field)
-    field.typeText("pika\n")
+    type("pika", into: field)
     wait(for: button(startingWith: "Pikachu"), "Search results")
     capture("search-results")
 
@@ -109,6 +109,10 @@ final class WalkthroughTests: XCTestCase {
     tap(button(startingWith: "Server and login"))
     wait(for: element(startingWith: "Using the"), "Server and login")
     capture("connection")
+
+    if !findings.isEmpty {
+      XCTFail("The accessibility audit found \(findings.count) issues; see audit.tsv")
+    }
   }
 
   // MARK: - Steps
@@ -138,6 +142,9 @@ final class WalkthroughTests: XCTestCase {
       diagnose("Onboarding did not finish")
       XCTFail("Onboarding did not finish")
     }
+    // iOS offers to save the password a moment after the app has moved on,
+    // over the top of it.
+    if app.buttons["Not Now"].waitForExistence(timeout: 8) { dismissSystemSheets() }
   }
 
   /// Sheets iOS shows on a fresh simulator that cover the app: the offer to
@@ -193,26 +200,30 @@ final class WalkthroughTests: XCTestCase {
           .compactMap { $0 }
           .first { !$0.isEmpty } ?? "(no label)"
         let frame = element.map { String(describing: $0.frame) } ?? ""
-        self.findings.append(
-          [screen, Self.name(of: issue.auditType), issue.compactDescription, label, frame]
-            .map { $0.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " ") }
-            .joined(separator: "\t"))
+        self.record([screen, Self.name(of: issue.auditType), issue.compactDescription, label, frame])
         return true
       }
     } catch {
-      findings.append([screen, "error", "\(error)", "", ""].joined(separator: "\t"))
+      record([screen, "error", "\(error)", "", ""])
     }
   }
 
-  private func reportFindings() {
-    let lines = ["screen\ttype\tissue\telement\tframe"] + findings
-    try? (lines.joined(separator: "\n") + "\n")
-      .write(to: outputDir.appendingPathComponent("audit.tsv"), atomically: true, encoding: .utf8)
-    for finding in findings { print("AUDIT\t\(finding)") }
-    if !findings.isEmpty {
-      XCTFail("The accessibility audit found \(findings.count) issues; see audit.tsv")
+  /// Writes a finding out at once: a step that fails later ends the test
+  /// there, and what was found up to then should not be lost with it.
+  private func record(_ fields: [String]) {
+    let line = fields
+      .map { $0.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " ") }
+      .joined(separator: "\t")
+    findings.append(line)
+    print("AUDIT\t\(line)")
+    if let handle = try? FileHandle(forWritingTo: auditFile) {
+      handle.seekToEndOfFile()
+      handle.write(Data((line + "\n").utf8))
+      try? handle.close()
     }
   }
+
+  private var auditFile: URL { outputDir.appendingPathComponent("audit.tsv") }
 
   private static func name(of type: XCUIAccessibilityAuditType) -> String {
     let names: [(XCUIAccessibilityAuditType, String)] = [
@@ -258,6 +269,7 @@ final class WalkthroughTests: XCTestCase {
     dismissSystemSheets()
     var swipes = 0
     while !element.isHittable, swipes < 6 {
+      dismissSystemSheets()
       app.swipeUp(velocity: .slow)
       swipes += 1
     }

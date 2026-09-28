@@ -30,8 +30,11 @@ again, commits that run's default-size screenshots to `screenshots/` on the
 branch, and removes the label. On a branch without a pull request, run the
 workflow by hand with **approve** ticked.
 
-A push made by the workflow does not start other workflows, so push again (or
-re-run CI) before merging.
+A push made by the workflow does not start other workflows, so the approving
+commit has no checks of its own. The next push to the branch runs them, and
+its Simulator run is the first to compare against the new screenshots. Push
+before merging. Re-running an earlier run does not help: it runs again on the
+commit it ran on before.
 
 The approved screenshots belong to one simulator model and iOS version,
 recorded in `screenshots/device.txt`. When the runner's newest model changes,

@@ -1,4 +1,4 @@
-import { cardImageSource } from '../images';
+import { avatarImageSource, cardImageSource } from '../images';
 
 const proxy = { baseUrl: 'https://pc.example.com', headers: { 'CF-Access-Client-Id': 'id' } };
 
@@ -36,5 +36,22 @@ describe('cardImageSource', () => {
 
   it('returns null when there is no image at all', () => {
     expect(cardImageSource({ id: 'x' }, 'small', proxy)).toBeNull();
+  });
+});
+
+describe('avatarImageSource', () => {
+  it("uses the server's cached artwork with the Access headers and an address-free cache key", () => {
+    expect(avatarImageSource(25, proxy)).toEqual({
+      uri: 'https://pc.example.com/api/pokedex/images/artwork/25.png',
+      headers: proxy.headers,
+      cacheKey: 'pokedex-artwork-25',
+    });
+  });
+
+  it('has nothing for no avatar or one out of range', () => {
+    expect(avatarImageSource(null, proxy)).toBeNull();
+    expect(avatarImageSource(0, proxy)).toBeNull();
+    expect(avatarImageSource(152, proxy)).toBeNull();
+    expect(avatarImageSource(25, { baseUrl: '', headers: {} })).toBeNull();
   });
 });

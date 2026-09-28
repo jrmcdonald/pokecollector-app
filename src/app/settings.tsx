@@ -9,6 +9,7 @@ import { ConnectionForm } from '@/components/connection-form';
 import { ListRow } from '@/components/list-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import type { User } from '@/api/schemas';
 import { sameAccount } from '@/auth/credentials';
 import { useMe } from '@/hooks/use-me';
 import { clearQueryCache } from '@/session/query';
@@ -94,13 +95,17 @@ export default function Settings() {
             {accounts.map((account) => {
               const current = account.id === cacheId;
               const name = current ? (me.data?.username ?? account.username) : account.username;
+              // Another account's avatar is known if it was used on this phone before.
+              const avatarId = current
+                ? me.data?.avatar_id
+                : queryClient.getQueryData<User>([account.id, 'me'])?.avatar_id;
               return (
                 <ListRow
                   key={account.id}
                   title={name}
                   subtitle={current ? 'Current account' : 'Tap to switch or remove'}
                   accessibilityLabel={current ? `${name}, current account` : name}
-                  leading={<Avatar name={name} size={36} />}
+                  leading={<Avatar name={name} avatarId={avatarId} size={36} />}
                   onPress={
                     current && accounts.length === 1
                       ? undefined

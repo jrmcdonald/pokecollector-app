@@ -526,10 +526,6 @@ versioned. So:
   that is the LAN one: the batch body can exceed Cloudflare's 100 MB)
 - Upstream PRs for API tokens or cursor pagination, if their absence starts to
   hurt
-- Pokémon artwork for account avatars instead of initials. The sprites and
-  artwork belong to Nintendo, Game Freak and The Pokémon Company, so this
-  public repo must never bundle them; loading them at runtime from a source
-  the user chooses keeps the repo clean, but is still their call to make
 - Revisit native Swift or a paid Apple account if widgets start to matter
 
 ---

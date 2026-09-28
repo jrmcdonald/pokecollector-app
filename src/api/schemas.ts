@@ -18,6 +18,8 @@ export const UserSchema = z.looseObject({
   username: z.string(),
   role: z.string(),
   must_change_password: z.boolean().optional(),
+  /** The Pokémon (1–151) picked as this account's avatar in the web UI. */
+  avatar_id: z.number().nullish(),
 });
 export type User = z.infer<typeof UserSchema>;
 

@@ -34,3 +34,25 @@ export function cardImageSource(
   }
   return null;
 }
+
+/**
+ * A PokeCollector account's avatar: the Pokémon (1–151) chosen in the web UI,
+ * as the official artwork the server keeps in its own cache. That route needs
+ * no PokeCollector login, only Access. The cache key leaves out the address,
+ * so the primary and fallback share one copy on disk, and it is fetched once
+ * per Pokémon, not once per screen.
+ *
+ * The artwork is not bundled with the app: it is not ours to redistribute.
+ */
+export function avatarImageSource(
+  avatarId: number | null | undefined,
+  proxy: { baseUrl: string; headers: Record<string, string> },
+): ImageSource | null {
+  if (!avatarId || !Number.isInteger(avatarId) || avatarId < 1 || avatarId > 151) return null;
+  if (!proxy.baseUrl) return null;
+  return {
+    uri: `${proxy.baseUrl}/api/pokedex/images/artwork/${avatarId}.png`,
+    headers: proxy.headers,
+    cacheKey: `pokedex-artwork-${avatarId}`,
+  };
+}

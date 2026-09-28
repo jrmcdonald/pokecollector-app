@@ -205,10 +205,8 @@ collector's binder, night holo).
   `useFonts`, one file per weight, and each weight is its own family name, so
   styles set `fontFamily` and never `fontWeight`. A failed load falls back to
   the system font rather than holding the splash screen.
-- **Avatars are initials.** The account's picture is the first letter of its
-  name on the accent color. Pokémon artwork is a possible later option, but it
-  is not ours to redistribute, so it would be loaded at runtime and never
-  committed (see `PLAN.md` §11).
+- **Avatars are initials** by default: the first letter of the account's
+  name on the accent color.
 - **The address in use moved to Settings.** Home shows only an "Offline"
   marker; which address answered is a detail for Settings.
 
@@ -255,3 +253,15 @@ Follows the plan in `PLAN.md` §7.4, with these details:
   id); signing out still clears everything.
 - **Edits name the account** ("To ash's collection") only when more than one
   is saved.
+
+## 2026-09-28 — Avatars are the Pokémon chosen in PokeCollector
+
+Each PokeCollector account can pick a Pokémon (1–151) as its avatar in the
+web UI; `/api/auth/me` returns it as `avatar_id`. The app shows that Pokémon's
+official artwork, from the server's own image cache
+(`/api/pokedex/images/artwork/{id}.png`), which needs Access but no login.
+Nothing is bundled: the artwork belongs to Nintendo, Game Freak and The
+Pokémon Company, and this repository is public. The disk cache key leaves out
+the address, so it downloads once per Pokémon. No avatar, or an image that
+fails, falls back to the initial. (The web UI itself uses animated sprites
+from PokeAPI's GitHub; the server's copy keeps the app to one origin.)

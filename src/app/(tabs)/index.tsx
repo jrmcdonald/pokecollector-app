@@ -49,7 +49,7 @@ export default function Home() {
               accessibilityHint="Switch account, add one, or open Settings"
               onPress={openAccountMenu}
               style={({ pressed }) => [styles.account, pressed && styles.pressed]}>
-              <Avatar name={name} />
+              <Avatar name={name} avatarId={me.data?.avatar_id} />
               <ThemedText variant="heading" numberOfLines={1} style={styles.name}>
                 {name ?? 'PokeCollector'}
               </ThemedText>

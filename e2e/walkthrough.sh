@@ -30,6 +30,7 @@ xcrun simctl ui "$SIM_UDID" content_size "$size"
 xcrun simctl install "$SIM_UDID" "$APP_PATH"
 
 mkdir -p "$OUT/$name"
+server_lines_before=$(wc -l < "$OUT/server.log")
 set +e
 TEST_RUNNER_APP_BUNDLE_ID="$APP_BUNDLE_ID" \
 TEST_RUNNER_OUTPUT_DIR="$OUT/$name" \
@@ -45,4 +46,15 @@ status=$?
 set -e
 
 grep -E '^AUDIT|error:|Test Case .* failed|\*\* TEST' "$OUT/$name.log" || true
+
+if [ "$status" -ne 0 ]; then
+  # What the walkthrough saw when it stopped, and what the app asked the
+  # server for, so a failure can be read from the job log alone.
+  echo "::group::What was on screen"
+  sed -n '/^DIAGNOSE-BEGIN/,/^DIAGNOSE-END/p' "$OUT/$name.log" | head -n 600
+  echo "::endgroup::"
+  echo "::group::Requests to the fake server in this run"
+  tail -n "+$((server_lines_before + 1))" "$OUT/server.log" | tail -n 80
+  echo "::endgroup::"
+fi
 exit $status

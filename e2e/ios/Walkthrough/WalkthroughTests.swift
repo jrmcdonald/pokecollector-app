@@ -16,6 +16,7 @@ final class WalkthroughTests: XCTestCase {
   private let password = "pikachu"
 
   private var app: XCUIApplication!
+  private let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
   private var outputDir: URL!
   private var serverURL = "https://localhost:8443"
   private var findings: [String] = []
@@ -128,7 +129,40 @@ final class WalkthroughTests: XCTestCase {
     type(username, into: app.textFields["PokeCollector username"])
     type(password, into: app.secureTextFields["PokeCollector password"])
     tap(app.buttons["Connect"])
-    XCTAssertTrue(tabs.waitForExistence(timeout: 30), "Onboarding did not finish")
+    let signedIn = Date().addingTimeInterval(45)
+    while Date() < signedIn, !tabs.exists {
+      dismissSystemSheets()
+      Thread.sleep(forTimeInterval: 0.5)
+    }
+    if !tabs.exists {
+      diagnose("Onboarding did not finish")
+      XCTFail("Onboarding did not finish")
+    }
+  }
+
+  /// Sheets iOS shows on a fresh simulator that cover the app: the offer to
+  /// save the password after signing in, and the keyboard's first-use tip.
+  private func dismissSystemSheets() {
+    for owner in [app!, springboard] {
+      for label in ["Not Now", "Continue"] {
+        let button = owner.buttons[label]
+        if button.exists, button.isHittable { button.tap() }
+      }
+    }
+  }
+
+  /// When a step fails: what was on screen, as a screenshot and as the
+  /// accessibility tree of the app and of the system UI over it, in the log.
+  private func diagnose(_ what: String) {
+    let dir = outputDir.appendingPathComponent("failure", isDirectory: true)
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    try? XCUIScreen.main.screenshot().pngRepresentation
+      .write(to: dir.appendingPathComponent("failure.png"))
+    print("DIAGNOSE-BEGIN \(what)")
+    print(app.debugDescription)
+    print("--- SpringBoard ---")
+    print(springboard.debugDescription)
+    print("DIAGNOSE-END")
   }
 
   /// A screenshot for comparison, then the audit of the same screen.
@@ -207,17 +241,30 @@ final class WalkthroughTests: XCTestCase {
   }
 
   private func wait(for element: XCUIElement, _ what: String, timeout: TimeInterval = 20) {
-    XCTAssertTrue(element.waitForExistence(timeout: timeout), "\(what) did not appear")
+    if !element.waitForExistence(timeout: timeout) {
+      diagnose("\(what) did not appear")
+      XCTFail("\(what) did not appear")
+    }
   }
 
   /// Taps, scrolling first when the element is below the fold, as it often
   /// is at the largest text sizes.
   private func tap(_ element: XCUIElement) {
-    XCTAssertTrue(element.waitForExistence(timeout: 20), "\(element) did not appear")
+    if !element.waitForExistence(timeout: 20) {
+      diagnose("\(element) did not appear")
+      XCTFail("\(element) did not appear")
+      return
+    }
+    dismissSystemSheets()
     var swipes = 0
     while !element.isHittable, swipes < 6 {
       app.swipeUp(velocity: .slow)
       swipes += 1
+    }
+    if !element.isHittable {
+      diagnose("\(element) is not hittable")
+      XCTFail("\(element) is not hittable")
+      return
     }
     element.tap()
   }

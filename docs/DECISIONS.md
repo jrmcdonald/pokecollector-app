@@ -302,8 +302,9 @@ from PokeAPI's GitHub; the server's copy keeps the app to one origin.)
   per account and entry.
 - **Card art fills its frame** (`cover`): scans are slightly taller than
   63 × 88, and `contain` left a sliver at the top and bottom.
-- **Every variant can be chosen**, the catalogue's first: its flags are
-  often incomplete. An owned copy's variant, condition and printing details
+- **Every variant can be chosen**, always in the same order (Normal, Holo,
+  Reverse Holo, First Edition), with the first one the catalogue lists
+  preselected: its flags are often incomplete. An owned copy's variant, condition and printing details
   can be changed in place, and printing details can be set when adding (a new
   name creates the tag upstream).
 - **The saved service token secret is not shown in a field**; it is a

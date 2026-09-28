@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
@@ -292,24 +292,22 @@ function EditCopy({ item, onDone }: { item: CollectionItem; onDone(): void }) {
 }
 
 /**
- * Every variant, the ones the catalogue says this printing exists in first.
- * All four stay available: the catalogue's flags are often incomplete, and
- * the copy in hand is what counts.
+ * The variant to preselect: the first one the catalogue says this printing
+ * exists in. All four are always offered, in a fixed order, because the
+ * catalogue's flags are often incomplete and the copy in hand is what counts.
  */
-function orderedVariants(card: Card): Variant[] {
+function defaultVariant(card: Card): Variant {
   const flags: [Variant, boolean | null | undefined][] = [
     ['Normal', card.variants_normal],
     ['Holo', card.variants_holo],
     ['Reverse Holo', card.variants_reverse],
     ['First Edition', card.variants_first_edition],
   ];
-  const known = flags.filter(([, flag]) => flag).map(([variant]) => variant);
-  return [...known, ...VARIANTS.filter((v) => !known.includes(v))];
+  return flags.find(([, flag]) => flag)?.[0] ?? 'Normal';
 }
 
 function AddCopies({ card, disabled }: { card: Card; disabled: boolean }) {
-  const variants = useMemo(() => orderedVariants(card), [card]);
-  const [variant, setVariant] = useState<Variant>(variants[0] ?? 'Normal');
+  const [variant, setVariant] = useState<Variant>(() => defaultVariant(card));
   const [condition, setCondition] = useState<Condition>('NM');
   const [details, setDetails] = useState<string[]>([]);
   const [quantity, setQuantity] = useState(1);
@@ -322,7 +320,7 @@ function AddCopies({ card, disabled }: { card: Card; disabled: boolean }) {
       <ThemedText variant="heading">Add copies</ThemedText>
       <Chips<Variant>
         label="Variant"
-        options={variants.map((v) => ({ value: v, label: v }))}
+        options={VARIANTS.map((v) => ({ value: v, label: v }))}
         value={variant}
         onChange={setVariant}
       />

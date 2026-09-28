@@ -126,7 +126,7 @@ export function ConnectionForm({ initial, submitTitle, onVerified }: Props) {
       />
 
       {error ? (
-        <ThemedView background="surface" style={styles.error} accessibilityRole="alert">
+        <ThemedView background="surface" style={styles.error} accessible accessibilityRole="alert">
           <ThemedText variant="label" color="danger">
             {error.title}
           </ThemedText>

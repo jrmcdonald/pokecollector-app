@@ -10,7 +10,7 @@
  */
 import { Appearance, type TextStyle } from 'react-native';
 
-const palette = {
+export const palette = {
   text: '#EEF0F6',
   textSecondary: '#9AA3B5',
   background: '#0D0F14',
@@ -19,7 +19,14 @@ const palette = {
   /** Tiles inside a surface, and pressed or selected controls. */
   surfaceRaised: '#222633',
   surfaceSelected: '#2A2F3D',
+  /** Separators and panel edges: decoration, so no contrast minimum. */
   border: '#2A2F3D',
+  /**
+   * The edge of a control that is recognised by its outline (a text field,
+   * an unselected chip): at least 3:1 against every surface, per WCAG 2.2
+   * 1.4.11 Non-text Contrast.
+   */
+  outline: '#687186',
   accent: '#F5C518',
   onAccent: '#111317',
   /** The holo edge on card art, and secondary highlights. */

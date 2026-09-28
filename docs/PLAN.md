@@ -506,6 +506,28 @@ one job, and added after a review that is mostly one tap each.
 
 ---
 
+### 8.2 Design and accessibility review (the plan is paused for this)
+
+Review the app's visual language against public standards, and add checks
+that keep it there. In order:
+
+- [x] **Automated checks that run in CI:** a WCAG 2.2 AA contrast test over
+      the theme, accessibility lint, and component tests that find controls
+      by role and accessible name.
+- [ ] **The review** against Apple's Human Interface Guidelines, WCAG 2.2 AA
+      (with the W3C's guidance on applying it to mobile apps), Apple's
+      Accessibility Nutrition Labels criteria (VoiceOver, Voice Control,
+      Larger Text, Dark Interface, Differentiate Without Color, Sufficient
+      Contrast, Reduced Motion) and the BBC Mobile Accessibility Guidelines.
+      Findings ranked by severity, with screenshots.
+- [ ] **Screenshot tests on the iOS simulator**, once the review has settled
+      what the screens should look like: a macOS CI job builds for the
+      simulator, runs the app against a fake server with made-up data, walks
+      the main screens with Maestro, compares screenshots with approved ones,
+      and runs Apple's accessibility audit (`performAccessibilityAudit`).
+
+---
+
 ## 9. Phase 4 — Prebuilt decks (last, once the core is done)
 
 Look up a prebuilt deck (a theme deck, battle deck, League Battle Deck or

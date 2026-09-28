@@ -85,5 +85,11 @@ an iOS build.
   JavaScript-only libraries and Expo's own modules.
 - Don't change the bundle IDs in `app.config.ts`: a free Apple ID can register
   only ten App IDs a week.
+- Accessibility is tested. A colour used somewhere new gets a line in
+  `src/theme/__tests__/contrast.test.ts` (WCAG 2.2 AA: 4.5:1 text, 3:1 control
+  edges). A control needs a role and an accessible name. A plain `View` given
+  a role or label to be read needs `accessible` too, or iOS ignores it (but
+  not a container of buttons: that would hide them). Test new controls with
+  React Native Testing Library queries by role and name.
 - Update `docs/API.md` when the app starts using a new endpoint and
   `docs/DECISIONS.md` for notable choices.

@@ -312,3 +312,26 @@ from PokeAPI's GitHub; the server's copy keeps the app to one origin.)
 - **Scan screen sits above the tab bar** (bottom safe area), the shade's
   cut-out has the guide's rounded corners, results can always be closed, and
   upstream's missing-key error (German for Gemini) gets the app's own words.
+
+## 2026-09-28 — Automated accessibility checks
+
+The first step of the design and accessibility review (`PLAN.md` §8.2).
+
+- **Theme contrast is a test.** `src/theme/__tests__/contrast.test.ts` lists
+  every foreground the app puts on every background, with the WCAG 2.2 AA
+  minimum it must meet: 4.5:1 for text, 3:1 for control edges and meaningful
+  graphics. All text already passed (the lowest is secondary text on a
+  selected control, 5.3:1). The control edges did not: `border` is 1.1–1.4:1,
+  so fields, unselected chips, secondary buttons and the torch now use a new
+  `outline` colour (3.1–3.9:1), and `border` is kept for decoration.
+- **Accessibility lint.** `eslint-plugin-react-native-a11y` with its iOS
+  rules, except the one requiring a hint on every label: Apple treats hints
+  as optional, and forcing them makes VoiceOver repeat itself. The plugin
+  declares ESLint 8 but works with 9; `package.json` overrides its peer
+  dependency, as for openapi-typescript. It found images that Smart Invert
+  would turn into negatives, and a Replace button VoiceOver could not reach.
+- **Component tests find controls as VoiceOver does**, by role and accessible
+  name, with React Native Testing Library. They found that a button showing
+  its spinner had no name, and that views given a role or label without
+  `accessible` (the progress bar, loading placeholders, the connection error)
+  were never exposed to VoiceOver at all.

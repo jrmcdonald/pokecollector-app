@@ -49,6 +49,7 @@ export function Avatar({
           source={source}
           style={{ width: size * 0.86, height: size * 0.86 }}
           contentFit="contain"
+          accessibilityIgnoresInvertColors
           cachePolicy="disk"
           transition={120}
           onError={() => setFailed(avatarId ?? null)}

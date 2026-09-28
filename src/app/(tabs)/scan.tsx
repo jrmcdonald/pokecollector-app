@@ -161,7 +161,7 @@ function Scanner() {
                   styles.round,
                   {
                     backgroundColor: torch ? colors.accent : colors.surface,
-                    borderColor: colors.border,
+                    borderColor: torch ? colors.accent : colors.outline,
                   },
                 ]}>
                 <ThemedText style={{ color: torch ? colors.onAccent : colors.text }}>ϟ</ThemedText>

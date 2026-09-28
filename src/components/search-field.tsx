@@ -13,7 +13,7 @@ export function SearchField({ value, onChangeText, style, ...rest }: Props) {
   const colors = useColors();
   return (
     <View
-      style={[styles.box, { backgroundColor: colors.surface, borderColor: colors.border }, style]}>
+      style={[styles.box, { backgroundColor: colors.surface, borderColor: colors.outline }, style]}>
       <TextInput
         value={value}
         onChangeText={onChangeText}

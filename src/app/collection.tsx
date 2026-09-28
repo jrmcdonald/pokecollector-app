@@ -186,7 +186,10 @@ function FilterButton({
       onPress={onPress}
       style={[
         styles.filter,
-        { backgroundColor: active ? colors.accent : colors.surface, borderColor: colors.border },
+        {
+          backgroundColor: active ? colors.accent : colors.surface,
+          borderColor: active ? colors.accent : colors.outline,
+        },
       ]}>
       <ThemedText
         variant="label"

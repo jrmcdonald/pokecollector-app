@@ -40,7 +40,7 @@ export function PrintingDetailsPicker({
   }
 
   return (
-    <View style={styles.container} accessibilityLabel="Printing details">
+    <View style={styles.container}>
       <ThemedText variant="overline" color="textSecondary">
         Printing details
       </ThemedText>
@@ -57,7 +57,7 @@ export function PrintingDetailsPicker({
                 styles.chip,
                 {
                   backgroundColor: on ? colors.accent : colors.surface,
-                  borderColor: on ? colors.accent : colors.border,
+                  borderColor: on ? colors.accent : colors.outline,
                 },
               ]}>
               <ThemedText variant="label" style={{ color: on ? colors.onAccent : colors.text }}>
@@ -70,7 +70,7 @@ export function PrintingDetailsPicker({
           accessibilityRole="button"
           accessibilityLabel="Add a new printing detail"
           onPress={addNew}
-          style={[styles.chip, styles.dashed, { borderColor: colors.border }]}>
+          style={[styles.chip, styles.dashed, { borderColor: colors.outline }]}>
           <ThemedText variant="label" color="textSecondary">
             + New
           </ThemedText>

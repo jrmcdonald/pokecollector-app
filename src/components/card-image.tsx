@@ -68,6 +68,7 @@ export function CardImage({
           // Cover, not contain: scans are a hair taller than a 63 × 88 card,
           // and contain left a sliver of background at the top and bottom.
           contentFit="cover"
+          accessibilityIgnoresInvertColors
           transition={120}
           recyclingKey={card.id}
           cachePolicy="disk"

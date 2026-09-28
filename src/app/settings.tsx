@@ -1,30 +1,31 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
+import type { ReactNode } from 'react';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 
+import type { User } from '@/api/schemas';
 import { Avatar } from '@/components/avatar';
-import { Button } from '@/components/button';
-import { ConnectionForm } from '@/components/connection-form';
+import { Icon } from '@/components/icon';
 import { ListRow } from '@/components/list-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import type { User } from '@/api/schemas';
-import { sameAccount } from '@/auth/credentials';
 import { useMe } from '@/hooks/use-me';
 import { clearQueryCache } from '@/session/query';
 import { useActiveRoute, useSession } from '@/session/session';
-import { radius, spacing, useColors } from '@/theme';
+import { spacing, useColors } from '@/theme';
 import { pick } from '@/utils/pick';
 import { showToast } from '@/utils/toast';
 
+/**
+ * Settings as an iOS grouped list: accounts first, the connection as one row
+ * that opens its own screen, then data, and Sign out as a red row at the
+ * bottom rather than the loudest thing on the screen (HIG Settings).
+ */
 export default function Settings() {
-  const { session, signIn, signOut, switchAccount, removeAccount } = useSession();
+  const { session, signOut, switchAccount, removeAccount } = useSession();
   const queryClient = useQueryClient();
-  const [saved, setSaved] = useState(false);
-  const { route, url } = useActiveRoute();
+  const { route } = useActiveRoute();
   const me = useMe();
-  const colors = useColors();
   if (session.status !== 'signedIn') return null;
 
   const { accounts, cacheId } = session;
@@ -90,106 +91,53 @@ export default function Settings() {
 
   return (
     <ThemedView style={styles.fill}>
-      <KeyboardAvoidingView behavior="padding" style={styles.fill}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <ThemedText variant="heading">Accounts</ThemedText>
-          <View style={[styles.accounts, { borderColor: colors.border }]}>
-            {accounts.map((account) => {
-              const current = account.id === cacheId;
-              const name = current ? (me.data?.username ?? account.username) : account.username;
-              // Another account's avatar is known if it was used on this phone before.
-              const avatarId = current
-                ? me.data?.avatar_id
-                : queryClient.getQueryData<User>([account.id, 'me'])?.avatar_id;
-              return (
-                <ListRow
-                  key={account.id}
-                  title={name}
-                  subtitle={current ? 'Current account' : 'Tap to switch or remove'}
-                  accessibilityLabel={current ? `${name}, current account` : name}
-                  leading={<Avatar name={name} avatarId={avatarId} size={36} />}
-                  onPress={
-                    current && accounts.length === 1
-                      ? undefined
-                      : () => accountOptions(account.id, account.username)
-                  }
-                />
-              );
-            })}
-          </View>
-          <Button
+      <ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
+        <Group title="Accounts">
+          {accounts.map((account) => {
+            const current = account.id === cacheId;
+            const name = current ? (me.data?.username ?? account.username) : account.username;
+            // Another account's avatar is known if it was used on this phone before.
+            const avatarId = current
+              ? me.data?.avatar_id
+              : queryClient.getQueryData<User>([account.id, 'me'])?.avatar_id;
+            return (
+              <ListRow
+                key={account.id}
+                title={name}
+                subtitle={current ? 'Current account' : 'Switch or remove'}
+                accessibilityLabel={current ? `${name}, current account` : name}
+                leading={<Avatar name={name} avatarId={avatarId} size={36} />}
+                kind="action"
+                onPress={
+                  current && accounts.length === 1
+                    ? undefined
+                    : () => accountOptions(account.id, account.username)
+                }
+              />
+            );
+          })}
+          <ListRow
             title="Add an account"
-            variant="secondary"
+            leading={<Icon name="plus.circle" size={22} color="accent" />}
             onPress={() => router.push('/add-account')}
           />
+        </Group>
 
-          <ThemedText variant="heading">Connection</ThemedText>
-          <ThemedView
-            background="surface"
-            style={[styles.panel, { borderColor: colors.border }]}
-            accessible
-            accessibilityLabel={
-              route && url ? `Using the ${route} address, ${url}` : 'Not connected yet'
-            }>
-            <ThemedText variant="overline" color="textSecondary">
-              Address in use
-            </ThemedText>
-            {route && url ? (
-              <>
-                <ThemedText variant="label">
-                  {route === 'primary' ? 'Primary' : 'Fallback'}
-                </ThemedText>
-                <ThemedText variant="figureSmall" color="textSecondary" numberOfLines={1}>
-                  {url}
-                </ThemedText>
-              </>
-            ) : (
-              <ThemedText>Not connected yet.</ThemedText>
-            )}
-          </ThemedView>
-          {session.credentials.fallbackUrl ? (
-            <Button
-              title="Re-check which address to use"
-              variant="secondary"
-              onPress={async () => {
-                session.client.invalidateRoute();
-                await queryClient.invalidateQueries({ queryKey: [session.cacheId] });
-              }}
-            />
-          ) : null}
-          <ThemedText color="textSecondary">
-            {accounts.length > 1
-              ? 'The addresses and service token apply to every account; the username and password are the current account’s. Changes are tested before they are saved.'
-              : 'Changes are tested before they are saved.'}
-          </ThemedText>
-          <ConnectionForm
-            initial={session.credentials}
-            submitTitle={saved ? 'Saved — test again' : 'Test and save'}
-            onVerified={async (credentials, _user, token) => {
-              // Data for accounts that are no longer saved has no business
-              // staying on disk. A new server replaces every account; a new
-              // username replaces the current one, unless it is already saved,
-              // in which case this is a switch.
-              if (credentials.primaryUrl !== session.credentials.primaryUrl) {
-                await clearQueryCache();
-              } else if (
-                !sameAccount(credentials, session.credentials) &&
-                !accounts.some((a) => a.username === credentials.username)
-              ) {
-                queryClient.removeQueries({ queryKey: [cacheId] });
-              }
-              await signIn(credentials, token ?? undefined);
-              // Safe straight after signIn: queries read the client through
-              // getClient, so these refetch with the new credentials.
-              await queryClient.invalidateQueries();
-              setSaved(true);
-            }}
+        <Group title="Connection">
+          <ListRow
+            title="Server and login"
+            subtitle={
+              route ? `Using the ${route === 'primary' ? 'primary' : 'fallback'} address` : undefined
+            }
+            onPress={() => router.push('/connection')}
           />
+        </Group>
 
-          <ThemedText variant="heading">Data</ThemedText>
-          <Button
+        <Group title="Data">
+          <ListRow
             title="Clear cached data"
-            variant="secondary"
+            subtitle="Everything is fetched again"
+            kind="action"
             onPress={async () => {
               await clearQueryCache();
               showToast({
@@ -199,16 +147,35 @@ export default function Settings() {
               });
             }}
           />
-          <Button title="Sign out" variant="destructive" onPress={confirmSignOut} />
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </Group>
+
+        <Group>
+          <ListRow title="Sign out" kind="destructive" onPress={confirmSignOut} />
+        </Group>
+      </ScrollView>
     </ThemedView>
+  );
+}
+
+/** A section of the grouped list: a heading, then rows edge to edge. */
+function Group({ title, children }: { title?: string; children: ReactNode }) {
+  const colors = useColors();
+  return (
+    <View style={styles.group}>
+      {title ? (
+        <ThemedText variant="heading" style={styles.groupTitle}>
+          {title}
+        </ThemedText>
+      ) : null}
+      <View style={[styles.rows, { borderColor: colors.border }]}>{children}</View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  content: { padding: spacing.lg, gap: spacing.md },
-  accounts: { borderTopWidth: StyleSheet.hairlineWidth, marginHorizontal: -spacing.lg },
-  panel: { borderWidth: 1, borderRadius: radius.md, padding: spacing.md, gap: 2 },
+  content: { paddingVertical: spacing.lg, gap: spacing.lg },
+  group: { gap: spacing.sm },
+  groupTitle: { paddingHorizontal: spacing.md },
+  rows: { borderTopWidth: StyleSheet.hairlineWidth },
 });

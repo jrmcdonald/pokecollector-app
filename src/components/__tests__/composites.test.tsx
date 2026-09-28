@@ -72,14 +72,49 @@ describe('CardTile', () => {
     images_small: 'https://assets.tcgdex.net/en/sv/sv01/025/low.webp',
   };
 
-  it('says how many are owned', async () => {
+  it('says how many are owned, and the detail line', async () => {
     await render(<CardTile card={card} detail="€1.20" quantity={2} />);
-    expect(screen.getByRole('button', { name: 'Pikachu, 2 owned' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Pikachu, 2 owned, €1.20' })).toBeOnTheScreen();
+    expect(screen.getByText('×2')).toBeOnTheScreen();
   });
 
-  it('says when a checklist card is missing', async () => {
-    await render(<CardTile card={card} dimmed />);
+  it('shows no quantity badge for a single copy', async () => {
+    await render(<CardTile card={card} quantity={1} />);
+    expect(screen.queryByText('×1')).not.toBeOnTheScreen();
+  });
+
+  it('marks a missing card in words as well as by fading it', async () => {
+    await render(<CardTile card={card} missing />);
     expect(screen.getByRole('button', { name: 'Pikachu, missing' })).toBeOnTheScreen();
+    expect(screen.getByText('Missing')).toBeOnTheScreen();
+  });
+
+  it('offers its extra actions to VoiceOver', async () => {
+    const onAction = jest.fn();
+    await render(
+      <CardTile
+        card={card}
+        accessibilityActions={[{ name: 'remove', label: 'Take out of binder', onAction }]}
+      />,
+    );
+    const tile = screen.getByRole('button', { name: 'Pikachu' });
+    expect(tile.props.accessibilityActions).toEqual([
+      { name: 'remove', label: 'Take out of binder' },
+    ]);
+    tile.props.onAccessibilityAction({ nativeEvent: { actionName: 'remove' } });
+    expect(onAction).toHaveBeenCalled();
+  });
+});
+
+describe('ListRow kinds', () => {
+  it('names a row by its title and subtitle when given no label', async () => {
+    await render(<ListRow title="Clear cached data" subtitle="Refetch" kind="action" onPress={jest.fn()} />);
+    expect(screen.getByRole('button', { name: 'Clear cached data, Refetch' })).toBeOnTheScreen();
+  });
+
+  it('is disabled without an action', async () => {
+    await render(<ListRow title="ash" subtitle="Current account" />);
+    expect(screen.getByRole('button', { name: 'ash, Current account' })).toBeDisabled();
   });
 });
 

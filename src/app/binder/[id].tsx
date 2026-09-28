@@ -1,6 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { Alert, RefreshControl, StyleSheet, View } from 'react-native';
+import { Link, Stack, useLocalSearchParams } from 'expo-router';
+import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import type { BinderCard, BinderCards } from '@/api/schemas';
 import { CardTile } from '@/components/card-tile';
@@ -17,9 +17,9 @@ import { completion } from '@/utils/sets';
 import { showToast } from '@/utils/toast';
 
 /**
- * One binder's cards. Planned binders show what is still missing, greyed
- * out; collection binders only ever hold owned copies. Long-press a card to
- * take it out of the binder (it stays in the collection).
+ * One binder's cards. Planned binders mark what is still missing; collection
+ * binders only ever hold owned copies. A card's long-press menu takes it out
+ * of the binder (it stays in the collection).
  */
 export default function BinderDetail() {
   const { id = '', name } = useLocalSearchParams<{ id: string; name?: string }>();
@@ -32,23 +32,23 @@ export default function BinderDetail() {
   const data = binder.data;
   const planned = data ? isPlanned(data.binder) : false;
 
-  function confirmRemove(card: BinderCard) {
+  // Chosen from the long-press menu, which is already the deliberate second
+  // step, so no confirmation: the copy stays in the collection either way.
+  function removeCard(card: BinderCard) {
     if (!online) {
       showToast({ kind: 'info', title: 'Offline', message: 'Changes need a connection.' });
       return;
     }
-    const what = [card.variant, card.condition].filter(Boolean).join(', ');
-    Alert.alert(
-      `Remove ${card.name} from this binder?`,
-      `${what ? `${what}. ` : ''}It stays in your collection.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => remove.mutate({ binderId, binderCardId: card.binder_card_id }),
-        },
-      ],
+    remove.mutate(
+      { binderId, binderCardId: card.binder_card_id },
+      {
+        onSuccess: () =>
+          showToast({
+            kind: 'success',
+            title: `${card.name} taken out of the binder`,
+            message: 'It is still in your collection.',
+          }),
+      },
     );
   }
 
@@ -76,9 +76,21 @@ export default function BinderDetail() {
               quantity={
                 card.required_quantity && card.required_quantity > 1 ? card.required_quantity : 0
               }
-              dimmed={planned && !card.owned}
-              onLongPress={() => confirmRemove(card)}
+              missing={planned && !card.owned}
+              variant={card.variant}
               photoItemId={card.has_scan_photo ? card.collection_item_id : null}
+              menu={
+                <Link.MenuAction icon="minus.circle" destructive onPress={() => removeCard(card)}>
+                  Take out of binder
+                </Link.MenuAction>
+              }
+              accessibilityActions={[
+                {
+                  name: 'remove',
+                  label: 'Take out of binder',
+                  onAction: () => removeCard(card),
+                },
+              ]}
             />
           )}
           ListEmptyComponent={
@@ -126,9 +138,6 @@ function Summary({ data, planned }: { data: BinderCards; planned: boolean }) {
           </ThemedText>
         </View>
       )}
-      <ThemedText variant="caption" color="textSecondary">
-        Hold a card to take it out of the binder.
-      </ThemedText>
     </View>
   );
 }

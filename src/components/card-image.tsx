@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useSession } from '@/session/session';
 import { radius, useColors } from '@/theme';
 import {
@@ -13,14 +14,20 @@ import {
 /** A card's printed proportions, 63 × 88 mm. */
 export const CARD_ASPECT = 63 / 88;
 
+/**
+ * How the card's edge is drawn, and what it says:
+ * - `plain`: a quiet hairline, for most cards.
+ * - `holo`: the teal edge, for a copy that is holo or reverse holo.
+ * - `missing`: a dashed outline and a faded image, for a card not owned in a
+ *   checklist or planned binder, so it is told apart by more than contrast.
+ */
+export type CardFrame = 'plain' | 'holo' | 'missing';
+
 type Props = {
   card: CardImageFields;
   size: ImageSize;
   style?: StyleProp<ViewStyle>;
-  /** Dims the image, for cards that are not owned in a checklist view. */
-  dimmed?: boolean;
-  /** The teal "holo" edge. Off for cards that are dimmed or very small. */
-  edge?: boolean;
+  frame?: CardFrame;
   /**
    * A collection entry with the owner's own photo, shown only when the card
    * has no other image.
@@ -28,15 +35,9 @@ type Props = {
   photoItemId?: number | null;
 };
 
-export function CardImage({
-  card,
-  size,
-  style,
-  dimmed = false,
-  edge = !dimmed,
-  photoItemId,
-}: Props) {
+export function CardImage({ card, size, style, frame = 'plain', photoItemId }: Props) {
   const colors = useColors();
+  const reduceMotion = useReduceMotion();
   const { session } = useSession();
   const proxy =
     session.status === 'signedIn'
@@ -52,24 +53,26 @@ export function CardImage({
         })
       : null);
 
+  const edge =
+    frame === 'holo'
+      ? { borderWidth: 1.5, borderColor: colors.holo }
+      : frame === 'missing'
+        ? { borderWidth: 1.5, borderColor: colors.outline, borderStyle: 'dashed' as const }
+        : { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border };
+
   return (
     <View
-      style={[
-        styles.frame,
-        { backgroundColor: colors.surface },
-        edge && { borderWidth: 1.5, borderColor: colors.holo },
-        style,
-      ]}
+      style={[styles.frame, { backgroundColor: colors.surface }, edge, style]}
       accessibilityIgnoresInvertColors>
       {source ? (
         <Image
           source={source}
-          style={[StyleSheet.absoluteFill, dimmed && styles.dimmed]}
+          style={[StyleSheet.absoluteFill, frame === 'missing' && styles.faded]}
           // Cover, not contain: scans are a hair taller than a 63 × 88 card,
           // and contain left a sliver of background at the top and bottom.
           contentFit="cover"
           accessibilityIgnoresInvertColors
-          transition={120}
+          transition={reduceMotion ? 0 : 120}
           recyclingKey={card.id}
           cachePolicy="disk"
         />
@@ -78,7 +81,12 @@ export function CardImage({
   );
 }
 
+/** Holo and reverse holo copies get the teal edge; everything else is plain. */
+export function frameForVariant(variant: string | null | undefined): CardFrame {
+  return variant === 'Holo' || variant === 'Reverse Holo' ? 'holo' : 'plain';
+}
+
 const styles = StyleSheet.create({
   frame: { aspectRatio: CARD_ASPECT, borderRadius: radius.sm, overflow: 'hidden' },
-  dimmed: { opacity: 0.35 },
+  faded: { opacity: 0.35 },
 });

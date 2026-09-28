@@ -2,7 +2,10 @@ import { StyleSheet, View } from 'react-native';
 
 import { useColors } from '@/theme';
 
-/** A thin completion bar. `value` runs from 0 to 1. */
+/**
+ * A thin completion bar. `value` runs from 0 to 1. Teal, turning green when
+ * complete: yellow is kept for things that can be tapped.
+ */
 export function ProgressBar({ value, height = 6 }: { value: number; height?: number }) {
   const colors = useColors();
   const clamped = Math.min(1, Math.max(0, value));
@@ -22,7 +25,7 @@ export function ProgressBar({ value, height = 6 }: { value: number; height?: num
           width: `${clamped * 100}%`,
           height,
           borderRadius: height / 2,
-          backgroundColor: clamped >= 1 ? colors.holo : colors.accent,
+          backgroundColor: clamped >= 1 ? colors.success : colors.holo,
         }}
       />
     </View>

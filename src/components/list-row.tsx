@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { minTapTarget, spacing, useColors } from '@/theme';
 
+import { Icon } from './icon';
 import { ThemedText } from './themed-text';
 
 type Props = {
@@ -15,11 +16,15 @@ type Props = {
   /** Under the text, full width: a progress bar. */
   footer?: ReactNode;
   onPress?(): void;
-  onLongPress?(): void;
+  /**
+   * An action rather than a place: no chevron. `destructive` draws the title
+   * in red, as iOS does for Sign Out and similar rows.
+   */
+  kind?: 'navigate' | 'action' | 'destructive';
   accessibilityLabel?: string;
 };
 
-/** A tappable row with a chevron, for lists of sets, binders and menus. */
+/** A tappable row, for lists of sets, binders, menus and settings. */
 export function ListRow({
   title,
   subtitle,
@@ -27,16 +32,16 @@ export function ListRow({
   trailing,
   footer,
   onPress,
-  onLongPress,
+  kind = 'navigate',
   accessibilityLabel,
 }: Props) {
   const colors = useColors();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
+      accessibilityLabel={accessibilityLabel ?? [title, subtitle].filter(Boolean).join(', ')}
       onPress={onPress}
-      onLongPress={onLongPress}
+      disabled={!onPress}
       style={({ pressed }) => [
         styles.row,
         { borderBottomColor: colors.border },
@@ -46,7 +51,10 @@ export function ListRow({
       <View style={styles.body}>
         <View style={styles.line}>
           <View style={styles.text}>
-            <ThemedText variant="label" numberOfLines={1} style={styles.title}>
+            <ThemedText
+              variant="label"
+              numberOfLines={1}
+              style={[styles.title, kind === 'destructive' && { color: colors.danger }]}>
               {title}
             </ThemedText>
             {subtitle ? (
@@ -56,10 +64,8 @@ export function ListRow({
             ) : null}
           </View>
           {trailing}
-          {onPress ? (
-            <ThemedText color="textSecondary" style={styles.chevron}>
-              ›
-            </ThemedText>
+          {onPress && kind === 'navigate' ? (
+            <Icon name="chevron.right" size={14} color="textSecondary" />
           ) : null}
         </View>
         {footer}
@@ -82,5 +88,4 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   text: { flex: 1, gap: 2 },
   title: { fontSize: 16, lineHeight: 21 },
-  chevron: { fontSize: 22, lineHeight: 24 },
 });

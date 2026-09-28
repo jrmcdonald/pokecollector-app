@@ -11,7 +11,51 @@ import { Chips } from '../chips';
 import { ProgressBar } from '../progress-bar';
 import { QuantityStepper } from '../quantity-stepper';
 import { SearchField } from '../search-field';
+import { Segmented } from '../segmented';
 import { TextField } from '../text-field';
+import { ThemedText } from '../themed-text';
+
+describe('ThemedText', () => {
+  it('marks titles and section headings as headings, for the VoiceOver rotor', async () => {
+    await render(
+      <>
+        <ThemedText variant="title">Pikachu</ThemedText>
+        <ThemedText variant="heading">Add copies</ThemedText>
+        <ThemedText variant="overline">Trend</ThemedText>
+        <ThemedText>Body</ThemedText>
+      </>,
+    );
+    expect(screen.getByRole('header', { name: 'Pikachu' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Add copies' })).toBeOnTheScreen();
+    expect(screen.queryByRole('header', { name: 'Trend' })).not.toBeOnTheScreen();
+    expect(screen.queryByRole('header', { name: 'Body' })).not.toBeOnTheScreen();
+  });
+});
+
+describe('Segmented', () => {
+  function Show() {
+    const [value, setValue] = useState<'all' | 'missing'>('all');
+    return (
+      <Segmented<'all' | 'missing'>
+        label="Show"
+        options={[
+          { value: 'all', label: 'All' },
+          { value: 'missing', label: 'Missing' },
+        ]}
+        value={value}
+        onChange={setValue}
+      />
+    );
+  }
+
+  it('reads each segment with its position, and moves the selection', async () => {
+    await render(<Show />);
+    expect(screen.getByRole('radio', { name: 'All, 1 of 2' })).toBeSelected();
+    await userEvent.setup().press(screen.getByRole('radio', { name: 'Missing, 2 of 2' }));
+    expect(screen.getByRole('radio', { name: 'Missing, 2 of 2' })).toBeSelected();
+    expect(screen.getByRole('radio', { name: 'All, 1 of 2' })).not.toBeSelected();
+  });
+});
 
 describe('Button', () => {
   it('is a button named by its title', async () => {

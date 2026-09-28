@@ -6,7 +6,39 @@
  */
 import type { PokeCollectorClient } from './client';
 import { getScanJob } from './endpoints';
-import type { Recognized, ScanItem } from './schemas';
+import type { Recognized, ScanItem, ScanMatch } from './schemas';
+
+/** A collector number reduced for comparing: "025", "25" and "25/198" agree. */
+export function normaliseNumber(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const local = String(value).trim().split('/')[0]?.trim().toUpperCase() ?? '';
+  const stripped = local.replace(/^0+(?=[0-9A-Z])/, '');
+  return stripped || null;
+}
+
+export interface RankedMatch {
+  match: ScanMatch;
+  /** The candidate's number is the one the scanner read off the card. */
+  numberMatches: boolean;
+}
+
+/**
+ * Upstream's candidates with the ones whose number agrees with what was read
+ * moved to the front, keeping upstream's order otherwise. Several printings
+ * of one Pokémon often differ only by set and number, so the number is what
+ * tells them apart.
+ */
+export function rankCandidates(
+  candidates: readonly ScanMatch[],
+  recognized: Recognized | null | undefined,
+): RankedMatch[] {
+  const read = normaliseNumber(recognized?.number_local);
+  const ranked = candidates.map((match) => ({
+    match,
+    numberMatches: read !== null && normaliseNumber(match.number) === read,
+  }));
+  return [...ranked.filter((r) => r.numberMatches), ...ranked.filter((r) => !r.numberMatches)];
+}
 
 export const POLL_DELAYS_MS = [1_000, 2_000, 4_000, 8_000] as const;
 /** Longest the app waits between polls, whatever upstream's retry time says. */

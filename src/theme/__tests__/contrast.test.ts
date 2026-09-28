@@ -16,10 +16,16 @@ const PAIRS: [fg: Role, bg: Role[], minimum: number, what: string][] = [
     AA.text,
     'secondary text and captions',
   ],
-  ['accent', ['background', 'surface', 'surfaceRaised'], AA.text, 'prices and links in the accent'],
+  ['accent', ['background', 'surface', 'surfaceRaised'], AA.text, 'links and accent icons'],
   ['onAccent', ['accent'], AA.text, 'text on accent buttons and chips'],
-  ['onAccent', ['danger'], AA.text, 'text on destructive buttons'],
-  ['danger', ['background', 'surface', 'surfaceRaised'], AA.text, 'error text'],
+  ['onAccent', ['danger'], AA.text, 'text on destructive buttons and swipe actions'],
+  ['onAccent', ['success'], AA.text, 'the "Matches" mark on a scan candidate'],
+  [
+    'danger',
+    ['background', 'surface', 'surfaceRaised'],
+    AA.text,
+    'error text and the Sign out row',
+  ],
   ['holo', ['background', 'surface', 'surfaceRaised'], AA.nonText, 'the holo edge and focus rings'],
   [
     'outline',
@@ -27,8 +33,9 @@ const PAIRS: [fg: Role, bg: Role[], minimum: number, what: string][] = [
     AA.nonText,
     'field, chip and secondary button edges',
   ],
-  ['accent', ['surfaceRaised'], AA.nonText, 'progress bar fill on its track'],
-  ['success', ['surfaceRaised'], AA.nonText, 'the success stripe on a notice'],
+  ['holo', ['surfaceRaised'], AA.nonText, 'progress bar fill on its track'],
+  ['success', ['surfaceRaised'], AA.nonText, 'a complete progress bar, and the success stripe'],
+  ['outline', ['background', 'surface'], AA.nonText, 'the dashed outline of a missing card'],
   ['danger', ['surfaceRaised'], AA.nonText, 'the error stripe on a notice'],
 ];
 

@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'rea
 
 import { minTapTarget, radius, spacing, type as typeScale, useColors } from '@/theme';
 
-import { ThemedText } from './themed-text';
+import { Icon } from './icon';
 
 type Props = Omit<TextInputProps, 'onChangeText' | 'value'> & {
   value: string;
@@ -14,6 +14,7 @@ export function SearchField({ value, onChangeText, style, ...rest }: Props) {
   return (
     <View
       style={[styles.box, { backgroundColor: colors.surface, borderColor: colors.outline }, style]}>
+      <Icon name="magnifyingglass" size={16} color="textSecondary" weight="regular" />
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -31,7 +32,7 @@ export function SearchField({ value, onChangeText, style, ...rest }: Props) {
           accessibilityLabel="Clear search"
           onPress={() => onChangeText('')}
           style={styles.clear}>
-          <ThemedText color="textSecondary">✕</ThemedText>
+          <Icon name="xmark.circle.fill" size={18} color="textSecondary" weight="regular" />
         </Pressable>
       ) : null}
     </View>
@@ -45,7 +46,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     minHeight: minTapTarget,
-    paddingLeft: spacing.md,
+    paddingLeft: spacing.sm + 4,
+    gap: spacing.sm,
   },
   input: { flex: 1, paddingVertical: spacing.sm },
   clear: {

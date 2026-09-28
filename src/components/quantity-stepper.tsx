@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { minTapTarget, radius, spacing, useColors } from '@/theme';
 
+import { Icon } from './icon';
 import { ThemedText } from './themed-text';
 
 type Props = {
@@ -30,7 +31,7 @@ export function QuantityStepper({
     Haptics.selectionAsync().catch(() => undefined);
     onChange(next);
   };
-  const button = (symbol: string, delta: number, a11y: string, atLimit: boolean) => (
+  const button = (symbol: 'minus' | 'plus', delta: number, a11y: string, atLimit: boolean) => (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${a11y} ${label}`}
@@ -43,16 +44,21 @@ export function QuantityStepper({
           opacity: disabled || atLimit ? 0.4 : pressed ? 0.7 : 1,
         },
       ]}>
-      <ThemedText variant="heading">{symbol}</ThemedText>
+      <Icon name={symbol} size={16} weight="bold" />
     </Pressable>
   );
   return (
     <View style={styles.row}>
-      {button('−', -1, value - 1 <= 0 && min === 0 ? 'Remove one of' : 'Decrease', value <= min)}
+      {button(
+        'minus',
+        -1,
+        value - 1 <= 0 && min === 0 ? 'Remove one of' : 'Decrease',
+        value <= min,
+      )}
       <ThemedText variant="figure" style={styles.value} accessibilityLabel={`${label}: ${value}`}>
         {value}
       </ThemedText>
-      {button('+', 1, 'Increase', value >= max)}
+      {button('plus', 1, 'Increase', value >= max)}
     </View>
   );
 }

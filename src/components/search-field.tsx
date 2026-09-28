@@ -12,7 +12,8 @@ type Props = Omit<TextInputProps, 'onChangeText' | 'value'> & {
 export function SearchField({ value, onChangeText, style, ...rest }: Props) {
   const colors = useColors();
   return (
-    <View style={[styles.box, { backgroundColor: colors.surface }, style]}>
+    <View
+      style={[styles.box, { backgroundColor: colors.surface, borderColor: colors.border }, style]}>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -42,6 +43,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: radius.md,
+    borderWidth: 1,
     minHeight: minTapTarget,
     paddingLeft: spacing.md,
   },

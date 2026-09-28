@@ -143,6 +143,16 @@ export class PokeCollectorClient {
   }
 
   /**
+   * Takes the route another client for the same server has already picked,
+   * so switching accounts does not cost a probe. Null means "probe".
+   */
+  adoptRoute(route: Route | null): void {
+    this.generation += 1;
+    this.resolving = null;
+    this.setRoute(route === 'fallback' && !this.credentials.fallbackUrl ? null : route);
+  }
+
+  /**
    * The Access headers alone, for image requests that go through the proxy.
    * Empty when no service token is configured, for a server without Access.
    */

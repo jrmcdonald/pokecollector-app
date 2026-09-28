@@ -24,7 +24,7 @@ export function Button({
       ? colors.accent
       : variant === 'destructive'
         ? colors.danger
-        : colors.surface;
+        : colors.surfaceRaised;
   const foreground = variant === 'secondary' ? colors.text : colors.onAccent;
   const inactive = disabled || busy;
 
@@ -42,7 +42,7 @@ export function Button({
       {busy ? (
         <ActivityIndicator color={foreground} />
       ) : (
-        <ThemedText variant="label" style={{ color: foreground }}>
+        <ThemedText variant="label" style={[styles.title, { color: foreground }]}>
           {title}
         </ThemedText>
       )}
@@ -52,10 +52,11 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: minTapTarget,
-    borderRadius: radius.md,
+    minHeight: minTapTarget + 4,
+    borderRadius: radius.md + 2,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  title: { fontSize: 16, lineHeight: 20 },
 });

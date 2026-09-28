@@ -11,6 +11,7 @@ import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useCollection } from '@/hooks/queries';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { minTapTarget, radius, spacing, useColors } from '@/theme';
 import {
   NO_FILTER,
@@ -31,6 +32,7 @@ const SORTS = Object.keys(SORT_LABELS) as CollectionSort[];
 export default function Collection() {
   const colors = useColors();
   const collection = useCollection();
+  const pull = usePullToRefresh(() => collection.refetch());
   const [filter, setFilter] = useState<CollectionFilter>(NO_FILTER);
   const [sort, setSort] = useState<CollectionSort>('recent');
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
@@ -110,7 +112,7 @@ export default function Collection() {
           />
         </View>
         {items ? (
-          <ThemedText variant="caption" color="textSecondary">
+          <ThemedText variant="figureSmall" color="textSecondary">
             {filtered ? `${shown.length} of ${items.length} entries` : `${items.length} entries`}
           </ThemedText>
         ) : null}
@@ -126,8 +128,8 @@ export default function Collection() {
           keyboardDismissMode="on-drag"
           refreshControl={
             <RefreshControl
-              refreshing={collection.isRefetching}
-              onRefresh={() => collection.refetch()}
+              refreshing={pull.refreshing}
+              onRefresh={pull.onRefresh}
               tintColor={colors.textSecondary}
             />
           }
@@ -137,6 +139,7 @@ export default function Collection() {
                 card={item.card ?? { id: item.card_id, name: item.card_id }}
                 detail={formatPrice(cardValue(item.card, item.variant))}
                 quantity={item.quantity}
+                photoItemId={item.has_scan_photo ? item.id : null}
               />
             ) : (
               <CollectionRow item={item} />
@@ -203,7 +206,12 @@ function CollectionRow({ item }: { item: CollectionItem }) {
       accessibilityRole="button"
       onPress={() => router.push({ pathname: '/card/[id]', params: { id: item.card_id } })}
       style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}>
-      <CardImage card={card} size="small" style={styles.rowImage} />
+      <CardImage
+        card={card}
+        size="small"
+        style={styles.rowImage}
+        photoItemId={item.has_scan_photo ? item.id : null}
+      />
       <View style={styles.rowText}>
         <ThemedText variant="label" numberOfLines={1}>
           {card.name}
@@ -216,8 +224,8 @@ function CollectionRow({ item }: { item: CollectionItem }) {
         </ThemedText>
       </View>
       <View style={styles.rowRight}>
-        <ThemedText variant="label">×{item.quantity}</ThemedText>
-        <ThemedText variant="caption" color="textSecondary">
+        <ThemedText variant="figureSmall">×{item.quantity}</ThemedText>
+        <ThemedText variant="figureSmall" color="textSecondary">
           {formatPrice(value * item.quantity)}
         </ThemedText>
       </View>
@@ -233,8 +241,8 @@ const styles = StyleSheet.create({
     minHeight: minTapTarget - 8,
     maxWidth: '48%',
     paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.sm + 2,
+    borderWidth: 1,
     justifyContent: 'center',
   },
   list: { padding: spacing.sm },

@@ -153,24 +153,24 @@ follows redirects by default, so without care an expired token looks like a
 
 ## 3. Tech stack
 
-| Concern          | Choice                                                                     | Notes                                                                                           |
-| ---------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Framework        | Expo SDK 57, TypeScript strict                                             | `expo-dev-client` for the custom dev build                                                      |
-| Navigation       | `expo-router`                                                              | Tab layout                                                                                      |
-| Server state     | TanStack Query v5                                                          | Cache persisted with `@tanstack/query-async-storage-persister`, so last-seen data works offline |
-| API types        | `openapi-typescript` over the committed spec                               | Generated, never hand-written                                                                   |
-| Validation       | `zod` at the boundary                                                      | For the fields the app relies on; the spec is the fuller description                            |
-| Lists            | `@shopify/flash-list`                                                      | Big card grids                                                                                  |
-| Images           | `expo-image`                                                               | Disk cache; `low.webp` in grids and `high.webp` in detail                                       |
-| Camera           | `expo-camera`                                                              | Shutter capture; version-matched to the SDK. See DECISIONS.md for why not vision-camera         |
-| Image processing | `expo-image-manipulator`                                                   | Crop and resize before upload                                                                   |
-| Secrets          | `expo-secure-store`                                                        | iOS Keychain                                                                                    |
-| Haptics          | `expo-haptics`                                                             |                                                                                                 |
-| Connectivity     | `@react-native-community/netinfo`                                          | Drives TanStack Query's `onlineManager`                                                         |
-| Charts (later)   | `react-native-gifted-charts` + `react-native-svg`                          | Chosen now so its native dependency ships in the first dev build                                |
-| Styling          | `StyleSheet` + a small theme (colors, spacing, type scale), light and dark | No UI kit                                                                                       |
-| Lint/format      | ESLint (`eslint-config-expo`) + Prettier                                   |                                                                                                 |
-| Tests            | Jest (`jest-expo`) + React Native Testing Library                          | API client and logic first                                                                      |
+| Concern          | Choice                                                                | Notes                                                                                           |
+| ---------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Framework        | Expo SDK 57, TypeScript strict                                        | `expo-dev-client` for the custom dev build                                                      |
+| Navigation       | `expo-router`                                                         | Tab layout                                                                                      |
+| Server state     | TanStack Query v5                                                     | Cache persisted with `@tanstack/query-async-storage-persister`, so last-seen data works offline |
+| API types        | `openapi-typescript` over the committed spec                          | Generated, never hand-written                                                                   |
+| Validation       | `zod` at the boundary                                                 | For the fields the app relies on; the spec is the fuller description                            |
+| Lists            | `@shopify/flash-list`                                                 | Big card grids                                                                                  |
+| Images           | `expo-image`                                                          | Disk cache; `low.webp` in grids and `high.webp` in detail                                       |
+| Camera           | `expo-camera`                                                         | Shutter capture; version-matched to the SDK. See DECISIONS.md for why not vision-camera         |
+| Image processing | `expo-image-manipulator`                                              | Crop and resize before upload                                                                   |
+| Secrets          | `expo-secure-store`                                                   | iOS Keychain                                                                                    |
+| Haptics          | `expo-haptics`                                                        |                                                                                                 |
+| Connectivity     | `@react-native-community/netinfo`                                     | Drives TanStack Query's `onlineManager`                                                         |
+| Charts (later)   | `react-native-gifted-charts` + `react-native-svg`                     | Chosen now so its native dependency ships in the first dev build                                |
+| Styling          | `StyleSheet` + a small theme (colors, spacing, type scale), dark only | No UI kit                                                                                       |
+| Lint/format      | ESLint (`eslint-config-expo`) + Prettier                              |                                                                                                 |
+| Tests            | Jest (`jest-expo`) + React Native Testing Library                     | API client and logic first                                                                      |
 
 **Every native module goes into the first dev-client build**, including the
 ones for later phases (camera, svg). Each native change means a CI rebuild and
@@ -330,11 +330,13 @@ bundle IDs: each new one uses one of the 10 App IDs a week.
       (TCGdex CDN, no auth); otherwise `/api/images/card/{id}/small|large` on the
       active address with the Access headers; otherwise a placeholder.
 - [x] Primary and fallback addresses, chosen by probe and re-chosen on network
-      changes (§2.0). Settings and Home show which is in use.
+      changes (§2.0). Settings shows which is in use; Home shows only an
+      "Offline" marker when there is no connection.
 
 ### 6.3 Theme and shell
 
-- [x] Theme (light and dark), base components, tab layout with placeholder
+- [x] Theme (dark only, "Night holo"; see `DECISIONS.md`), base components,
+      tab layout with placeholder
       screens.
 
 **Done when:** a fresh install onboards, survives an app restart, recovers from
@@ -358,28 +360,28 @@ a revoked service token.
 - [x] **Search (catalogue):** debounced (≥ 400 ms, given the rate limit),
       `page`/`page_size` infinite scroll, an owned badge computed against the
       cached collection rather than an extra request per tile.
-- [ ] **Sets:** list with a completion bar; the checklist shows owned vs
+- [x] **Sets:** list with a completion bar; the checklist shows owned vs
       missing (missing greyed out) with a "missing only" toggle.
-- [ ] **Binders:** list, then the binder's cards as a grid with owned/missing
+- [x] **Binders:** list, then the binder's cards as a grid with owned/missing
       state. Add a card from its detail screen; remove from the binder view.
-- [ ] **Wishlist:** list with prices and swipe to remove.
+- [x] **Wishlist:** list with prices and swipe to remove.
 
 ### 7.2 Offline and optimistic edits
 
 - [x] Persist the query cache so screens show last-known data offline.
-- [ ] Quantity, wishlist and binder edits update the UI at once and roll back
+- [x] Quantity, wishlist and binder edits update the UI at once and roll back
       with a toast if the request fails.
 - [ ] **Offline writes are out of scope for the MVP.** Edits need a
       connection; the UI disables them offline and says why. Queued offline
       mutations need each one registered with `setMutationDefaults` to survive a
       restart, plus conflict handling, which is not worth it for one user yet.
-- [ ] A small "offline" indicator.
+- [x] A small "offline" indicator.
 
 ### 7.3 UX quality bar
 
 - [ ] Skeleton loaders rather than spinners, pull-to-refresh everywhere.
 - [ ] A useful empty state for every list.
-- [ ] Haptic feedback on quantity change and on adding a card.
+- [x] Haptic feedback on quantity change and on adding a card.
 - [ ] Tap targets 44 pt or larger; Dynamic Type supported sensibly.
 - [ ] Smooth scrolling in 500+ card grids (FlashList, correctly sized images).
 
@@ -394,27 +396,28 @@ on one server needs one login each. The app holds several accounts **on one
 server** and switches between them; `pokecollector-mcp`'s `additional_accounts`
 solves the same problem the same way.
 
-- [ ] **Stored model.** One server entry (the two addresses and the service
-      token) and a list of accounts (username, password, opaque cache ID, and
-      a display name that defaults to the username), plus which one is active.
+- [x] **Stored model.** One server entry (the two addresses and the service
+      token) and a list of accounts (username, password and an opaque cache
+      ID), plus which one is active. A display name separate from the username
+      can come later if usernames turn out to be unfriendly.
       All of it lives in the Keychain, as now; the stored format gets a
       version bump and the existing single account is migrated into the list.
-- [ ] **One client per account.** Each account has its own client with its
+- [x] **One client per account.** Each account has its own client with its
       own JWT and login latch, over the shared route choice (primary or
       fallback is a property of the server, not the account). Logins stay lazy:
       an account signs in the first time it is used, not at launch, because
       five logins a minute are shared with every browser behind the tunnel.
-- [ ] **Switching.** From Home (tap the account name) and from Settings. The
+- [x] **Switching.** From Home (tap the account name) and from Settings. The
       switch is instant: query keys already start with the account's cache ID,
       so each account's persisted data is shown straight away and refreshed in
       the background. No cache is cleared on a switch.
-- [ ] **Adding an account.** Settings → Accounts → Add: username and password
+- [x] **Adding an account.** Settings → Accounts → Add: username and password
       only, tested against the server already configured. Removing one wipes
       its Keychain entry and its cached queries.
-- [ ] **Always visible.** The active account's name shows on Home and in any
+- [x] **Always visible.** The active account's name shows on Home and in any
       edit confirmation, so a card is never added to the wrong collection by
       accident.
-- [ ] **Tests.** Migration from the single-account format; per-account token
+- [x] **Tests.** Migration from the single-account format; per-account token
       isolation; switching keeps each account's cache; removing an account
       clears only its data.
 
@@ -433,20 +436,21 @@ account's collection.
 - [ ] **Prerequisite:** a scanner provider configured in PokeCollector for the
       account the app signs in as (Settings → Scanner in the web UI, on the LAN
       name because the configuration test outlasts Cloudflare's timeout).
-- [ ] **Camera screen:** full-screen preview with a card-shaped guide
+- [x] **Camera screen:** full-screen preview with a card-shaped guide
       (63 × 88 mm, aspect ≈ 0.716), torch toggle and shutter.
-- [ ] **Capture:** crop to the guide and resize to about 1200 px on the long
+- [x] **Capture:** crop to the guide and resize to about 1200 px on the long
       edge, JPEG quality ≈ 0.85. The model reads the collector number, set code and
       regulation mark, so smaller risks misreads. Upstream sanitises and re-encodes
       anyway.
-- [ ] **Upload** with `POST /api/cards/recognize/jobs` (one file), then poll
+- [x] **Upload** with `POST /api/cards/recognize/jobs` (one file), then poll
       `GET /api/cards/recognize/jobs/{job_id}` with backoff (1 s, 2 s, 4 s … capped;
       each poll counts against the rate limit). Show the candidates as tiles, plus
       "none of these, search instead", which opens a prefilled search.
-- [ ] **Confirm sheet:** variant, condition, quantity → `POST
+- [x] **Confirm sheet:** variant, condition, quantity → `POST
 .../items/{item_id}/resolve-and-add` (atomic and idempotent upstream).
-      "Add to binder" afterwards is a second call.
-- [ ] **Quick-scan mode:** after confirming, straight back to the camera, with
+      Adding to a binder stays on the card's page, so quick scanning stays
+      two taps.
+- [x] **Quick-scan mode:** after confirming, straight back to the camera, with
       a running tally.
 - [ ] **Later:** auto-capture with edge detection. That needs frame
       processors, which means adding `react-native-vision-camera` and a CI
@@ -455,9 +459,95 @@ account's collection.
 **Done when:** a sleeved or unsleeved card on a table gives the right card in
 the top 3 most of the time, and adding it takes 2 taps or fewer after the scan.
 
+### 8.1 Bulk scanning
+
+Photograph a stack of cards first, then send them all at once. PokeCollector's
+web UI already works this way, and the jobs API the app uses is built for it:
+
+- **Upstream:** the web UI stages photos (camera or library), and "Start
+  scanning" uploads them all as **one job**: up to 50 photos and 200 MB, one
+  item per photo, one card per photo. The server works through them in the
+  background. When the scanner provider passed its multi-image check
+  (`GET /api/settings/scanner` → `visual_verification: "automatic"`), it
+  groups up to four photos into one labelled composite per model call, which
+  is cheaper and quicker; otherwise it reads them one at a time. The
+  `individual_positions` field opts chosen photos out of grouping.
+- **Rate limit:** one upload, and one poll covers the whole job, since
+  `GET /api/cards/recognize/jobs/{id}` returns every item. So polling costs
+  the same for 30 cards as for one.
+
+The app:
+
+- [ ] **Batch mode on the Scan tab.** The shutter adds the cropped photo to a
+      tray of thumbnails instead of uploading: remove any, see the count, then
+      "Scan N cards". Photos stay on the phone until then.
+- [ ] **One multipart upload** with a `files` part per photo. At a few hundred
+      KB each, 50 photos are about 15 MB, well inside Cloudflare's 100 MB
+      body limit.
+- [ ] **Progress while it works:** "12 of 30 read", polling more slowly than
+      a single scan (every 3 s, easing to 10 s), and cards that are ready can
+      be reviewed before the rest finish.
+- [ ] **Review list:** every photo in order, using the phone's own thumbnail
+      (fetching each photo back from the server would cost a request each),
+      with the best candidate preselected. Tap to pick another candidate, set
+      variant, condition and quantity, or search instead.
+- [ ] **Add in a paced queue.** Confirming is still one `resolve-and-add` per
+      card, so "Add all" sends them one after another and backs off on a 429,
+      showing how many are left, rather than firing 30 at once.
+- [ ] **Come back later.** Jobs persist upstream, so a batch can be left and
+      reviewed later, in the app or in the web UI (`/scans/{id}`).
+      `GET /api/cards/recognize/jobs` lists the ones still needing attention;
+      the Scan tab shows a count and opens them.
+- [ ] **Later, needs a native build:** adding photos from the photo library
+      (`expo-image-picker`).
+
+**Done when:** thirty cards can be photographed in a minute or two, sent as
+one job, and added after a review that is mostly one tap each.
+
 ---
 
-## 9. Keeping up with upstream
+## 9. Phase 4 — Prebuilt decks (last, once the core is done)
+
+Look up a prebuilt deck (a theme deck, battle deck, League Battle Deck or
+similar), and add its cards in one go: to the collection, and as a deck made
+of those owned copies. PokeCollector has no catalogue of prebuilt decks, so
+the list has to come from somewhere else; everything after that is upstream
+endpoints that already exist.
+
+- [ ] **Find a source of deck lists.** Candidates, to check for coverage and
+      licence before choosing:
+  - `PokemonTCG/pokemon-tcg-data`, which has theme decks per set as JSON (the
+    older sets are well covered; the newer battle decks need checking). Its
+    card ids are pokemontcg.io's, which differ from TCGdex's for many sets
+    (`sv1-25` against `sv01-025`), so ids need mapping, by set and number.
+  - Decklists published as PTCGL export text (`4 Pikachu ex SVI 57`), which
+    many sites offer and people can paste. A paste box is the fallback in any
+    case: it works for any deck, including ones no source lists.
+- [ ] **Where the data lives.** Most likely a small JSON index bundled with
+      the app or fetched from a public URL, never the user's server. Nothing
+      in it is personal, so it can be public.
+- [ ] **Resolve each line to a catalogue card** with `/api/cards/search` by
+      set and number, and show anything unresolved for the user to pick or
+      skip before anything is written.
+- [ ] **Add in four requests, not sixty.** A 60-card deck is 20 to 40
+      distinct cards, and one request each would use the whole minute's rate
+      limit. Upstream already has the bulk paths:
+  1. `POST /api/collection/bulk-add` with every card and quantity.
+  2. `POST /api/decks/` to create a planned deck with the product's name.
+  3. `POST /api/binders/{id}/import-csv` with the list.
+  4. `POST /api/decks/{id}/convert-to-real`, which reserves the owned copies
+     just added, making it a "Real Deck": an owned deck card list.
+- [ ] **Options on confirm:** add to the collection only; or deck only, for
+      a deck being planned rather than opened.
+- [ ] **A Decks screen** to list and open decks, since the Binders screen
+      leaves them out today.
+
+**Done when:** choosing a prebuilt deck, or pasting a list, adds its cards to
+the collection and creates a Real Deck of them, in a handful of requests.
+
+---
+
+## 10. Keeping up with upstream
 
 The addon's upstream version moves with Renovate, and the API is not
 versioned. So:
@@ -474,19 +564,19 @@ versioned. So:
 
 ---
 
-## 10. Later ideas (only if the app gets heavy use)
+## 11. Later ideas (only if the app gets heavy use)
 
 - Decks, trades and sealed product screens
 - Price history charts and top movers
-- Auto-capture and batch "rip mode" scanning (only on the primary address when
-  that is the LAN one: the batch body can exceed Cloudflare's 100 MB)
+- Auto-capture (§8) and a "rip mode" that scans each card as it is flipped
+  onto the table, on top of bulk scanning (§8.1)
 - Upstream PRs for API tokens or cursor pagination, if their absence starts to
   hurt
 - Revisit native Swift or a paid Apple account if widgets start to matter
 
 ---
 
-## 11. Conventions for Claude Code
+## 12. Conventions for Claude Code
 
 - TypeScript strict and no `any`. Types come from the generated spec; zod
   validates what the app depends on.

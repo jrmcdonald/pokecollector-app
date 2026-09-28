@@ -18,6 +18,8 @@ export const UserSchema = z.looseObject({
   username: z.string(),
   role: z.string(),
   must_change_password: z.boolean().optional(),
+  /** The Pokémon (1–151) picked as this account's avatar in the web UI. */
+  avatar_id: z.number().nullish(),
 });
 export type User = z.infer<typeof UserSchema>;
 
@@ -115,11 +117,24 @@ export const CollectionItemSchema = z.looseObject({
   lang: z.string().nullish(),
   added_at: z.string().nullish(),
   purchase_price: price,
+  /** The owner has a photo of this entry: `GET /api/collection/{id}/photo`. */
+  has_scan_photo: z.boolean().nullish(),
+  printing_details: z.array(z.looseObject({ id: z.number(), name: z.string() })).nullish(),
   card: CardSchema.nullish(),
 });
 export type CollectionItem = z.infer<typeof CollectionItemSchema>;
 
 export const CollectionSchema = z.array(CollectionItemSchema);
+
+/** The account's own labels for a copy: "Stamped", "Error print", and so on. */
+export const PrintingDetailTagSchema = z.looseObject({
+  id: z.number(),
+  name: z.string(),
+  usage_count: z.number().nullish(),
+});
+export type PrintingDetailTag = z.infer<typeof PrintingDetailTagSchema>;
+
+export const PrintingDetailTagsSchema = z.array(PrintingDetailTagSchema);
 
 const DashboardCardSchema = z.looseObject({
   collection_item_id: z.number().nullish(),
@@ -132,6 +147,7 @@ const DashboardCardSchema = z.looseObject({
   variant: z.string().nullish(),
   added_at: z.string().nullish(),
   price_market: price,
+  has_scan_photo: z.boolean().nullish(),
 });
 export type DashboardCard = z.infer<typeof DashboardCardSchema>;
 
@@ -149,8 +165,183 @@ export const DashboardSchema = z.looseObject({
 });
 export type Dashboard = z.infer<typeof DashboardSchema>;
 
+// ---------------------------------------------------------------------------
+// Wishlist, sets and binders. Shapes follow upstream 1.51.0's routers
+// (`api/wishlist.py`, `api/sets.py`, `api/binders.py`); the checklist and
+// binder cards are untyped dicts in the spec.
+// ---------------------------------------------------------------------------
+
 export const WishlistItemSchema = z.looseObject({
   id: z.number(),
   card_id: z.string(),
   quantity: z.number(),
+  created_at: z.string().nullish(),
+  card: CardSchema.nullish(),
 });
+export type WishlistItem = z.infer<typeof WishlistItemSchema>;
+
+export const WishlistSchema = z.array(WishlistItemSchema);
+
+/** GET /api/sets/: every visible set, with how many of its cards this account owns. */
+export const SetSchema = z.looseObject({
+  id: z.string(),
+  name: z.string(),
+  series: z.string().nullish(),
+  release_date: z.string().nullish(),
+  total: z.number().nullish(),
+  printed_total: z.number().nullish(),
+  images_symbol: z.string().nullish(),
+  images_logo: z.string().nullish(),
+  abbreviation: z.string().nullish(),
+  lang: z.string().nullish(),
+  owned_count: z.number().nullish(),
+});
+export type CardSet = z.infer<typeof SetSchema>;
+
+export const SetsSchema = z.array(SetSchema);
+
+export const ChecklistCardSchema = CardSchema.extend({
+  owned: z.boolean().nullish(),
+  owned_quantity: z.number().nullish(),
+  wishlisted: z.boolean().nullish(),
+});
+export type ChecklistCard = z.infer<typeof ChecklistCardSchema>;
+
+/** GET /api/sets/{id}/checklist: every card in the set, owned or not, in number order. */
+export const ChecklistSchema = z.looseObject({
+  set: z.looseObject({
+    id: z.string(),
+    name: z.string(),
+    total: z.number().nullish(),
+  }),
+  cards: z.array(ChecklistCardSchema),
+  owned_count: z.number(),
+  total_count: z.number(),
+  progress: z.number().nullish(),
+});
+export type Checklist = z.infer<typeof ChecklistSchema>;
+
+/**
+ * Upstream's binder types. A "collection" binder holds exact collection
+ * entries, so it only ever shows owned cards; a "wishlist" (planned) binder
+ * lists cards to collect, owned or not. Decks share the endpoint and are
+ * left out of the Binders screen.
+ */
+export const DECK_TYPES = ['deck', 'physical_deck'] as const;
+
+export const BinderSchema = z.looseObject({
+  id: z.number(),
+  name: z.string(),
+  description: z.string().nullish(),
+  color: z.string().nullish(),
+  binder_type: z.string().nullish(),
+  card_count: z.number().nullish(),
+  unique_card_count: z.number().nullish(),
+});
+export type Binder = z.infer<typeof BinderSchema>;
+
+export const BindersSchema = z.array(BinderSchema);
+
+export const BinderCardSchema = z.looseObject({
+  /** The catalogue card's id. */
+  id: z.string(),
+  /** This entry's id in the binder, for removing it. */
+  binder_card_id: z.number(),
+  name: z.string(),
+  set_id: z.string().nullish(),
+  set_name: z.string().nullish(),
+  number: z.string().nullish(),
+  rarity: z.string().nullish(),
+  images_small: z.string().nullish(),
+  images_large: z.string().nullish(),
+  price_market: price,
+  owned: z.boolean().nullish(),
+  required_quantity: z.number().nullish(),
+  owned_quantity: z.number().nullish(),
+  missing_quantity: z.number().nullish(),
+  variant: z.string().nullish(),
+  condition: z.string().nullish(),
+  collection_item_id: z.number().nullish(),
+  has_scan_photo: z.boolean().nullish(),
+});
+export type BinderCard = z.infer<typeof BinderCardSchema>;
+
+export const BinderCardsSchema = z.looseObject({
+  binder: BinderSchema,
+  cards: z.array(BinderCardSchema),
+  owned_count: z.number().nullish(),
+  total_count: z.number().nullish(),
+  missing_count: z.number().nullish(),
+  binder_value: z.number().nullish(),
+  current_value: z.number().nullish(),
+  cost_to_complete: z.number().nullish(),
+});
+export type BinderCards = z.infer<typeof BinderCardsSchema>;
+
+// ---------------------------------------------------------------------------
+// Scanning. Upstream 1.51.0's `api/scan_jobs.py`; all untyped in the spec.
+// ---------------------------------------------------------------------------
+
+/** One candidate the scanner offers for a photo. */
+export const ScanMatchSchema = z.looseObject({
+  /** The catalogue card id, with its language: `sv1-025_en`. */
+  id: z.string(),
+  /** TCGdex's id without the language: `sv1-025`. What confirming names. */
+  tcg_card_id: z.string(),
+  name: z.string(),
+  number: z.string().nullish(),
+  rarity: z.string().nullish(),
+  set_abbreviation: z.string().nullish(),
+  image: z.string().nullish(),
+  image_hd: z.string().nullish(),
+  lang: z.string().nullish(),
+});
+export type ScanMatch = z.infer<typeof ScanMatchSchema>;
+
+/** What the model read off the card, before matching. */
+export const RecognizedSchema = z.looseObject({
+  name: z.string().nullish(),
+  name_en: z.string().nullish(),
+  number_local: z.union([z.string(), z.number()]).nullish(),
+  set_code: z.string().nullish(),
+  language: z.string().nullish(),
+});
+export type Recognized = z.infer<typeof RecognizedSchema>;
+
+export const SCAN_ITEM_STATUSES = ['pending', 'processing', 'retrying', 'done', 'failed'] as const;
+
+export const ScanItemSchema = z.looseObject({
+  id: z.number(),
+  // A string, not an enum: a new upstream status must not break polling.
+  status: z.string(),
+  resolved: z.boolean(),
+  error: z.string().nullish(),
+  recognized: RecognizedSchema.nullish(),
+  // Checked one by one in `candidatesOf`, so one odd candidate cannot hide
+  // the rest.
+  matches: z.array(z.unknown()).nullish(),
+  next_attempt_at: z.string().nullish(),
+  retry_reason: z.string().nullish(),
+});
+export type ScanItem = z.infer<typeof ScanItemSchema>;
+
+export const ScanJobSchema = z.looseObject({
+  id: z.number(),
+  status: z.string(),
+  total: z.number().nullish(),
+  items: z.array(ScanItemSchema).nullish(),
+});
+export type ScanJob = z.infer<typeof ScanJobSchema>;
+
+export const ResolveAndAddSchema = z.looseObject({
+  item: z.looseObject({ id: z.number() }),
+  collection_item: CollectionItemSchema,
+});
+
+/** The usable candidates of a scanned item, best first as upstream ranks them. */
+export function candidatesOf(item: Pick<ScanItem, 'matches'>): ScanMatch[] {
+  return (item.matches ?? []).flatMap((m) => {
+    const parsed = ScanMatchSchema.safeParse(m);
+    return parsed.success ? [parsed.data] : [];
+  });
+}

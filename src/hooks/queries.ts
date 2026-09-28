@@ -13,23 +13,35 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
 import { useSyncExternalStore } from 'react';
-import { Alert } from 'react-native';
 
 import {
+  addCardToPlannedBinder,
+  addCollectionItemToBinder,
   addToCollection,
   addToWishlist,
+  getBinderCards,
+  getBinders,
   getCard,
   getCollection,
   getDashboard,
+  getPrintingDetailTags,
+  getSetChecklist,
+  getSets,
+  getWishlist,
+  removeBinderEntry,
   removeFromCollection,
+  removeFromWishlist,
+  resolveAndAddScan,
   searchCards,
   updateCollectionItem,
   type NewCollectionItem,
 } from '@/api/endpoints';
 import { ApiError } from '@/api/errors';
-import type { CollectionItem } from '@/api/schemas';
+import type { BinderCards, CollectionItem, WishlistItem } from '@/api/schemas';
 import { useSession } from '@/session/session';
+import { showToast } from '@/utils/toast';
 
 const SEARCH_PAGE_SIZE = 30;
 
@@ -46,6 +58,14 @@ function useKeys() {
       card: (id: string) => [cacheId, 'card', id] as const,
       search: (q: string) => [cacheId, 'search', q] as const,
       searchAll: [cacheId, 'search'] as const,
+      wishlist: [cacheId, 'wishlist'] as const,
+      sets: [cacheId, 'sets'] as const,
+      checklist: (setId: string) => [cacheId, 'checklist', setId] as const,
+      checklistAll: [cacheId, 'checklist'] as const,
+      binders: [cacheId, 'binders'] as const,
+      binder: (id: number) => [cacheId, 'binder', id] as const,
+      binderAll: [cacheId, 'binder'] as const,
+      printingDetails: [cacheId, 'printing-details'] as const,
     },
   };
 }
@@ -98,20 +118,98 @@ export function useCardSearch(q: string) {
   });
 }
 
-/** Refetches what a change to the collection affects. */
+export function usePrintingDetailTags() {
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.printingDetails,
+    queryFn: () => getPrintingDetailTags(getClient()),
+    enabled,
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+export function useWishlist() {
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.wishlist,
+    queryFn: () => getWishlist(getClient()),
+    enabled,
+  });
+}
+
+export function useSets() {
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.sets,
+    queryFn: () => getSets(getClient()),
+    enabled,
+    // New sets arrive a few times a year; owned counts are refreshed by
+    // invalidation whenever the collection changes.
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+export function useSetChecklist(setId: string) {
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.checklist(setId),
+    queryFn: () => getSetChecklist(getClient(), setId),
+    enabled: enabled && setId.length > 0,
+    staleTime: 30 * 60 * 1000,
+  });
+}
+
+export function useBinders() {
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.binders,
+    queryFn: () => getBinders(getClient()),
+    enabled,
+  });
+}
+
+export function useBinderCards(id: number) {
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.binder(id),
+    queryFn: () => getBinderCards(getClient(), id),
+    enabled: enabled && Number.isInteger(id) && id > 0,
+  });
+}
+
+/**
+ * Refetches what a change to the collection affects. Only screens on show
+ * refetch straight away; the rest are marked stale and refetch when opened.
+ */
 function useInvalidateOwnership() {
   const queryClient = useQueryClient();
   const { keys } = useKeys();
   return () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: keys.collection }),
-      queryClient.invalidateQueries({ queryKey: keys.dashboard }),
-      queryClient.invalidateQueries({ queryKey: keys.searchAll }),
-    ]);
+    Promise.all(
+      [
+        keys.collection,
+        keys.dashboard,
+        keys.searchAll,
+        keys.sets,
+        keys.checklistAll,
+        keys.binders,
+        keys.binderAll,
+        keys.printingDetails,
+      ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    );
+}
+
+/** A success tap. Never allowed to fail the mutation it follows. */
+function succeeded() {
+  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
 }
 
 function reportFailure(title: string, error: unknown) {
-  Alert.alert(title, error instanceof ApiError ? error.message : 'Something went wrong.');
+  showToast({
+    kind: 'error',
+    title,
+    message: error instanceof ApiError ? error.message : 'Something went wrong. Try again.',
+  });
 }
 
 /**
@@ -155,6 +253,24 @@ export function applyQuantity(
     : items.filter((entry) => entry.id !== id);
 }
 
+/** Changes a copy's variant, condition or printing details. Not optimistic: upstream may merge rows. */
+export function useUpdateCopy() {
+  const { getClient } = useKeys();
+  const invalidate = useInvalidateOwnership();
+  return useMutation({
+    mutationFn: ({
+      item,
+      patch,
+    }: {
+      item: CollectionItem;
+      patch: Parameters<typeof updateCollectionItem>[2];
+    }) => updateCollectionItem(getClient(), item.id, patch),
+    onSuccess: succeeded,
+    onError: (error) => reportFailure('Could not change the copy', error),
+    onSettled: invalidate,
+  });
+}
+
 export function useAddToCollection() {
   const { getClient } = useKeys();
   const invalidate = useInvalidateOwnership();
@@ -165,13 +281,120 @@ export function useAddToCollection() {
   });
 }
 
+/** Adds a scanned card as its confirmed candidate, and marks the scan handled. */
+export function useAddFromScan() {
+  const { getClient } = useKeys();
+  const invalidate = useInvalidateOwnership();
+  return useMutation({
+    mutationFn: ({
+      jobId,
+      itemId,
+      add,
+    }: {
+      jobId: number;
+      itemId: number;
+      add: Parameters<typeof resolveAndAddScan>[3];
+    }) => resolveAndAddScan(getClient(), jobId, itemId, add),
+    onSuccess: succeeded,
+    onError: (error) => reportFailure('Could not add the card', error),
+    onSettled: invalidate,
+  });
+}
+
 export function useAddToWishlist() {
   const queryClient = useQueryClient();
   const { getClient, keys } = useKeys();
   return useMutation({
     mutationFn: (cardId: string) => addToWishlist(getClient(), cardId),
+    onSuccess: succeeded,
     onError: (error) => reportFailure('Could not add to the wishlist', error),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.searchAll }),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.wishlist }),
+        queryClient.invalidateQueries({ queryKey: keys.searchAll }),
+        queryClient.invalidateQueries({ queryKey: keys.checklistAll }),
+      ]),
+  });
+}
+
+/** Optimistic: the row goes at once and comes back if the server says no. */
+export function useRemoveFromWishlist() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: (item: WishlistItem) => removeFromWishlist(getClient(), item.id),
+    onMutate: async (item) => {
+      await queryClient.cancelQueries({ queryKey: keys.wishlist });
+      const previous = queryClient.getQueryData<WishlistItem[]>(keys.wishlist);
+      queryClient.setQueryData<WishlistItem[]>(keys.wishlist, (items) =>
+        items?.filter((entry) => entry.id !== item.id),
+      );
+      return { previous };
+    },
+    onError: (error, _item, context) => {
+      if (context?.previous) queryClient.setQueryData(keys.wishlist, context.previous);
+      reportFailure('Could not remove it from the wishlist', error);
+    },
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.wishlist }),
+        queryClient.invalidateQueries({ queryKey: keys.searchAll }),
+        queryClient.invalidateQueries({ queryKey: keys.checklistAll }),
+      ]),
+  });
+}
+
+/**
+ * What to put in a binder. A collection binder takes one exact owned copy; a
+ * planned binder takes the card itself, owned or not.
+ */
+export type BinderAddition =
+  { binderId: number; collectionItemId: number } | { binderId: number; cardId: string };
+
+export function useAddToBinder() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: (addition: BinderAddition) =>
+      'collectionItemId' in addition
+        ? addCollectionItemToBinder(getClient(), addition.binderId, addition.collectionItemId)
+        : addCardToPlannedBinder(getClient(), addition.binderId, addition.cardId),
+    onSuccess: succeeded,
+    onError: (error) => reportFailure('Could not add it to the binder', error),
+    onSettled: (_data, _error, addition) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.binders }),
+        queryClient.invalidateQueries({ queryKey: keys.binder(addition.binderId) }),
+      ]),
+  });
+}
+
+/** Optimistic, like the wishlist. */
+export function useRemoveFromBinder() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: ({ binderId, binderCardId }: { binderId: number; binderCardId: number }) =>
+      removeBinderEntry(getClient(), binderId, binderCardId),
+    onMutate: async ({ binderId, binderCardId }) => {
+      await queryClient.cancelQueries({ queryKey: keys.binder(binderId) });
+      const previous = queryClient.getQueryData<BinderCards>(keys.binder(binderId));
+      queryClient.setQueryData<BinderCards>(keys.binder(binderId), (data) =>
+        data
+          ? { ...data, cards: data.cards.filter((c) => c.binder_card_id !== binderCardId) }
+          : data,
+      );
+      return { previous };
+    },
+    onError: (error, { binderId }, context) => {
+      if (context?.previous) queryClient.setQueryData(keys.binder(binderId), context.previous);
+      reportFailure('Could not remove it from the binder', error);
+    },
+    onSettled: (_data, _error, { binderId }) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.binders }),
+        queryClient.invalidateQueries({ queryKey: keys.binder(binderId) }),
+      ]),
   });
 }
 

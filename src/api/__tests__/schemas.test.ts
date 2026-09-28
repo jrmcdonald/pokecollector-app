@@ -1,4 +1,12 @@
-import { CollectionSchema, DashboardSchema, SearchResponseSchema } from '../schemas';
+import {
+  BinderCardsSchema,
+  ChecklistSchema,
+  CollectionSchema,
+  DashboardSchema,
+  SearchResponseSchema,
+  SetsSchema,
+  WishlistSchema,
+} from '../schemas';
 
 // Shapes copied from a live 1.51.0 server's responses, with made-up values.
 const card = {
@@ -73,5 +81,90 @@ describe('response schemas', () => {
       price_field: 'price_trend',
     });
     expect(parsed.total_sets).toBe(221);
+  });
+
+  // Shapes from upstream 1.51.0's routers, with made-up values.
+  it('parses sets with owned counts', () => {
+    const [set] = SetsSchema.parse([
+      {
+        id: 'xy1_en',
+        tcg_set_id: 'xy1',
+        name: 'XY',
+        series: 'XY',
+        release_date: '2014-02-05',
+        total: 146,
+        printed_total: 146,
+        images_symbol: null,
+        images_logo: null,
+        abbreviation: 'XY',
+        is_new: false,
+        is_digital: false,
+        lang: 'en',
+        owned_count: 12,
+      },
+    ]);
+    expect(set?.owned_count).toBe(12);
+  });
+
+  it('parses a set checklist', () => {
+    const parsed = ChecklistSchema.parse({
+      set: { id: 'xy1_en', name: 'XY', series: 'XY', total: 146, lang: 'en' },
+      cards: [{ ...card, owned: true, owned_quantity: 2, wishlisted: false, owned_items: [] }],
+      owned_count: 1,
+      total_count: 146,
+      progress: 0.7,
+    });
+    expect(parsed.cards[0]?.owned_quantity).toBe(2);
+  });
+
+  it('parses a binder with its cards', () => {
+    const parsed = BinderCardsSchema.parse({
+      binder: { id: 4, name: 'Trade binder', color: '#EE1515', binder_type: 'collection' },
+      cards: [
+        {
+          id: card.id,
+          binder_card_id: 90,
+          name: card.name,
+          set_id: 'xy1',
+          set_name: 'XY',
+          number: '1',
+          rarity: card.rarity,
+          images_small: card.images_small,
+          images_large: card.images_large,
+          price_market: 3.5,
+          in_collection: true,
+          owned: true,
+          required_quantity: 1,
+          owned_quantity: 1,
+          missing_quantity: 0,
+          variant: 'Holo',
+          condition: 'NM',
+          card: { id: card.id, name: card.name },
+        },
+      ],
+      owned_count: 1,
+      total_count: 1,
+      missing_count: 0,
+      binder_value: 3.5,
+      current_value: 3.5,
+      cost_to_complete: 0,
+    });
+    expect(parsed.cards[0]?.binder_card_id).toBe(90);
+  });
+
+  it('parses a wishlist with its cards', () => {
+    const [item] = WishlistSchema.parse([
+      {
+        id: 3,
+        card_id: card.id,
+        quantity: 1,
+        price_alert_above: null,
+        price_alert_below: null,
+        notified_at: null,
+        created_at: '2026-09-01T10:00:00',
+        card: { ...card, set_ref: { id: 'xy1_en', name: 'XY' } },
+      },
+    ]);
+    expect(item?.card?.set_ref?.name).toBe('XY');
   });
 });

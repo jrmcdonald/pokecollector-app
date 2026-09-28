@@ -1,4 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
+import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,7 +21,16 @@ const DEBOUNCE_MS = 400;
 
 export default function Search() {
   const colors = useColors();
-  const [text, setText] = useState('');
+  // Scan's "search instead" opens this tab with what the scanner read.
+  const { q } = useLocalSearchParams<{ q?: string }>();
+  const [text, setText] = useState(q ?? '');
+  // A new q (the tab stays mounted) replaces what was typed. Adjusted during
+  // render rather than in an effect, so there is no render with the old text.
+  const [lastQ, setLastQ] = useState(q);
+  if (q !== lastQ) {
+    setLastQ(q);
+    if (q) setText(q);
+  }
   const query = useDebouncedValue(text.trim(), DEBOUNCE_MS);
   const search = useCardSearch(query);
 

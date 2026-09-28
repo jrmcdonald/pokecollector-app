@@ -186,3 +186,129 @@ the case that exists, and it keeps the addresses, service token and route
 choice single. Each account gets its own client and token, logging in lazily,
 and switching relies on the per-account cache IDs already in place, so it
 costs no requests for cached screens.
+
+## 2026-09-27 — The "Night holo" look, dark only
+
+Chosen from three directions mocked up in Claude Design (clean native,
+collector's binder, night holo).
+
+- **Dark only.** `Appearance.setColorScheme('dark')` at launch makes the native
+  headers, tab bar, alerts and keyboards dark whatever the phone is set to. It
+  is a JavaScript call, so the change needs no native build; the splash
+  screen's colors, which are native, stay as they are until the next build
+  touches `app.config.ts`.
+- **Colors:** near-black background, two raised surfaces, a yellow accent with
+  dark text on it, and a teal "holo" edge on card art.
+- **Fonts:** Space Grotesk for text and JetBrains Mono for prices, counts and
+  collector numbers, both under the SIL Open Font License, from the
+  `@expo-google-fonts` packages. They load at runtime from the bundle with
+  `useFonts`, one file per weight, and each weight is its own family name, so
+  styles set `fontFamily` and never `fontWeight`. A failed load falls back to
+  the system font rather than holding the splash screen.
+- **Avatars are initials** by default: the first letter of the account's
+  name on the accent color.
+- **The address in use moved to Settings.** Home shows only an "Offline"
+  marker; which address answered is a detail for Settings.
+
+## 2026-09-27 — Sets, binders and wishlist
+
+- **Sets and Wishlist live under More**, with Settings; Binders keeps its tab.
+  The Sets list defaults to the sets with a card owned, since the catalogue
+  has hundreds.
+- **Only binders, not decks.** Upstream serves decks from the binder
+  endpoints; they have their own rules (real decks allocate copies) and stay
+  in the web UI.
+- **Adding to a binder follows upstream's two kinds.** A collection binder
+  takes one exact owned copy, so the app asks which copy when there are
+  several and refuses when there is none; a planned binder takes the card
+  whether owned or not.
+- **Removing is a gesture with a confirmation or an undo.** Binder cards are
+  removed with a long press and a confirmation; wishlist rows with a swipe,
+  optimistically, restored if the server refuses. VoiceOver gets a "Remove"
+  action on the row.
+- **Every collection change marks sets, checklists and binders stale.** Only
+  the screen on show refetches straight away, so a change costs one or two
+  requests rather than one per cached list.
+
+## 2026-09-27 — Multiple accounts, as built
+
+Follows the plan in `PLAN.md` §7.4, with these details:
+
+- **Keychain format v4:** `{ server, accounts, activeId }` in one item. The
+  v3 single-account item is migrated on first launch, keeping its cache id as
+  the account's id, so nothing cached is lost; the new item is written before
+  the old one is deleted.
+- **The rules live in `src/auth/accounts.ts` as pure functions** and the
+  per-account clients in `src/session/client-pool.ts`, both unit-tested; the
+  React provider only wires them up.
+- **The connection form still edits the current account's login.** A new
+  primary address replaces every account (they belonged to the old server); a
+  username that is already saved switches to it; a new one replaces the
+  current account. A change to the addresses or service token retires every
+  account's client, since each carries them.
+- **Switching adopts the route** the previous account's client had picked,
+  so it costs no probe, and reuses that account's client (and token) if it
+  has one, so it costs no login either.
+- **Removing an account removes only its queries** (`removeQueries` on its
+  id); signing out still clears everything.
+- **Edits name the account** ("To ash's collection") only when more than one
+  is saved.
+
+## 2026-09-28 — Avatars are the Pokémon chosen in PokeCollector
+
+Each PokeCollector account can pick a Pokémon (1–151) as its avatar in the
+web UI; `/api/auth/me` returns it as `avatar_id`. The app shows that Pokémon's
+official artwork, from the server's own image cache
+(`/api/pokedex/images/artwork/{id}.png`), which needs Access but no login.
+Nothing is bundled: the artwork belongs to Nintendo, Game Freak and The
+Pokémon Company, and this repository is public. The disk cache key leaves out
+the address, so it downloads once per Pokémon. No avatar, or an image that
+fails, falls back to the initial. (The web UI itself uses animated sprites
+from PokeAPI's GitHub; the server's copy keeps the app to one origin.)
+
+## 2026-09-28 — Scanning
+
+- **Background jobs, not the synchronous endpoint.** `POST
+/api/cards/recognize` waits for the model inside the request, which can
+  outlast Cloudflare's 100-second timeout; the jobs API returns at once and is
+  polled. Polls back off (1, 2, 4, then 8 s, or upstream's own retry time) and
+  stop after two minutes, so one scan costs about half a dozen requests.
+- **The phone crops and shrinks the photo** to the card guide plus a small
+  margin, about 1200 px on the long edge, JPEG 0.85. The crop maths assumes the
+  preview fills its view, and lives in `src/utils/crop.ts` with tests.
+- **Uploads use an expo-file-system `File`.** `expo/fetch` encodes a
+  FormData part from anything with `bytes()`, but not React Native's
+  `{ uri, type, name }` objects. expo-file-system is already in the native
+  build through `expo`; listing it in `package.json` changes nothing native.
+- **Abandoned scans are deleted upstream** (cancel, retake, search instead),
+  so they do not collect in the web UI's scan inbox. Confirmed scans are
+  resolved by `resolve-and-add`, which also deletes the photo.
+- **Two taps after the shutter:** a candidate, then Add. Variant, condition
+  and quantity default to Normal, NM and 1, and the camera comes straight back
+  with a running tally. Binders stay on the card's page.
+
+## 2026-09-28 — After the first phone test
+
+- **Notices are in-app banners** (`src/utils/toast.ts`, `ToastHost`), themed
+  and dismissed with a tap, instead of system alerts. Questions before
+  something destructive (remove a copy, an account, a binder card) stay
+  native alerts.
+- **Pull-to-refresh shows only for the person's own pull.** Binding the
+  spinner to `isRefetching` showed it for background refreshes too, and iOS
+  could leave it stuck on a screen left mid-refresh.
+- **The owner's photo stands in for a missing card image**, as in the web UI:
+  when a card has no TCGdex or custom image and the entry has a photo
+  (`has_scan_photo`), `GET /api/collection/{id}/photo`, with the login, cached
+  per account and entry.
+- **Card art fills its frame** (`cover`): scans are slightly taller than
+  63 × 88, and `contain` left a sliver at the top and bottom.
+- **Every variant can be chosen**, always in the same order (Normal, Holo,
+  Reverse Holo, First Edition), with the first one the catalogue lists
+  preselected: its flags are often incomplete. An owned copy's variant, condition and printing details
+  can be changed in place, and printing details can be set when adding (a new
+  name creates the tag upstream).
+- **The saved service token secret is not shown in a field**; it is a
+  masked summary with Replace, which sidesteps the field that kept wrapping.
+- **Scan screen sits above the tab bar** (bottom safe area), the shade's
+  cut-out has the guide's rounded corners, results can always be closed, and
+  upstream's missing-key error (German for Gemini) gets the app's own words.

@@ -1,0 +1,31 @@
+import { StyleSheet, View } from 'react-native';
+
+import { useColors } from '@/theme';
+
+/** A thin completion bar. `value` runs from 0 to 1. */
+export function ProgressBar({ value, height = 6 }: { value: number; height?: number }) {
+  const colors = useColors();
+  const clamped = Math.min(1, Math.max(0, value));
+  return (
+    <View
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(clamped * 100) }}
+      style={[
+        styles.track,
+        { height, borderRadius: height / 2, backgroundColor: colors.surfaceRaised },
+      ]}>
+      <View
+        style={{
+          width: `${clamped * 100}%`,
+          height,
+          borderRadius: height / 2,
+          backgroundColor: clamped >= 1 ? colors.holo : colors.accent,
+        }}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  track: { overflow: 'hidden' },
+});

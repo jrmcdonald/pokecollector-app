@@ -40,3 +40,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Simulator tests (e2e/): build output, run output, and the generated Xcode project
+/build/
+/e2e-output/
+e2e/ios/*.xcodeproj/

@@ -1,0 +1,250 @@
+# Screenshot tests and Apple's accessibility audit, on the iOS simulator.
+#
+# Builds the production app for the simulator, serves it made-up data from a
+# fake PokeCollector (e2e/server), and runs the walkthrough (e2e/ios) twice:
+# at the default text size and at the largest accessibility size. Each run
+# screenshots every main screen and audits it. The default-size screenshots
+# are compared with the approved ones in e2e/screenshots.
+#
+# To approve a run's screenshots, add the approve-screenshots label to the
+# pull request, or run this workflow by hand with "approve" ticked. The run
+# commits them to the branch. See e2e/README.md.
+#
+# Free on a public repository, like every standard runner; about 40 minutes.
+name: Simulator
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'e2e/**'
+      - 'app.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/simulator.yml'
+  workflow_dispatch:
+    inputs:
+      approve:
+        description: Commit this run's screenshots to the branch as the approved ones
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: simulator-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  walkthrough:
+    # Other labels are not a reason to spend 40 minutes.
+    if: github.event.action != 'labeled' || github.event.label.name == 'approve-screenshots'
+    runs-on: macos-latest
+    timeout-minutes: 90
+    permissions:
+      # Only for approving: committing screenshots and removing the label.
+      contents: write
+      pull-requests: write
+    env:
+      APP_VARIANT: production
+      EXPO_NO_TELEMETRY: 1
+      SERVER_URL: https://localhost:8443
+      OUT: ${{ github.workspace }}/e2e-output
+      APPROVE: ${{ inputs.approve || github.event.label.name == 'approve-screenshots' }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          node --version
+          brew install xcodegen
+
+      - run: npm ci
+
+      # The newest "iPhone NN Pro" on the newest iOS. Its name goes next to the
+      # approved screenshots, since they only match on the same model.
+      - name: Pick a simulator
+        run: |
+          read -r udid device < <(xcrun simctl list devices available --json | jq -r '
+            [.devices | to_entries[] | select(.key | test("iOS")) | .key as $runtime
+             | .value[] | select(.name | test("^iPhone [0-9]+ Pro$"))
+             | {udid, name, ios: ($runtime | sub(".*iOS-"; "") | gsub("-"; "."))}]
+            | sort_by(.name, (.ios | split(".") | map(tonumber))) | last
+            | "\(.udid) \(.name), iOS \(.ios)"')
+          if [ -z "${udid}" ] || [ "${udid}" = null ]; then
+            echo "::error::No iPhone Pro simulator available" >&2
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "Using ${device} (${udid})"
+          mkdir -p "${OUT}"
+          echo "${device}" > "${OUT}/device.txt"
+          echo "SIM_UDID=${udid}" >> "$GITHUB_ENV"
+
+      - name: Generate the native project
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: pods-production-${{ hashFiles('package-lock.json', 'app.config.ts') }}
+
+      - name: Install pods
+        working-directory: ios
+        run: pod install
+
+      # Release, so the JavaScript is bundled in and no Metro is needed.
+      - name: Build the app for the simulator
+        run: |
+          set -o pipefail
+          mkdir -p build
+          workspace=$(ls -d ios/*.xcworkspace | head -n 1)
+          scheme=$(basename "${workspace}" .xcworkspace)
+          xcodebuild build \
+            -workspace "${workspace}" \
+            -scheme "${scheme}" \
+            -configuration Release \
+            -destination "id=${SIM_UDID}" \
+            -derivedDataPath build/app \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+            | tee build/app-build.log | grep -E 'error:|\*\* BUILD' || true
+          app=$(ls -d build/app/Build/Products/Release-iphonesimulator/*.app | head -n 1)
+          test -d "${app}"
+          echo "APP_PATH=${PWD}/${app}" >> "$GITHUB_ENV"
+          echo "APP_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "${app}/Info.plist")" >> "$GITHUB_ENV"
+
+      - name: Build the walkthrough
+        run: |
+          set -o pipefail
+          (cd e2e/ios && xcodegen generate)
+          xcodebuild build-for-testing \
+            -project e2e/ios/Walkthrough.xcodeproj \
+            -scheme Walkthrough \
+            -destination "id=${SIM_UDID}" \
+            -derivedDataPath build/walkthrough \
+            | tee build/walkthrough-build.log | grep -E 'error:|\*\* TEST BUILD' || true
+          grep -q '\*\* TEST BUILD SUCCEEDED' build/walkthrough-build.log
+
+      # A throwaway certificate authority, made fresh for each run, and a
+      # certificate for localhost signed by it. iOS wants a SAN, serverAuth
+      # and a short life for a certificate from a user-installed root.
+      - name: Start the fake server
+        run: |
+          tls="${RUNNER_TEMP}/tls"
+          mkdir -p "${tls}"
+          cd "${tls}"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -keyout ca-key.pem -out ca.pem \
+            -subj "/CN=PokeCollector walkthrough CA" \
+            -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign"
+          openssl req -newkey rsa:2048 -nodes -keyout server-key.pem -out server.csr -subj "/CN=localhost"
+          printf '%s\n' "subjectAltName=DNS:localhost,IP:127.0.0.1" "extendedKeyUsage=serverAuth" \
+            "basicConstraints=CA:FALSE" "keyUsage=critical,digitalSignature,keyEncipherment" > server.ext
+          openssl x509 -req -in server.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -days 2 \
+            -sha256 -extfile server.ext -out server.pem
+          echo "CA_CERT=${tls}/ca.pem" >> "$GITHUB_ENV"
+          cd "${GITHUB_WORKSPACE}"
+          nohup node e2e/server/fake-server.ts --port 8443 \
+            --cert "${tls}/server.pem" --key "${tls}/server-key.pem" > "${OUT}/server.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -fsS --cacert "${tls}/ca.pem" "${SERVER_URL}/api/auth/mode" && exit 0
+            sleep 1
+          done
+          cat "${OUT}/server.log"
+          exit 1
+
+      - name: Walkthrough at the default text size
+        id: default
+        continue-on-error: true
+        run: e2e/walkthrough.sh default large
+
+      - name: Walkthrough at the largest text size
+        id: largest
+        continue-on-error: true
+        run: e2e/walkthrough.sh largest accessibility-extra-extra-extra-large
+
+      - name: Report
+        id: report
+        if: always()
+        continue-on-error: true
+        run: node e2e/report.ts --output "${OUT}" --approved e2e/screenshots
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: simulator-screenshots
+          path: |
+            e2e-output
+            !e2e-output/*.xcresult
+            build/*.log
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure() || steps.default.outcome == 'failure' || steps.largest.outcome == 'failure'
+        with:
+          name: simulator-results
+          path: e2e-output/*.xcresult
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Approve these screenshots
+        if: always() && env.APPROVE == 'true'
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          shots=("${OUT}"/default/*.png)
+          if [ ${#shots[@]} -eq 0 ]; then
+            echo "::error::No screenshots to approve" >&2
+            exit 1
+          fi
+          git fetch --depth=1 origin "${BRANCH}"
+          git checkout -B "${BRANCH}" "origin/${BRANCH}"
+          rm -rf e2e/screenshots
+          mkdir -p e2e/screenshots
+          cp "${shots[@]}" e2e/screenshots/
+          cp "${OUT}/device.txt" e2e/screenshots/device.txt
+          git add -A e2e/screenshots
+          if git diff --cached --quiet; then
+            echo "The approved screenshots are already these."
+          else
+            git -c user.name='github-actions[bot]' \
+                -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+                commit -m "test: approve simulator screenshots" \
+                -m "From ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}, on $(cat "${OUT}/device.txt")."
+            git push origin "HEAD:${BRANCH}"
+          fi
+          if [ -n "${PR}" ]; then
+            gh pr edit "${PR}" --remove-label approve-screenshots
+          fi
+
+      - name: Result
+        if: always()
+        run: |
+          failed=0
+          if [ "${{ steps.default.outcome }}" != success ]; then
+            echo "::error::The walkthrough at the default text size failed; see the summary and its log"
+            failed=1
+          fi
+          if [ "${{ steps.largest.outcome }}" != success ]; then
+            echo "::error::The walkthrough at the largest text size failed; see the summary and its log"
+            failed=1
+          fi
+          if [ "${{ steps.report.outcome }}" != success ] && [ "${APPROVE}" != true ]; then
+            echo "::error::Screenshots differ from the approved ones; see the summary"
+            failed=1
+          fi
+          exit "${failed}"

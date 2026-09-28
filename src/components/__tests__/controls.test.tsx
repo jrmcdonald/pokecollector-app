@@ -151,4 +151,9 @@ describe('ProgressBar', () => {
     await render(<ProgressBar value={0.25} />);
     expect(screen.getByRole('progressbar')).toHaveAccessibilityValue({ min: 0, max: 100, now: 25 });
   });
+
+  it('stays out of VoiceOver when a summary beside it reads the same figures', async () => {
+    await render(<ProgressBar value={0.25} decorative />);
+    expect(screen.queryByRole('progressbar')).not.toBeOnTheScreen();
+  });
 });

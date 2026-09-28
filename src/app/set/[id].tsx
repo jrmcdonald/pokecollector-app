@@ -67,7 +67,11 @@ export default function SetChecklist() {
                   {Math.round(completion(data.owned_count, data.total_count) * 100)}%
                 </ThemedText>
               </View>
-              <ProgressBar value={completion(data.owned_count, data.total_count)} height={8} />
+              <ProgressBar
+                value={completion(data.owned_count, data.total_count)}
+                height={8}
+                decorative
+              />
               <Segmented<Show>
                 label="Show"
                 options={[

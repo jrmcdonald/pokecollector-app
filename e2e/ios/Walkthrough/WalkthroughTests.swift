@@ -317,7 +317,11 @@ final class WalkthroughTests: XCTestCase {
     guard let current = field.value as? String, !current.isEmpty,
       current != field.placeholderValue
     else { return }
-    field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+    // Put the cursor after the text first: a tap in the middle of it (one
+    // run left "https://localhost:8443" growing with each retry) deletes
+    // only what comes before.
+    field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
+    field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count + 4))
   }
 
   private func tab(_ name: String) {

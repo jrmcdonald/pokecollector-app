@@ -112,7 +112,10 @@ function Summary({ data, planned }: { data: BinderCards; planned: boolean }) {
     <View style={styles.header}>
       {planned ? (
         <>
-          <View style={styles.row}>
+          <View
+            style={styles.row}
+            accessible
+            accessibilityLabel={`${owned} of ${total} owned, ${Math.round(completion(owned, total) * 100)} percent, ${formatTotal(data.cost_to_complete ?? 0)} to complete`}>
             <ThemedText variant="figure">
               {owned}
               <ThemedText variant="figureSmall" color="textSecondary">
@@ -124,7 +127,7 @@ function Summary({ data, planned }: { data: BinderCards; planned: boolean }) {
               {formatTotal(data.cost_to_complete ?? 0)} to complete
             </ThemedText>
           </View>
-          <ProgressBar value={completion(owned, total)} height={8} />
+          <ProgressBar value={completion(owned, total)} height={8} decorative />
         </>
       ) : (
         <View style={styles.row}>

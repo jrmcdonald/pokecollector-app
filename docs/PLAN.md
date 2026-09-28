@@ -459,6 +459,51 @@ account's collection.
 **Done when:** a sleeved or unsleeved card on a table gives the right card in
 the top 3 most of the time, and adding it takes 2 taps or fewer after the scan.
 
+### 8.1 Bulk scanning
+
+Photograph a stack of cards first, then send them all at once. PokeCollector's
+web UI already works this way, and the jobs API the app uses is built for it:
+
+- **Upstream:** the web UI stages photos (camera or library), and "Start
+  scanning" uploads them all as **one job**: up to 50 photos and 200 MB, one
+  item per photo, one card per photo. The server works through them in the
+  background. When the scanner provider passed its multi-image check
+  (`GET /api/settings/scanner` → `visual_verification: "automatic"`), it
+  groups up to four photos into one labelled composite per model call, which
+  is cheaper and quicker; otherwise it reads them one at a time. The
+  `individual_positions` field opts chosen photos out of grouping.
+- **Rate limit:** one upload, and one poll covers the whole job, since
+  `GET /api/cards/recognize/jobs/{id}` returns every item. So polling costs
+  the same for 30 cards as for one.
+
+The app:
+
+- [ ] **Batch mode on the Scan tab.** The shutter adds the cropped photo to a
+      tray of thumbnails instead of uploading: remove any, see the count, then
+      "Scan N cards". Photos stay on the phone until then.
+- [ ] **One multipart upload** with a `files` part per photo. At a few hundred
+      KB each, 50 photos are about 15 MB, well inside Cloudflare's 100 MB
+      body limit.
+- [ ] **Progress while it works:** "12 of 30 read", polling more slowly than
+      a single scan (every 3 s, easing to 10 s), and cards that are ready can
+      be reviewed before the rest finish.
+- [ ] **Review list:** every photo in order, using the phone's own thumbnail
+      (fetching each photo back from the server would cost a request each),
+      with the best candidate preselected. Tap to pick another candidate, set
+      variant, condition and quantity, or search instead.
+- [ ] **Add in a paced queue.** Confirming is still one `resolve-and-add` per
+      card, so "Add all" sends them one after another and backs off on a 429,
+      showing how many are left, rather than firing 30 at once.
+- [ ] **Come back later.** Jobs persist upstream, so a batch can be left and
+      reviewed later, in the app or in the web UI (`/scans/{id}`).
+      `GET /api/cards/recognize/jobs` lists the ones still needing attention;
+      the Scan tab shows a count and opens them.
+- [ ] **Later, needs a native build:** adding photos from the photo library
+      (`expo-image-picker`).
+
+**Done when:** thirty cards can be photographed in a minute or two, sent as
+one job, and added after a review that is mostly one tap each.
+
 ---
 
 ## 9. Phase 4 — Prebuilt decks (last, once the core is done)
@@ -523,8 +568,8 @@ versioned. So:
 
 - Decks, trades and sealed product screens
 - Price history charts and top movers
-- Auto-capture and batch "rip mode" scanning (only on the primary address when
-  that is the LAN one: the batch body can exceed Cloudflare's 100 MB)
+- Auto-capture (§8) and a "rip mode" that scans each card as it is flipped
+  onto the table, on top of bulk scanning (§8.1)
 - Upstream PRs for API tokens or cursor pagination, if their absence starts to
   hurt
 - Revisit native Swift or a paid Apple account if widgets start to matter

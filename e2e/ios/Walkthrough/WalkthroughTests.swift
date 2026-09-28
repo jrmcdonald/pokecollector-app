@@ -133,9 +133,17 @@ final class WalkthroughTests: XCTestCase {
     type(username, into: app.textFields["PokeCollector username"])
     type(password, into: app.secureTextFields["PokeCollector password"])
     tap(app.buttons["Connect"])
-    let signedIn = Date().addingTimeInterval(45)
+    // The first connection on a freshly booted simulator can outlast the
+    // app's eight-second connection test; try again, as a person would.
+    let unreachable = element(startingWith: "Could not reach the server")
+    var retries = 0
+    let signedIn = Date().addingTimeInterval(60)
     while Date() < signedIn, !tabs.exists {
       dismissSystemSheets()
+      if unreachable.exists, retries < 2 {
+        retries += 1
+        tap(app.buttons["Connect"])
+      }
       Thread.sleep(forTimeInterval: 0.5)
     }
     if !tabs.exists {

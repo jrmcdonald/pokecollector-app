@@ -189,8 +189,6 @@ final class WalkthroughTests: XCTestCase {
       (.dynamicType, "dynamicType"),
       (.textClipped, "textClipped"),
       (.trait, "trait"),
-      (.action, "action"),
-      (.parentChild, "parentChild"),
     ]
     let matched = names.filter { type.contains($0.0) }.map(\.1)
     return matched.isEmpty ? "other(\(type.rawValue))" : matched.joined(separator: "+")

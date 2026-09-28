@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -12,6 +12,7 @@ import { ThemedView } from '@/components/themed-view';
 import { useIsOnline, useRemoveFromWishlist, useWishlist } from '@/hooks/queries';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { minTapTarget, spacing, useColors } from '@/theme';
+import { pick } from '@/utils/pick';
 import { cardValue, formatPrice, formatTotal } from '@/utils/pricing';
 import { wishlistCost } from '@/utils/wishlist';
 
@@ -82,8 +83,8 @@ export default function Wishlist() {
 }
 
 /**
- * A wishlist card. Tap opens it; the long-press menu or a swipe left removes
- * it, and VoiceOver has the same Remove action, so no gesture is the only
+ * A wishlist card. Tap opens it; holding it offers Remove, as does a swipe
+ * left, and VoiceOver has the same Remove action, so no gesture is the only
  * way (WCAG 2.5.1).
  */
 function WishlistRow({ item }: { item: WishlistItem }) {
@@ -93,6 +94,12 @@ function WishlistRow({ item }: { item: WishlistItem }) {
   const card = item.card ?? { id: item.card_id, name: item.card_id };
   const set = item.card?.set_ref?.name;
   const price = cardValue(item.card);
+
+  async function offerRemove() {
+    const index = await pick(card.name, ['Remove from wishlist'], { destructive: [0] });
+    if (index === 0) remove.mutate(item);
+  }
+
   return (
     <Swipeable
       friction={2}
@@ -106,51 +113,40 @@ function WishlistRow({ item }: { item: WishlistItem }) {
         </View>
       )}
       onSwipeableOpen={() => remove.mutate(item)}>
-      <Link href={{ pathname: '/card/[id]', params: { id: item.card_id } }} asChild>
-        <Link.Trigger>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${card.name}, ${price > 0 ? formatPrice(price) : 'no price yet'}${item.quantity > 1 ? `, ${item.quantity} wanted` : ''}`}
-            accessibilityActions={online ? [{ name: 'delete', label: 'Remove' }] : []}
-            onAccessibilityAction={(event) => {
-              if (event.nativeEvent.actionName === 'delete') remove.mutate(item);
-            }}
-            style={({ pressed }) => [
-              styles.row,
-              { backgroundColor: pressed ? colors.surface : colors.background },
-              { borderBottomColor: colors.border },
-            ]}>
-            <CardImage card={card} size="small" style={styles.image} />
-            <View style={styles.text}>
-              <ThemedText variant="label" numberOfLines={2}>
-                {card.name}
-              </ThemedText>
-              <ThemedText variant="caption" color="textSecondary" numberOfLines={1}>
-                {[set, item.card?.number, item.card?.rarity].filter(Boolean).join(' · ')}
-              </ThemedText>
-            </View>
-            <View style={styles.right}>
-              <ThemedText variant="figureSmall" color={price > 0 ? 'text' : 'textSecondary'}>
-                {price > 0 ? formatPrice(price) : 'No price'}
-              </ThemedText>
-              {item.quantity > 1 ? (
-                <ThemedText variant="figureSmall" color="textSecondary">
-                  ×{item.quantity}
-                </ThemedText>
-              ) : null}
-            </View>
-          </Pressable>
-        </Link.Trigger>
-        <Link.Menu>
-          <Link.MenuAction
-            icon="trash"
-            destructive
-            disabled={!online}
-            onPress={() => remove.mutate(item)}>
-            Remove from wishlist
-          </Link.MenuAction>
-        </Link.Menu>
-      </Link>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${card.name}, ${price > 0 ? formatPrice(price) : 'no price yet'}${item.quantity > 1 ? `, ${item.quantity} wanted` : ''}`}
+        accessibilityActions={online ? [{ name: 'delete', label: 'Remove' }] : []}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'delete') remove.mutate(item);
+        }}
+        onPress={() => router.push({ pathname: '/card/[id]', params: { id: item.card_id } })}
+        onLongPress={online ? offerRemove : undefined}
+        style={({ pressed }) => [
+          styles.row,
+          { backgroundColor: pressed ? colors.surface : colors.background },
+          { borderBottomColor: colors.border },
+        ]}>
+        <CardImage card={card} size="small" style={styles.image} />
+        <View style={styles.text}>
+          <ThemedText variant="label" numberOfLines={2}>
+            {card.name}
+          </ThemedText>
+          <ThemedText variant="caption" color="textSecondary" numberOfLines={1}>
+            {[set, item.card?.number, item.card?.rarity].filter(Boolean).join(' · ')}
+          </ThemedText>
+        </View>
+        <View style={styles.right}>
+          <ThemedText variant="figureSmall" color={price > 0 ? 'text' : 'textSecondary'}>
+            {price > 0 ? formatPrice(price) : 'No price'}
+          </ThemedText>
+          {item.quantity > 1 ? (
+            <ThemedText variant="figureSmall" color="textSecondary">
+              ×{item.quantity}
+            </ThemedText>
+          ) : null}
+        </View>
+      </Pressable>
     </Swipeable>
   );
 }

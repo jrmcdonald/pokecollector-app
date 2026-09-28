@@ -344,9 +344,11 @@ Mobile Accessibility Guidelines found 3 high, 8 medium and 8 low findings.
 Every one was fixed except Larger Text (below).
 
 - **Hidden gestures have visible, native alternatives.** A long press on a
-  binder card, or on a wishlist row, opens an iOS context menu
-  (`Link.Menu` from expo-router, JavaScript only) with the action named, and
-  VoiceOver gets the same action from its Actions rotor. Taking a card out of
+  binder card, or on a wishlist row, opens an action sheet with the action
+  named, and VoiceOver gets the same action from its Actions rotor. (It was
+  expo-router's `Link.Menu` context menu at first, but its native preview
+  wrapper hid every tile in a list from VoiceOver, which the simulator audit
+  caught.) Taking a card out of
   a binder no longer asks first: it is undone by adding it back, the card
   stays in the collection, and a banner says so. Swipe to remove stays on the
   wishlist as a shortcut.
@@ -409,3 +411,7 @@ The third step of `PLAN.md` §8.2, in the `Simulator` workflow (`e2e/`).
 - **Approving commits from CI.** The `approve-screenshots` label makes a run
   commit its screenshots to the branch and remove the label, so approving
   never needs a Mac.
+- **The walkthrough found real bugs on its first full runs:** Home's stat
+  tiles broke words at the largest text size, binder cards inside
+  `Link.Menu` were missing from the accessibility tree, and back buttons were
+  named "(tabs)". All three are fixed; see the commits on PR #6.

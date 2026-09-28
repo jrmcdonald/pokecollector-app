@@ -208,7 +208,7 @@ collector's binder, night holo).
 - **Avatars are initials.** The account's picture is the first letter of its
   name on the accent color. Pokémon artwork is a possible later option, but it
   is not ours to redistribute, so it would be loaded at runtime and never
-  committed (see `PLAN.md` §10).
+  committed (see `PLAN.md` §11).
 - **The address in use moved to Settings.** Home shows only an "Offline"
   marker; which address answered is a detail for Settings.
 

@@ -460,7 +460,48 @@ the top 3 most of the time, and adding it takes 2 taps or fewer after the scan.
 
 ---
 
-## 9. Keeping up with upstream
+## 9. Phase 4 — Prebuilt decks (last, once the core is done)
+
+Look up a prebuilt deck (a theme deck, battle deck, League Battle Deck or
+similar), and add its cards in one go: to the collection, and as a deck made
+of those owned copies. PokeCollector has no catalogue of prebuilt decks, so
+the list has to come from somewhere else; everything after that is upstream
+endpoints that already exist.
+
+- [ ] **Find a source of deck lists.** Candidates, to check for coverage and
+      licence before choosing:
+  - `PokemonTCG/pokemon-tcg-data`, which has theme decks per set as JSON (the
+    older sets are well covered; the newer battle decks need checking). Its
+    card ids are pokemontcg.io's, which differ from TCGdex's for many sets
+    (`sv1-25` against `sv01-025`), so ids need mapping, by set and number.
+  - Decklists published as PTCGL export text (`4 Pikachu ex SVI 57`), which
+    many sites offer and people can paste. A paste box is the fallback in any
+    case: it works for any deck, including ones no source lists.
+- [ ] **Where the data lives.** Most likely a small JSON index bundled with
+      the app or fetched from a public URL, never the user's server. Nothing
+      in it is personal, so it can be public.
+- [ ] **Resolve each line to a catalogue card** with `/api/cards/search` by
+      set and number, and show anything unresolved for the user to pick or
+      skip before anything is written.
+- [ ] **Add in four requests, not sixty.** A 60-card deck is 20 to 40
+      distinct cards, and one request each would use the whole minute's rate
+      limit. Upstream already has the bulk paths:
+  1. `POST /api/collection/bulk-add` with every card and quantity.
+  2. `POST /api/decks/` to create a planned deck with the product's name.
+  3. `POST /api/binders/{id}/import-csv` with the list.
+  4. `POST /api/decks/{id}/convert-to-real`, which reserves the owned copies
+     just added, making it a "Real Deck": an owned deck card list.
+- [ ] **Options on confirm:** add to the collection only; or deck only, for
+      a deck being planned rather than opened.
+- [ ] **A Decks screen** to list and open decks, since the Binders screen
+      leaves them out today.
+
+**Done when:** choosing a prebuilt deck, or pasting a list, adds its cards to
+the collection and creates a Real Deck of them, in a handful of requests.
+
+---
+
+## 10. Keeping up with upstream
 
 The addon's upstream version moves with Renovate, and the API is not
 versioned. So:
@@ -477,7 +518,7 @@ versioned. So:
 
 ---
 
-## 10. Later ideas (only if the app gets heavy use)
+## 11. Later ideas (only if the app gets heavy use)
 
 - Decks, trades and sealed product screens
 - Price history charts and top movers
@@ -493,7 +534,7 @@ versioned. So:
 
 ---
 
-## 11. Conventions for Claude Code
+## 12. Conventions for Claude Code
 
 - TypeScript strict and no `any`. Types come from the generated spec; zod
   validates what the app depends on.

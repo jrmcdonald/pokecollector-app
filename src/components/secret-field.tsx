@@ -56,11 +56,12 @@ export function SecretField({
   return (
     <View style={styles.container}>
       <ThemedText variant="label">{label}</ThemedText>
-      <View
-        style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        accessible
-        accessibilityLabel={`${label}: saved, ${value.length} characters`}>
-        <ThemedText variant="figureSmall" color="textSecondary" style={styles.mask}>
+      <View style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.outline }]}>
+        <ThemedText
+          variant="figureSmall"
+          color="textSecondary"
+          style={styles.mask}
+          accessibilityLabel={`${label}: saved, ${value.length} characters`}>
           •••••••• {value.length} characters
         </ThemedText>
         <Pressable

@@ -76,6 +76,7 @@ function RootStack() {
         <Stack.Screen name="set/[id]" options={{ title: '' }} />
         <Stack.Screen name="binder/[id]" options={{ title: '' }} />
         <Stack.Screen name="add-account" options={{ title: 'Add an account' }} />
+        <Stack.Screen name="connection" options={{ title: 'Server and login' }} />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />

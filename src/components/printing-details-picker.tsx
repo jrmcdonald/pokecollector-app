@@ -4,6 +4,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { usePrintingDetailTags } from '@/hooks/queries';
 import { minTapTarget, radius, spacing, useColors } from '@/theme';
 
+import { Icon } from './icon';
 import { ThemedText } from './themed-text';
 
 /**
@@ -40,8 +41,8 @@ export function PrintingDetailsPicker({
   }
 
   return (
-    <View style={styles.container} accessibilityLabel="Printing details">
-      <ThemedText variant="overline" color="textSecondary">
+    <View style={styles.container}>
+      <ThemedText variant="label" color="textSecondary">
         Printing details
       </ThemedText>
       <View style={styles.row}>
@@ -57,7 +58,7 @@ export function PrintingDetailsPicker({
                 styles.chip,
                 {
                   backgroundColor: on ? colors.accent : colors.surface,
-                  borderColor: on ? colors.accent : colors.border,
+                  borderColor: on ? colors.accent : colors.outline,
                 },
               ]}>
               <ThemedText variant="label" style={{ color: on ? colors.onAccent : colors.text }}>
@@ -70,9 +71,10 @@ export function PrintingDetailsPicker({
           accessibilityRole="button"
           accessibilityLabel="Add a new printing detail"
           onPress={addNew}
-          style={[styles.chip, styles.dashed, { borderColor: colors.border }]}>
+          style={[styles.chip, styles.dashed, styles.newChip, { borderColor: colors.outline }]}>
+          <Icon name="plus" size={12} color="textSecondary" weight="bold" />
           <ThemedText variant="label" color="textSecondary">
-            + New
+            New
           </ThemedText>
         </Pressable>
       </View>
@@ -91,4 +93,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dashed: { borderStyle: 'dashed' },
+  newChip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
 });

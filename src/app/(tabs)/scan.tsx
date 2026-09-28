@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { searchTermFor } from '@/api/scan';
 import type { ScanMatch } from '@/api/schemas';
 import { Button } from '@/components/button';
+import { Icon } from '@/components/icon';
 import { GuideOverlay } from '@/components/scan/guide-overlay';
 import { ScanCandidates } from '@/components/scan/scan-candidates';
 import { ScanConfirm, type ScanChoice } from '@/components/scan/scan-confirm';
@@ -161,10 +162,14 @@ function Scanner() {
                   styles.round,
                   {
                     backgroundColor: torch ? colors.accent : colors.surface,
-                    borderColor: colors.border,
+                    borderColor: torch ? colors.accent : colors.outline,
                   },
                 ]}>
-                <ThemedText style={{ color: torch ? colors.onAccent : colors.text }}>ϟ</ThemedText>
+                <Icon
+                  name={torch ? 'flashlight.on.fill' : 'flashlight.off.fill'}
+                  size={18}
+                  color={torch ? 'onAccent' : 'text'}
+                />
               </Pressable>
             </View>
             {state.step === 'camera' && guide ? (
@@ -228,7 +233,7 @@ function Scanner() {
                     flow.reset();
                   }}
                   style={[styles.close, { backgroundColor: colors.surfaceRaised }]}>
-                  <ThemedText color="textSecondary">✕</ThemedText>
+                  <Icon name="xmark" size={14} color="textSecondary" weight="bold" />
                 </Pressable>
               </View>
               <ScrollView contentContainerStyle={styles.sheetContent} bounces={false}>

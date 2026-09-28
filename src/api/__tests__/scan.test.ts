@@ -1,5 +1,13 @@
 import { PokeCollectorClient } from '../client';
-import { MISSING_KEY, ScanTimedOut, nextDelay, searchTermFor, waitForScan } from '../scan';
+import {
+  MISSING_KEY,
+  ScanTimedOut,
+  nextDelay,
+  normaliseNumber,
+  rankCandidates,
+  searchTermFor,
+  waitForScan,
+} from '../scan';
 import { candidatesOf } from '../schemas';
 import { CREDENTIALS, fakeFetch, loginOk } from './fake-server';
 
@@ -112,5 +120,40 @@ describe('MISSING_KEY', () => {
     expect(MISSING_KEY.test('Only JPEG, PNG, WebP, and HEIC scan photos are supported.')).toBe(
       false,
     );
+  });
+});
+
+describe('normaliseNumber', () => {
+  it('compares collector numbers without leading zeros or the set total', () => {
+    expect(normaliseNumber('025')).toBe('25');
+    expect(normaliseNumber('25/198')).toBe('25');
+    expect(normaliseNumber(120)).toBe('120');
+    expect(normaliseNumber('TG05')).toBe('TG05');
+    expect(normaliseNumber('000')).toBe('0');
+    expect(normaliseNumber(null)).toBeNull();
+    expect(normaliseNumber('  ')).toBeNull();
+  });
+});
+
+describe('rankCandidates', () => {
+  const koraidon = (id: string, number: string) => ({
+    id: `${id}_en`,
+    tcg_card_id: id,
+    name: 'Koraidon ex',
+    number,
+  });
+  const candidates = [koraidon('sv05-120', '120'), koraidon('asc-121', '121')];
+
+  it('moves the candidate whose number was read to the front, and marks it', () => {
+    const ranked = rankCandidates([...candidates].reverse(), { number_local: '120' });
+    expect(ranked.map((r) => [r.match.tcg_card_id, r.numberMatches])).toEqual([
+      ['sv05-120', true],
+      ['asc-121', false],
+    ]);
+  });
+
+  it("keeps upstream's order when no number was read", () => {
+    expect(rankCandidates(candidates, null).map((r) => r.numberMatches)).toEqual([false, false]);
+    expect(rankCandidates(candidates, null)[0]?.match.tcg_card_id).toBe('sv05-120');
   });
 });

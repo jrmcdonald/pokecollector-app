@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useSession } from '@/session/session';
 import { fonts, useColors } from '@/theme';
 import { avatarImageSource } from '@/utils/images';
@@ -24,6 +25,7 @@ export function Avatar({
   size?: number;
 }) {
   const colors = useColors();
+  const reduceMotion = useReduceMotion();
   const { session } = useSession();
   const [failed, setFailed] = useState<number | null>(null);
   const proxy =
@@ -49,8 +51,9 @@ export function Avatar({
           source={source}
           style={{ width: size * 0.86, height: size * 0.86 }}
           contentFit="contain"
+          accessibilityIgnoresInvertColors
           cachePolicy="disk"
-          transition={120}
+          transition={reduceMotion ? 0 : 120}
           onError={() => setFailed(avatarId ?? null)}
         />
       ) : (

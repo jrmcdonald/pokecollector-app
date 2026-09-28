@@ -64,7 +64,7 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry(): void
 export function GridSkeleton({ columns = 3, rows = 3 }: { columns?: number; rows?: number }) {
   const colors = useColors();
   return (
-    <View style={styles.grid} accessibilityLabel="Loading">
+    <View style={styles.grid} accessible accessibilityLabel="Loading">
       {Array.from({ length: rows * columns }, (_, i) => (
         <View key={i} style={[styles.cell, { width: `${100 / columns}%` }]}>
           <View style={[styles.block, { backgroundColor: colors.surface }]} />
@@ -79,7 +79,7 @@ export function GridSkeleton({ columns = 3, rows = 3 }: { columns?: number; rows
 export function ListSkeleton({ rows = 8 }: { rows?: number }) {
   const colors = useColors();
   return (
-    <View style={styles.rows} accessibilityLabel="Loading">
+    <View style={styles.rows} accessible accessibilityLabel="Loading">
       {Array.from({ length: rows }, (_, i) => (
         <View key={i} style={styles.rowBlock}>
           <View style={[styles.line, styles.rowTitle, { backgroundColor: colors.surface }]} />

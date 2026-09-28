@@ -31,11 +31,20 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
+      // The title is replaced by a spinner while busy; without this the
+      // button would have no name for VoiceOver then.
+      accessibilityLabel={title}
       accessibilityState={{ disabled: !!inactive, busy }}
       disabled={inactive}
       style={(state) => [
         styles.base,
-        { backgroundColor: background, opacity: inactive ? 0.5 : state.pressed ? 0.8 : 1 },
+        {
+          backgroundColor: background,
+          // A secondary button's fill barely differs from the page, so its
+          // outline is what marks it as a button (WCAG 1.4.11).
+          borderColor: variant === 'secondary' ? colors.outline : background,
+          opacity: inactive ? 0.5 : state.pressed ? 0.8 : 1,
+        },
         typeof style === 'function' ? style(state) : style,
       ]}
       {...rest}>
@@ -54,6 +63,7 @@ const styles = StyleSheet.create({
   base: {
     minHeight: minTapTarget + 4,
     borderRadius: radius.md + 2,
+    borderWidth: 1,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',

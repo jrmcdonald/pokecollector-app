@@ -14,8 +14,9 @@ import {
   type Variant,
 } from '@/api/schemas';
 import { Button } from '@/components/button';
-import { CardImage } from '@/components/card-image';
+import { CardImage, frameForVariant } from '@/components/card-image';
 import { Chips } from '@/components/chips';
+import { Icon } from '@/components/icon';
 import { PrintingDetailsPicker } from '@/components/printing-details-picker';
 import { QuantityStepper } from '@/components/quantity-stepper';
 import { ErrorState, GridSkeleton } from '@/components/states';
@@ -52,13 +53,24 @@ export default function CardDetail() {
   const entries = entriesForCard(collection.data, id);
   const setName = useSetName(id, entries);
 
+  // The name is the large heading under the card; the bar shows it only once
+  // that heading has scrolled out of view, so it is never on screen twice.
+  const [headingBottom, setHeadingBottom] = useState(Number.POSITIVE_INFINITY);
+  const [showTitle, setShowTitle] = useState(false);
+
   const c = card.data;
+  const holo = entries.some((e) => frameForVariant(e.variant) === 'holo');
   return (
     <ThemedView style={styles.fill}>
-      <Stack.Screen options={{ title: c?.name ?? '' }} />
+      <Stack.Screen options={{ title: showTitle ? (c?.name ?? '') : '' }} />
       {c ? (
         <ScrollView
           contentContainerStyle={styles.content}
+          scrollEventThrottle={32}
+          onScroll={(event) => {
+            const past = event.nativeEvent.contentOffset.y > headingBottom;
+            if (past !== showTitle) setShowTitle(past);
+          }}
           refreshControl={
             <RefreshControl
               refreshing={pull.refreshing}
@@ -70,9 +82,15 @@ export default function CardDetail() {
             card={c}
             size="large"
             style={styles.image}
+            frame={holo ? 'holo' : 'plain'}
             photoItemId={entries.find((e) => e.has_scan_photo)?.id}
           />
-          <View style={styles.heading}>
+          <View
+            style={styles.heading}
+            onLayout={(event) => {
+              const { y, height } = event.nativeEvent.layout;
+              setHeadingBottom(y + height / 2);
+            }}>
             <ThemedText variant="title">{c.name}</ThemedText>
             <View style={styles.tags}>
               {[setName ?? c.set_id?.toUpperCase(), c.number, c.rarity]
@@ -147,7 +165,7 @@ function Prices({ card }: { card: Card }) {
         <ThemedText variant="overline" color="textSecondary">
           Trend
         </ThemedText>
-        <ThemedText variant="figure" style={[styles.trendValue, { color: colors.accent }]}>
+        <ThemedText variant="figure" style={styles.trendValue}>
           {formatPrice(card.price_trend)}
         </ThemedText>
       </View>
@@ -203,9 +221,7 @@ function Owned({ entries, disabled }: { entries: CollectionItem[]; disabled: boo
 
   return (
     <ThemedView background="surface" style={[styles.panel, { borderColor: colors.border }]}>
-      <ThemedText variant="overline" color="textSecondary">
-        {owner ? `In ${owner}` : 'In your collection'}
-      </ThemedText>
+      <ThemedText variant="heading">{owner ? `In ${owner}` : 'In your collection'}</ThemedText>
       {entries.map((item) => {
         const details = (item.printing_details ?? []).map((d) => d.name);
         const open = editing === item.id;
@@ -221,12 +237,10 @@ function Owned({ entries, disabled }: { entries: CollectionItem[]; disabled: boo
                 disabled={disabled}
                 onPress={() => setEditing(open ? null : item.id)}
                 style={({ pressed }) => [styles.ownedText, pressed && styles.pressed]}>
-                <ThemedText variant="label">
-                  {item.variant ?? 'Normal'}
-                  <ThemedText variant="label" style={{ color: colors.accent }}>
-                    {open ? '  ▴' : '  ✎'}
-                  </ThemedText>
-                </ThemedText>
+                <View style={styles.variantLine}>
+                  <ThemedText variant="label">{item.variant ?? 'Normal'}</ThemedText>
+                  <Icon name={open ? 'chevron.up' : 'pencil'} size={13} color="accent" />
+                </View>
                 <ThemedText variant="caption" color="textSecondary">
                   {[item.condition, ...details].join(' · ')} ·{' '}
                   {formatPrice(cardValue(item.card, item.variant))} each
@@ -427,7 +441,7 @@ function AddToBinder({
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   content: { padding: spacing.lg, gap: spacing.lg },
-  image: { width: '65%', alignSelf: 'center', borderRadius: radius.md, borderWidth: 2 },
+  image: { width: '65%', alignSelf: 'center', borderRadius: radius.md },
   heading: { gap: spacing.sm },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2 },
   tag: { borderRadius: radius.sm, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs },
@@ -451,4 +465,5 @@ const styles = StyleSheet.create({
   entry: { gap: spacing.sm },
   editor: { gap: spacing.sm + 4, paddingTop: spacing.xs, paddingBottom: spacing.sm },
   pressed: { opacity: 0.7 },
+  variantLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
 });

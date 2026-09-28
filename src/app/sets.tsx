@@ -3,10 +3,10 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
-import { Chips } from '@/components/chips';
 import { ListRow } from '@/components/list-row';
 import { ProgressBar } from '@/components/progress-bar';
 import { SearchField } from '@/components/search-field';
+import { Segmented } from '@/components/segmented';
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -32,7 +32,7 @@ export default function Sets() {
     <ThemedView style={styles.fill}>
       <View style={styles.controls}>
         <SearchField value={query} onChangeText={setQuery} placeholder="Set name or series" />
-        <Chips<Show>
+        <Segmented<Show>
           label="Show"
           options={[
             { value: 'started', label: 'Started' },
@@ -97,5 +97,5 @@ export default function Sets() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  controls: { padding: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm },
+  controls: { padding: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm + 4 },
 });

@@ -42,7 +42,7 @@ export function Chips<T extends string>({
               styles.chip,
               {
                 backgroundColor: selected ? colors.accent : colors.surface,
-                borderColor: selected ? colors.accent : colors.border,
+                borderColor: selected ? colors.accent : colors.outline,
               },
             ]}>
             <ThemedText variant="label" style={{ color: selected ? colors.onAccent : colors.text }}>

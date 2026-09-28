@@ -11,6 +11,8 @@ import {
   type Toast,
 } from '@/utils/toast';
 
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
+
 import { ThemedText } from './themed-text';
 
 /** Renders the current notice as a banner under the status bar. Mounted once, at the root. */
@@ -18,6 +20,8 @@ export function ToastHost() {
   const toast = useSyncExternalStore(subscribeToToasts, currentToast);
   const insets = useSafeAreaInsets();
   const [opacity] = useState(() => new Animated.Value(0));
+  // With Reduce Motion on, notices fade without sliding.
+  const reduceMotion = useReduceMotion();
 
   const hide = useCallback(
     (t: Toast) => {
@@ -48,7 +52,12 @@ export function ToastHost() {
           top: insets.top + spacing.sm,
           opacity,
           transform: [
-            { translateY: opacity.interpolate({ inputRange: [0, 1], outputRange: [-12, 0] }) },
+            {
+              translateY: opacity.interpolate({
+                inputRange: [0, 1],
+                outputRange: [reduceMotion ? 0 : -12, 0],
+              }),
+            },
           ],
         },
       ]}>

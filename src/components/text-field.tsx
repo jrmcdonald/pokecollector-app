@@ -23,7 +23,7 @@ export function TextField({ label, hint, style, ...rest }: Props) {
         style={[
           styles.input,
           typeScale.body,
-          { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border },
+          { color: colors.text, backgroundColor: colors.surface, borderColor: colors.outline },
           style,
         ]}
         {...rest}

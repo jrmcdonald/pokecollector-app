@@ -2,23 +2,30 @@ import { router } from 'expo-router';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import type { DashboardCard } from '@/api/schemas';
 import { Avatar } from '@/components/avatar';
 import { Button } from '@/components/button';
 import { CardTile } from '@/components/card-tile';
+import { Icon } from '@/components/icon';
 import { StatTile } from '@/components/stat-tile';
 import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useDashboard, useIsOnline } from '@/hooks/queries';
-import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useAccountMenu } from '@/hooks/use-account-menu';
 import { useMe } from '@/hooks/use-me';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useSession } from '@/session/session';
 import { minTapTarget, radius, spacing, useColors } from '@/theme';
 import { formatPrice, formatTotal } from '@/utils/pricing';
 
 const number = new Intl.NumberFormat('en-GB');
 
+/**
+ * The account, the collection's value and counts, one way into the
+ * collection, then what was added lately and what is worth most. Both rows
+ * come from the one dashboard request.
+ */
 export default function Home() {
   const colors = useColors();
   const me = useMe();
@@ -52,15 +59,18 @@ export default function Home() {
               onPress={openAccountMenu}
               style={({ pressed }) => [styles.account, pressed && styles.pressed]}>
               <Avatar name={name} avatarId={me.data?.avatar_id} />
-              <ThemedText variant="heading" numberOfLines={1} style={styles.name}>
+              <ThemedText
+                variant="heading"
+                accessibilityRole="none"
+                numberOfLines={1}
+                style={styles.name}>
                 {name ?? 'PokeCollector'}
               </ThemedText>
-              <ThemedText color="textSecondary" style={styles.caret}>
-                ⌄
-              </ThemedText>
+              <Icon name="chevron.down" size={13} color="textSecondary" />
             </Pressable>
             {!online ? (
-              <View style={[styles.offline, { borderColor: colors.border }]}>
+              <View style={[styles.offline, { borderColor: colors.outline }]}>
+                <Icon name="wifi.slash" size={12} color="textSecondary" />
                 <ThemedText variant="label" color="textSecondary">
                   Offline
                 </ThemedText>
@@ -79,11 +89,7 @@ export default function Home() {
                   <ThemedText variant="overline" color="textSecondary">
                     Collection value
                   </ThemedText>
-                  <ThemedText
-                    variant="figureLarge"
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    style={{ color: colors.accent }}>
+                  <ThemedText variant="figureLarge" numberOfLines={1} adjustsFontSizeToFit>
                     {formatTotal(d.total_value)}
                   </ThemedText>
                 </View>
@@ -99,39 +105,11 @@ export default function Home() {
                     }
                   />
                 </View>
+                <Button title="Browse your collection" onPress={() => router.push('/collection')} />
               </ThemedView>
 
               {d.recent_additions.length > 0 ? (
-                <View style={styles.section}>
-                  <View style={styles.sectionHeader}>
-                    <ThemedText variant="heading">Recently added</ThemedText>
-                    <Pressable
-                      accessibilityRole="link"
-                      hitSlop={spacing.sm}
-                      onPress={() => router.push('/collection')}>
-                      <ThemedText variant="label" style={{ color: colors.accent }}>
-                        All cards
-                      </ThemedText>
-                    </Pressable>
-                  </View>
-                  <FlatList
-                    horizontal
-                    data={d.recent_additions}
-                    keyExtractor={(item) => String(item.collection_item_id ?? item.card_id)}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.recentList}
-                    renderItem={({ item }) => (
-                      <View style={styles.recent}>
-                        <CardTile
-                          card={{ ...item, id: item.card_id }}
-                          detail={formatPrice(item.price_market)}
-                          quantity={item.quantity ?? 0}
-                          photoItemId={item.has_scan_photo ? item.collection_item_id : null}
-                        />
-                      </View>
-                    )}
-                  />
-                </View>
+                <CardRow title="Recently added" cards={d.recent_additions} />
               ) : (
                 <EmptyState
                   title="Nothing here yet"
@@ -139,8 +117,9 @@ export default function Home() {
                   action={{ title: 'Search the catalogue', onPress: () => router.push('/search') }}
                 />
               )}
-
-              <Button title="Browse your collection" onPress={() => router.push('/collection')} />
+              {d.top_cards && d.top_cards.length > 0 ? (
+                <CardRow title="Most valuable" cards={d.top_cards} />
+              ) : null}
             </>
           ) : dashboard.error ? (
             <ErrorState error={dashboard.error} onRetry={() => dashboard.refetch()} />
@@ -153,9 +132,35 @@ export default function Home() {
   );
 }
 
+function CardRow({ title, cards }: { title: string; cards: DashboardCard[] }) {
+  return (
+    <View style={styles.section}>
+      <ThemedText variant="heading">{title}</ThemedText>
+      <FlatList
+        horizontal
+        data={cards}
+        keyExtractor={(item) => String(item.collection_item_id ?? item.card_id)}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.cardList}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <CardTile
+              card={{ ...item, id: item.card_id }}
+              detail={formatPrice(item.price_market)}
+              quantity={item.quantity ?? 0}
+              variant={item.variant}
+              photoItemId={item.has_scan_photo ? item.collection_item_id : null}
+            />
+          </View>
+        )}
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  content: { padding: spacing.lg - 4, gap: spacing.lg - 4 },
+  content: { padding: spacing.lg - 4, gap: spacing.lg },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   account: {
     flex: 1,
@@ -166,8 +171,10 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.7 },
   name: { flexShrink: 1 },
-  caret: { fontSize: 18, lineHeight: 20, marginTop: -6 },
   offline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     borderWidth: 1,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.sm,
@@ -176,11 +183,6 @@ const styles = StyleSheet.create({
   hero: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md + 2, gap: spacing.md },
   stats: { flexDirection: 'row', gap: spacing.sm },
   section: { gap: spacing.sm + 4 },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  recentList: { gap: spacing.sm },
-  recent: { width: 116 },
+  cardList: { gap: spacing.sm },
+  card: { width: 116 },
 });

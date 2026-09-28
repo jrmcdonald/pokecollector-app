@@ -1,11 +1,17 @@
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
+import { rankCandidates } from '@/api/scan';
 import type { Recognized, ScanMatch } from '@/api/schemas';
 import { CardImage } from '@/components/card-image';
+import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
-import { spacing } from '@/theme';
+import { radius, spacing, useColors } from '@/theme';
 
-/** What the scanner read, and its candidates as tiles, best first. */
+/**
+ * What the scanner read, and its candidates as tiles. A candidate whose
+ * number is the one read off the card comes first and is marked, since
+ * printings of one Pokémon often differ only by set and number.
+ */
 export function ScanCandidates({
   candidates,
   recognized,
@@ -15,10 +21,10 @@ export function ScanCandidates({
   recognized: Recognized | null;
   onPick(match: ScanMatch): void;
 }) {
-  const read = [
-    recognized?.name,
-    [recognized?.set_code, recognized?.number_local].filter(Boolean).join(' '),
-  ]
+  const colors = useColors();
+  const ranked = rankCandidates(candidates, recognized).slice(0, 8);
+  const readNumber = recognized?.number_local ? String(recognized.number_local) : null;
+  const read = [recognized?.name, [recognized?.set_code, readNumber].filter(Boolean).join(' ')]
     .filter(Boolean)
     .join(' · ');
   return (
@@ -35,28 +41,55 @@ export function ScanCandidates({
       </View>
       <FlatList
         horizontal
-        data={candidates.slice(0, 8)}
-        keyExtractor={(m) => m.id}
+        data={ranked}
+        keyExtractor={(r) => r.match.id}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.list}
-        renderItem={({ item: match, index }) => (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${match.name}, ${match.set_abbreviation ?? ''} ${match.number ?? ''}${index === 0 ? ', best match' : ''}`}
-            onPress={() => onPick(match)}
-            style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
-            <CardImage
-              card={{ id: match.id, images_small: match.image, images_large: match.image_hd }}
-              size="small"
-            />
-            <ThemedText variant="label" numberOfLines={1}>
-              {match.name}
-            </ThemedText>
-            <ThemedText variant="figureSmall" color="textSecondary" numberOfLines={1}>
-              {[match.set_abbreviation?.toUpperCase(), match.number].filter(Boolean).join(' ')}
-            </ThemedText>
-          </Pressable>
-        )}
+        renderItem={({ item: { match, numberMatches } }) => {
+          const code = [match.set_abbreviation?.toUpperCase(), match.number]
+            .filter(Boolean)
+            .join(' ');
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={[
+                match.name,
+                code,
+                match.rarity,
+                numberMatches ? `matches number ${readNumber}` : null,
+              ]
+                .filter(Boolean)
+                .join(', ')}
+              onPress={() => onPick(match)}
+              style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
+              <CardImage
+                card={{ id: match.id, images_small: match.image, images_large: match.image_hd }}
+                size="small"
+              />
+              {numberMatches ? (
+                <View style={[styles.matchMark, { backgroundColor: colors.success }]}>
+                  <Icon name="checkmark" size={10} color="onAccent" weight="bold" />
+                  <ThemedText
+                    variant="caption"
+                    style={[styles.matchText, { color: colors.onAccent }]}>
+                    Matches {readNumber}
+                  </ThemedText>
+                </View>
+              ) : null}
+              <ThemedText variant="label" numberOfLines={2}>
+                {match.name}
+              </ThemedText>
+              <ThemedText variant="figureSmall" color="textSecondary" numberOfLines={1}>
+                {code}
+              </ThemedText>
+              {match.rarity ? (
+                <ThemedText variant="caption" color="textSecondary" numberOfLines={1}>
+                  {match.rarity}
+                </ThemedText>
+              ) : null}
+            </Pressable>
+          );
+        }}
       />
     </View>
   );
@@ -65,6 +98,16 @@ export function ScanCandidates({
 const styles = StyleSheet.create({
   container: { gap: spacing.sm + 4 },
   list: { gap: spacing.sm + 4 },
-  tile: { width: 108, gap: spacing.xs },
+  tile: { width: 112, gap: spacing.xs },
   pressed: { opacity: 0.7 },
+  matchMark: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 3,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.xs + 2,
+    marginTop: spacing.xs,
+  },
+  matchText: { fontSize: 11, lineHeight: 16 },
 });

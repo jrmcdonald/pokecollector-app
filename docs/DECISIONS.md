@@ -312,3 +312,70 @@ from PokeAPI's GitHub; the server's copy keeps the app to one origin.)
 - **Scan screen sits above the tab bar** (bottom safe area), the shade's
   cut-out has the guide's rounded corners, results can always be closed, and
   upstream's missing-key error (German for Gemini) gets the app's own words.
+
+## 2026-09-28 — Automated accessibility checks
+
+The first step of the design and accessibility review (`PLAN.md` §8.2).
+
+- **Theme contrast is a test.** `src/theme/__tests__/contrast.test.ts` lists
+  every foreground the app puts on every background, with the WCAG 2.2 AA
+  minimum it must meet: 4.5:1 for text, 3:1 for control edges and meaningful
+  graphics. All text already passed (the lowest is secondary text on a
+  selected control, 5.3:1). The control edges did not: `border` is 1.1–1.4:1,
+  so fields, unselected chips, secondary buttons and the torch now use a new
+  `outline` colour (3.1–3.9:1), and `border` is kept for decoration.
+- **Accessibility lint.** `eslint-plugin-react-native-a11y` with its iOS
+  rules, except the one requiring a hint on every label: Apple treats hints
+  as optional, and forcing them makes VoiceOver repeat itself. The plugin
+  declares ESLint 8 but works with 9; `package.json` overrides its peer
+  dependency, as for openapi-typescript. It found images that Smart Invert
+  would turn into negatives, and a Replace button VoiceOver could not reach.
+- **Component tests find controls as VoiceOver does**, by role and accessible
+  name, with React Native Testing Library. They found that a button showing
+  its spinner had no name, and that views given a role or label without
+  `accessible` (the progress bar, loading placeholders, the connection error)
+  were never exposed to VoiceOver at all.
+
+## 2026-09-28 — Design review fixes
+
+The second step of `PLAN.md` §8.2: the review against Apple's Human Interface
+Guidelines, WCAG 2.2 AA, Apple's Accessibility Nutrition Labels and the BBC
+Mobile Accessibility Guidelines found 3 high, 8 medium and 8 low findings.
+Every one was fixed except Larger Text (below).
+
+- **Hidden gestures have visible, native alternatives.** A long press on a
+  binder card, or on a wishlist row, opens an iOS context menu
+  (`Link.Menu` from expo-router, JavaScript only) with the action named, and
+  VoiceOver gets the same action from its Actions rotor. Taking a card out of
+  a binder no longer asks first: it is undone by adding it back, the card
+  stays in the collection, and a banner says so. Swipe to remove stays on the
+  wishlist as a shortcut.
+- **Icons are SF Symbols** (`Icon`, over expo-symbols' `SymbolView`), not text
+  glyphs: they match iOS, follow the weight of the text beside them and are
+  hidden from VoiceOver unless given a label. Tests replace `SymbolView` with
+  a plain view (`jest.setup.ts`).
+- **Accent means "you can press this."** Values (the collection's worth,
+  trend prices) are in the text colour; progress bars are holo, and green
+  when complete.
+- **A card's frame says one thing each:** a hairline for normal copies, holo
+  for holo and reverse holo, dashed with a "Missing" mark for cards not owned,
+  so missing is never shown by fading alone. The quantity badge shows only
+  from two copies up.
+- **Screens reached from a tab have large titles** (each tab is its own
+  stack, `TabStack`), headings are headings for the VoiceOver rotor
+  (`ThemedText`'s title and heading variants), and a card's name moves into
+  the navigation bar once its heading scrolls away.
+- **Settings is a grouped list** (accounts, connection, data, sign out); the
+  server addresses and login moved to their own screen, `/connection`.
+- **Two-way choices are a segmented control** (`Segmented`); chips stay for
+  the longer lists, such as variant and condition.
+- **Reduce Motion** turns off the banner's slide and image fades
+  (`useReduceMotion`).
+- **The wishlist total says what it leaves out** ("Plus 3 cards with no price
+  yet") instead of counting unpriced cards as free.
+- **Scan results put a card whose number matches the photo first**, marked
+  "Matches", with its rarity (`rankCandidates` in `src/api/scan.ts`).
+- **Later: Larger Text.** The app has not been checked at the largest
+  Dynamic Type sizes, and fixed heights (tiles, rows, the tab bar's
+  neighbours) will clip. That needs screenshots at each size, so it waits for
+  the simulator screenshot tests.

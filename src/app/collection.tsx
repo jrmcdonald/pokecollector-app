@@ -3,9 +3,12 @@ import { Stack, router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
+import type { SymbolViewProps } from 'expo-symbols';
+
 import type { CollectionItem } from '@/api/schemas';
-import { CardImage } from '@/components/card-image';
+import { CardImage, frameForVariant } from '@/components/card-image';
 import { CardTile } from '@/components/card-tile';
+import { Icon } from '@/components/icon';
 import { SearchField } from '@/components/search-field';
 import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
@@ -84,22 +87,27 @@ export default function Collection() {
         />
         <View style={styles.buttons}>
           <FilterButton
+            name="Set"
             label={labelFor(options.sets, filter.setId, 'Set')}
             active={!!filter.setId}
             onPress={() => choose('Set', options.sets, 'setId')}
           />
           <FilterButton
+            name="Rarity"
             label={labelFor(options.rarities, filter.rarity, 'Rarity')}
             active={!!filter.rarity}
             onPress={() => choose('Rarity', options.rarities, 'rarity')}
           />
           <FilterButton
+            name="Variant"
             label={labelFor(options.variants, filter.variant, 'Variant')}
             active={!!filter.variant}
             onPress={() => choose('Variant', options.variants, 'variant')}
           />
           <FilterButton
-            label={`↕ ${SORT_LABELS[sort]}`}
+            name="Sort"
+            icon="arrow.up.arrow.down"
+            label={SORT_LABELS[sort]}
             active={false}
             onPress={async () => {
               const index = await pick(
@@ -139,6 +147,7 @@ export default function Collection() {
                 card={item.card ?? { id: item.card_id, name: item.card_id }}
                 detail={formatPrice(cardValue(item.card, item.variant))}
                 quantity={item.quantity}
+                variant={item.variant}
                 photoItemId={item.has_scan_photo ? item.id : null}
               />
             ) : (
@@ -170,30 +179,48 @@ export default function Collection() {
   );
 }
 
+/**
+ * A button that opens a list of choices: the down chevron says so, unlike a
+ * chip that switches something directly (HIG Pull-down buttons).
+ */
 function FilterButton({
+  name,
   label,
   active,
+  icon,
   onPress,
 }: {
+  /** What it filters or sorts by, for VoiceOver. */
+  name: string;
+  /** What is chosen now, shown on the button. */
   label: string;
   active: boolean;
+  icon?: SymbolViewProps['name'];
   onPress(): void;
 }) {
   const colors = useColors();
+  const tint = active ? 'onAccent' : 'text';
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={`${name}: ${active || icon ? label : 'all'}`}
+      accessibilityHint="Opens a list of choices"
       onPress={onPress}
       style={[
         styles.filter,
-        { backgroundColor: active ? colors.accent : colors.surface, borderColor: colors.border },
+        {
+          backgroundColor: active ? colors.accent : colors.surface,
+          borderColor: active ? colors.accent : colors.outline,
+        },
       ]}>
+      {icon ? <Icon name={icon} size={13} color={tint} /> : null}
       <ThemedText
         variant="label"
         numberOfLines={1}
-        style={{ color: active ? colors.onAccent : colors.text }}>
+        style={[styles.filterLabel, { color: colors[tint] }]}>
         {label}
       </ThemedText>
+      <Icon name="chevron.down" size={11} color={tint} />
     </Pressable>
   );
 }
@@ -201,30 +228,34 @@ function FilterButton({
 function CollectionRow({ item }: { item: CollectionItem }) {
   const card = item.card ?? { id: item.card_id, name: item.card_id };
   const value = cardValue(item.card, item.variant);
+  const where = [setNameOf(item), item.card?.number].filter(Boolean).join(' · ');
+  const what = [item.variant ?? 'Normal', item.condition].join(' · ');
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={`${card.name}, ${where}, ${what}, ${item.quantity} owned, ${formatPrice(value * item.quantity)}`}
       onPress={() => router.push({ pathname: '/card/[id]', params: { id: item.card_id } })}
       style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}>
       <CardImage
         card={card}
         size="small"
         style={styles.rowImage}
+        frame={frameForVariant(item.variant)}
         photoItemId={item.has_scan_photo ? item.id : null}
       />
       <View style={styles.rowText}>
-        <ThemedText variant="label" numberOfLines={1}>
+        <ThemedText variant="label" numberOfLines={2}>
           {card.name}
         </ThemedText>
         <ThemedText variant="caption" color="textSecondary" numberOfLines={1}>
-          {[setNameOf(item), item.card?.number].filter(Boolean).join(' · ')}
+          {where}
         </ThemedText>
         <ThemedText variant="caption" color="textSecondary" numberOfLines={1}>
-          {[item.variant ?? 'Normal', item.condition].join(' · ')}
+          {what}
         </ThemedText>
       </View>
       <View style={styles.rowRight}>
-        <ThemedText variant="figureSmall">×{item.quantity}</ThemedText>
+        {item.quantity > 1 ? <ThemedText variant="figureSmall">×{item.quantity}</ThemedText> : null}
         <ThemedText variant="figureSmall" color="textSecondary">
           {formatPrice(value * item.quantity)}
         </ThemedText>
@@ -240,11 +271,14 @@ const styles = StyleSheet.create({
   filter: {
     minHeight: minTapTarget - 8,
     maxWidth: '48%',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm + 4,
     borderRadius: radius.sm + 2,
     borderWidth: 1,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
   },
+  filterLabel: { flexShrink: 1 },
   list: { padding: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.sm },
   rowImage: { width: 48 },

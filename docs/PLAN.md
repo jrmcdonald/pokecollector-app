@@ -436,20 +436,21 @@ account's collection.
 - [ ] **Prerequisite:** a scanner provider configured in PokeCollector for the
       account the app signs in as (Settings → Scanner in the web UI, on the LAN
       name because the configuration test outlasts Cloudflare's timeout).
-- [ ] **Camera screen:** full-screen preview with a card-shaped guide
+- [x] **Camera screen:** full-screen preview with a card-shaped guide
       (63 × 88 mm, aspect ≈ 0.716), torch toggle and shutter.
-- [ ] **Capture:** crop to the guide and resize to about 1200 px on the long
+- [x] **Capture:** crop to the guide and resize to about 1200 px on the long
       edge, JPEG quality ≈ 0.85. The model reads the collector number, set code and
       regulation mark, so smaller risks misreads. Upstream sanitises and re-encodes
       anyway.
-- [ ] **Upload** with `POST /api/cards/recognize/jobs` (one file), then poll
+- [x] **Upload** with `POST /api/cards/recognize/jobs` (one file), then poll
       `GET /api/cards/recognize/jobs/{job_id}` with backoff (1 s, 2 s, 4 s … capped;
       each poll counts against the rate limit). Show the candidates as tiles, plus
       "none of these, search instead", which opens a prefilled search.
-- [ ] **Confirm sheet:** variant, condition, quantity → `POST
+- [x] **Confirm sheet:** variant, condition, quantity → `POST
 .../items/{item_id}/resolve-and-add` (atomic and idempotent upstream).
-      "Add to binder" afterwards is a second call.
-- [ ] **Quick-scan mode:** after confirming, straight back to the camera, with
+      Adding to a binder stays on the card's page, so quick scanning stays
+      two taps.
+- [x] **Quick-scan mode:** after confirming, straight back to the camera, with
       a running tally.
 - [ ] **Later:** auto-capture with edge detection. That needs frame
       processors, which means adding `react-native-vision-camera` and a CI

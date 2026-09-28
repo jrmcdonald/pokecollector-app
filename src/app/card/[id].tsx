@@ -30,6 +30,7 @@ import {
   useIsOnline,
   useSetQuantity,
 } from '@/hooks/queries';
+import { useOwnerLabel } from '@/hooks/use-owner-label';
 import { useSession } from '@/session/session';
 import { radius, spacing, useColors } from '@/theme';
 import { binderKind, bindersOnly, isPlanned } from '@/utils/binders';
@@ -346,16 +347,6 @@ function AddToBinder({
       onPress={choose}
     />
   );
-}
-
-/**
- * "ash's collection" when more than one account is saved, so an edit never
- * lands in the wrong one unnoticed; null with a single account.
- */
-function useOwnerLabel(): string | null {
-  const { session } = useSession();
-  if (session.status !== 'signedIn' || session.accounts.length < 2) return null;
-  return `${session.credentials.username}’s collection`;
 }
 
 const styles = StyleSheet.create({

@@ -8,6 +8,9 @@ import {
   CollectionItemSchema,
   CollectionSchema,
   DashboardSchema,
+  ResolveAndAddSchema,
+  ScanItemSchema,
+  ScanJobSchema,
   SearchResponseSchema,
   SetsSchema,
   UserSchema,
@@ -19,6 +22,8 @@ import {
   type Card,
   type CardSet,
   type Checklist,
+  type ScanItem,
+  type ScanJob,
   type CollectionItem,
   type Condition,
   type Dashboard,
@@ -182,4 +187,61 @@ export function removeBinderEntry(
   binderCardId: number,
 ): Promise<unknown> {
   return client.request(`/api/binders/${binderId}/entries/${binderCardId}`, { method: 'DELETE' });
+}
+
+/**
+ * Uploads one photo as a scan job and returns straight away; recognition
+ * runs in the background upstream. `photo` is anything FormData can send
+ * as a file: in the app, an expo-file-system File.
+ */
+export function createScanJob(client: PokeCollectorClient, photo: Blob): Promise<ScanJob> {
+  const form = new FormData();
+  form.append('files', photo);
+  return client.request('/api/cards/recognize/jobs', {
+    method: 'POST',
+    form,
+    schema: ScanJobSchema,
+    // A photo over a slow uplink, through the tunnel.
+    timeoutMs: 60_000,
+  });
+}
+
+export function getScanJob(client: PokeCollectorClient, jobId: number): Promise<ScanJob> {
+  return client.request(`/api/cards/recognize/jobs/${jobId}`, { schema: ScanJobSchema });
+}
+
+/**
+ * Adds the confirmed candidate and marks the scan handled, atomically;
+ * upstream makes a repeat of the same request a no-op rather than a second
+ * copy.
+ */
+export function resolveAndAddScan(
+  client: PokeCollectorClient,
+  jobId: number,
+  itemId: number,
+  add: NewCollectionItem & { confirmedCardId: string; lang: string },
+): Promise<unknown> {
+  const { confirmedCardId, ...item } = add;
+  return client.request(`/api/cards/recognize/jobs/${jobId}/items/${itemId}/resolve-and-add`, {
+    method: 'POST',
+    json: { ...item, confirmed_card_id: confirmedCardId },
+    schema: ResolveAndAddSchema,
+  });
+}
+
+/** Asks upstream to recognize a failed item again. */
+export function retryScanItem(
+  client: PokeCollectorClient,
+  jobId: number,
+  itemId: number,
+): Promise<ScanItem> {
+  return client.request(`/api/cards/recognize/jobs/${jobId}/items/${itemId}/retry`, {
+    method: 'POST',
+    schema: ScanItemSchema,
+  });
+}
+
+/** Drops a job and its photo, when the scan is abandoned or dismissed. */
+export function deleteScanJob(client: PokeCollectorClient, jobId: number): Promise<unknown> {
+  return client.request(`/api/cards/recognize/jobs/${jobId}`, { method: 'DELETE' });
 }

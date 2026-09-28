@@ -261,3 +261,71 @@ export const BinderCardsSchema = z.looseObject({
   cost_to_complete: z.number().nullish(),
 });
 export type BinderCards = z.infer<typeof BinderCardsSchema>;
+
+// ---------------------------------------------------------------------------
+// Scanning. Upstream 1.51.0's `api/scan_jobs.py`; all untyped in the spec.
+// ---------------------------------------------------------------------------
+
+/** One candidate the scanner offers for a photo. */
+export const ScanMatchSchema = z.looseObject({
+  /** The catalogue card id, with its language: `sv1-025_en`. */
+  id: z.string(),
+  /** TCGdex's id without the language: `sv1-025`. What confirming names. */
+  tcg_card_id: z.string(),
+  name: z.string(),
+  number: z.string().nullish(),
+  rarity: z.string().nullish(),
+  set_abbreviation: z.string().nullish(),
+  image: z.string().nullish(),
+  image_hd: z.string().nullish(),
+  lang: z.string().nullish(),
+});
+export type ScanMatch = z.infer<typeof ScanMatchSchema>;
+
+/** What the model read off the card, before matching. */
+export const RecognizedSchema = z.looseObject({
+  name: z.string().nullish(),
+  name_en: z.string().nullish(),
+  number_local: z.union([z.string(), z.number()]).nullish(),
+  set_code: z.string().nullish(),
+  language: z.string().nullish(),
+});
+export type Recognized = z.infer<typeof RecognizedSchema>;
+
+export const SCAN_ITEM_STATUSES = ['pending', 'processing', 'retrying', 'done', 'failed'] as const;
+
+export const ScanItemSchema = z.looseObject({
+  id: z.number(),
+  // A string, not an enum: a new upstream status must not break polling.
+  status: z.string(),
+  resolved: z.boolean(),
+  error: z.string().nullish(),
+  recognized: RecognizedSchema.nullish(),
+  // Checked one by one in `candidatesOf`, so one odd candidate cannot hide
+  // the rest.
+  matches: z.array(z.unknown()).nullish(),
+  next_attempt_at: z.string().nullish(),
+  retry_reason: z.string().nullish(),
+});
+export type ScanItem = z.infer<typeof ScanItemSchema>;
+
+export const ScanJobSchema = z.looseObject({
+  id: z.number(),
+  status: z.string(),
+  total: z.number().nullish(),
+  items: z.array(ScanItemSchema).nullish(),
+});
+export type ScanJob = z.infer<typeof ScanJobSchema>;
+
+export const ResolveAndAddSchema = z.looseObject({
+  item: z.looseObject({ id: z.number() }),
+  collection_item: CollectionItemSchema,
+});
+
+/** The usable candidates of a scanned item, best first as upstream ranks them. */
+export function candidatesOf(item: Pick<ScanItem, 'matches'>): ScanMatch[] {
+  return (item.matches ?? []).flatMap((m) => {
+    const parsed = ScanMatchSchema.safeParse(m);
+    return parsed.success ? [parsed.data] : [];
+  });
+}

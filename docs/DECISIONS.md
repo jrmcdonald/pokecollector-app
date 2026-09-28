@@ -265,3 +265,24 @@ Pokémon Company, and this repository is public. The disk cache key leaves out
 the address, so it downloads once per Pokémon. No avatar, or an image that
 fails, falls back to the initial. (The web UI itself uses animated sprites
 from PokeAPI's GitHub; the server's copy keeps the app to one origin.)
+
+## 2026-09-28 — Scanning
+
+- **Background jobs, not the synchronous endpoint.** `POST
+/api/cards/recognize` waits for the model inside the request, which can
+  outlast Cloudflare's 100-second timeout; the jobs API returns at once and is
+  polled. Polls back off (1, 2, 4, then 8 s, or upstream's own retry time) and
+  stop after two minutes, so one scan costs about half a dozen requests.
+- **The phone crops and shrinks the photo** to the card guide plus a small
+  margin, about 1200 px on the long edge, JPEG 0.85. The crop maths assumes the
+  preview fills its view, and lives in `src/utils/crop.ts` with tests.
+- **Uploads use an expo-file-system `File`.** `expo/fetch` encodes a
+  FormData part from anything with `bytes()`, but not React Native's
+  `{ uri, type, name }` objects. expo-file-system is already in the native
+  build through `expo`; listing it in `package.json` changes nothing native.
+- **Abandoned scans are deleted upstream** (cancel, retake, search instead),
+  so they do not collect in the web UI's scan inbox. Confirmed scans are
+  resolved by `resolve-and-add`, which also deletes the photo.
+- **Two taps after the shutter:** a candidate, then Add. Variant, condition
+  and quantity default to Normal, NM and 1, and the camera comes straight back
+  with a running tally. Binders stay on the card's page.

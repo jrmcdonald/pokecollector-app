@@ -33,6 +33,7 @@ import {
   removeBinderEntry,
   removeFromCollection,
   removeFromWishlist,
+  resolveAndAddScan,
   searchCards,
   updateCollectionItem,
   type NewCollectionItem,
@@ -240,6 +241,26 @@ export function useAddToCollection() {
   const invalidate = useInvalidateOwnership();
   return useMutation({
     mutationFn: (item: NewCollectionItem) => addToCollection(getClient(), item),
+    onError: (error) => reportFailure('Could not add the card', error),
+    onSettled: invalidate,
+  });
+}
+
+/** Adds a scanned card as its confirmed candidate, and marks the scan handled. */
+export function useAddFromScan() {
+  const { getClient } = useKeys();
+  const invalidate = useInvalidateOwnership();
+  return useMutation({
+    mutationFn: ({
+      jobId,
+      itemId,
+      add,
+    }: {
+      jobId: number;
+      itemId: number;
+      add: Parameters<typeof resolveAndAddScan>[3];
+    }) => resolveAndAddScan(getClient(), jobId, itemId, add),
+    onSuccess: succeeded,
     onError: (error) => reportFailure('Could not add the card', error),
     onSettled: invalidate,
   });

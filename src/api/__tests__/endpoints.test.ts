@@ -2,6 +2,8 @@ import { PokeCollectorClient } from '../client';
 import {
   addCardToPlannedBinder,
   addCollectionItemToBinder,
+  createScanJob,
+  resolveAndAddScan,
   removeBinderEntry,
   removeFromCollection,
   removeFromWishlist,
@@ -55,5 +57,44 @@ describe('endpoints', () => {
       'DELETE https://pc.example.com/api/wishlist/3',
     ]);
     expect(calls[1]?.body).toBeUndefined();
+  });
+
+  it('uploads a scan as multipart and confirms it with the candidate id', async () => {
+    const { fetch, calls } = fakeFetch(({ url }) => {
+      if (url.endsWith('/login')) return loginOk('t');
+      if (url.endsWith('/recognize/jobs'))
+        return { status: 200, body: { id: 3, status: 'pending' } };
+      return {
+        status: 200,
+        body: {
+          item: { id: 7 },
+          collection_item: { id: 1, card_id: 'sv1-025_en', quantity: 1, condition: 'NM' },
+        },
+      };
+    });
+    const client = new PokeCollectorClient(CREDENTIALS, fetch);
+    await createScanJob(client, new Blob(['jpeg'], { type: 'image/jpeg' }));
+    await resolveAndAddScan(client, 3, 7, {
+      card_id: 'sv1-025_en',
+      confirmedCardId: 'sv1-025',
+      quantity: 1,
+      variant: 'Normal',
+      condition: 'NM',
+      lang: 'en',
+    });
+    expect(calls[1]?.url).toBe('https://pc.example.com/api/cards/recognize/jobs');
+    expect(calls[1]?.body).toBeInstanceOf(FormData);
+    expect(calls[1]?.headers['Content-Type']).toBeUndefined();
+    expect(calls[2]?.url).toBe(
+      'https://pc.example.com/api/cards/recognize/jobs/3/items/7/resolve-and-add',
+    );
+    expect(JSON.parse(String(calls[2]?.body))).toEqual({
+      card_id: 'sv1-025_en',
+      quantity: 1,
+      variant: 'Normal',
+      condition: 'NM',
+      lang: 'en',
+      confirmed_card_id: 'sv1-025',
+    });
   });
 });

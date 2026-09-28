@@ -28,6 +28,12 @@ xcrun simctl status_bar "$SIM_UDID" override \
 xcrun simctl keychain "$SIM_UDID" add-root-cert "$CA_CERT"
 xcrun simctl ui "$SIM_UDID" content_size "$size"
 xcrun simctl install "$SIM_UDID" "$APP_PATH"
+# The first launch after an erase is slow while iOS prepares the app, and once
+# outlasted XCUITest's launch timeout. Launch it once here, where there is no
+# timeout; nothing is signed in, so the walkthrough still starts at onboarding.
+xcrun simctl launch "$SIM_UDID" "$APP_BUNDLE_ID" > /dev/null
+sleep 5
+xcrun simctl terminate "$SIM_UDID" "$APP_BUNDLE_ID" || true
 
 mkdir -p "$OUT/$name"
 server_lines_before=$(wc -l < "$OUT/server.log")

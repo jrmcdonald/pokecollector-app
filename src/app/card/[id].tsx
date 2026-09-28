@@ -33,6 +33,7 @@ import {
   useSetQuantity,
   useUpdateCopy,
 } from '@/hooks/queries';
+import { useLargeText } from '@/hooks/use-large-text';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useOwnerLabel } from '@/hooks/use-owner-label';
 import { useSession } from '@/session/session';
@@ -148,6 +149,7 @@ function useSetName(cardId: string, entries: CollectionItem[]): string | null {
 
 function Prices({ card }: { card: Card }) {
   const colors = useColors();
+  const largeText = useLargeText();
   const rows: [string, number | null | undefined][] = [
     ['Market', card.price_market],
     ['Low', card.price_low],
@@ -169,7 +171,7 @@ function Prices({ card }: { card: Card }) {
           {formatPrice(card.price_trend)}
         </ThemedText>
       </View>
-      <View style={styles.priceTiles}>
+      <View style={[styles.priceTiles, largeText && styles.stacked]}>
         {rows.map(([label, value]) => (
           <ThemedView
             key={label}
@@ -454,6 +456,7 @@ const styles = StyleSheet.create({
   },
   trendValue: { fontSize: 30, lineHeight: 36 },
   priceTiles: { flexDirection: 'row', gap: spacing.sm },
+  stacked: { flexDirection: 'column' },
   priceTile: { flex: 1, borderRadius: radius.sm + 2, padding: spacing.sm, gap: 2 },
   ownedRow: {
     flexDirection: 'row',

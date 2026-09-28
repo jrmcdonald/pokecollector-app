@@ -10,6 +10,7 @@ import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useDashboard, useIsOnline } from '@/hooks/queries';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useAccountMenu } from '@/hooks/use-account-menu';
 import { useMe } from '@/hooks/use-me';
 import { useSession } from '@/session/session';
@@ -22,6 +23,7 @@ export default function Home() {
   const colors = useColors();
   const me = useMe();
   const dashboard = useDashboard();
+  const pull = usePullToRefresh(() => Promise.all([dashboard.refetch(), me.refetch()]));
   const online = useIsOnline();
   const d = dashboard.data;
   const { session } = useSession();
@@ -37,8 +39,8 @@ export default function Home() {
           contentContainerStyle={styles.content}
           refreshControl={
             <RefreshControl
-              refreshing={dashboard.isRefetching}
-              onRefresh={() => dashboard.refetch()}
+              refreshing={pull.refreshing}
+              onRefresh={pull.onRefresh}
               tintColor={colors.textSecondary}
             />
           }>
@@ -124,6 +126,7 @@ export default function Home() {
                           card={{ ...item, id: item.card_id }}
                           detail={formatPrice(item.price_market)}
                           quantity={item.quantity ?? 0}
+                          photoItemId={item.has_scan_photo ? item.collection_item_id : null}
                         />
                       </View>
                     )}

@@ -11,6 +11,7 @@ import { EmptyState, ErrorState, ListSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useSets } from '@/hooks/queries';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { spacing, useColors } from '@/theme';
 import { completion, filterSets } from '@/utils/sets';
 
@@ -19,6 +20,7 @@ type Show = 'started' | 'all';
 export default function Sets() {
   const colors = useColors();
   const sets = useSets();
+  const pull = usePullToRefresh(() => sets.refetch());
   const [query, setQuery] = useState('');
   const [show, setShow] = useState<Show>('started');
   const shown = useMemo(
@@ -47,8 +49,8 @@ export default function Sets() {
           keyboardDismissMode="on-drag"
           refreshControl={
             <RefreshControl
-              refreshing={sets.isRefetching}
-              onRefresh={() => sets.refetch()}
+              refreshing={pull.refreshing}
+              onRefresh={pull.onRefresh}
               tintColor={colors.textSecondary}
             />
           }

@@ -69,3 +69,20 @@ export function downscaleTo(size: Size, longEdge = 1200): Size | null {
   const factor = longEdge / long;
   return { width: Math.round(size.width * factor), height: Math.round(size.height * factor) };
 }
+
+/** A rounded rectangle as an SVG path, for cutting the guide out of the shade. */
+export function roundedRectPath({ x, y, width: w, height: h }: Rect, r: number): string {
+  const k = Math.min(r, w / 2, h / 2);
+  return [
+    `M${x + k},${y}`,
+    `H${x + w - k}`,
+    `A${k},${k} 0 0 1 ${x + w},${y + k}`,
+    `V${y + h - k}`,
+    `A${k},${k} 0 0 1 ${x + w - k},${y + h}`,
+    `H${x + k}`,
+    `A${k},${k} 0 0 1 ${x},${y + h - k}`,
+    `V${y + k}`,
+    `A${k},${k} 0 0 1 ${x + k},${y}`,
+    'Z',
+  ].join(' ');
+}

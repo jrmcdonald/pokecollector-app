@@ -15,7 +15,6 @@ import {
 } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useSyncExternalStore } from 'react';
-import { Alert } from 'react-native';
 
 import {
   addCardToPlannedBinder,
@@ -27,6 +26,7 @@ import {
   getCard,
   getCollection,
   getDashboard,
+  getPrintingDetailTags,
   getSetChecklist,
   getSets,
   getWishlist,
@@ -41,6 +41,7 @@ import {
 import { ApiError } from '@/api/errors';
 import type { BinderCards, CollectionItem, WishlistItem } from '@/api/schemas';
 import { useSession } from '@/session/session';
+import { showToast } from '@/utils/toast';
 
 const SEARCH_PAGE_SIZE = 30;
 
@@ -64,6 +65,7 @@ function useKeys() {
       binders: [cacheId, 'binders'] as const,
       binder: (id: number) => [cacheId, 'binder', id] as const,
       binderAll: [cacheId, 'binder'] as const,
+      printingDetails: [cacheId, 'printing-details'] as const,
     },
   };
 }
@@ -113,6 +115,16 @@ export function useCardSearch(q: string) {
     // for a short while only, but do not refetch on every keystroke-return.
     staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000,
+  });
+}
+
+export function usePrintingDetailTags() {
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.printingDetails,
+    queryFn: () => getPrintingDetailTags(getClient()),
+    enabled,
+    staleTime: 60 * 60 * 1000,
   });
 }
 
@@ -182,6 +194,7 @@ function useInvalidateOwnership() {
         keys.checklistAll,
         keys.binders,
         keys.binderAll,
+        keys.printingDetails,
       ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
     );
 }
@@ -192,7 +205,11 @@ function succeeded() {
 }
 
 function reportFailure(title: string, error: unknown) {
-  Alert.alert(title, error instanceof ApiError ? error.message : 'Something went wrong.');
+  showToast({
+    kind: 'error',
+    title,
+    message: error instanceof ApiError ? error.message : 'Something went wrong. Try again.',
+  });
 }
 
 /**
@@ -234,6 +251,24 @@ export function applyQuantity(
   return quantity > 0
     ? items.map((entry) => (entry.id === id ? { ...entry, quantity } : entry))
     : items.filter((entry) => entry.id !== id);
+}
+
+/** Changes a copy's variant, condition or printing details. Not optimistic: upstream may merge rows. */
+export function useUpdateCopy() {
+  const { getClient } = useKeys();
+  const invalidate = useInvalidateOwnership();
+  return useMutation({
+    mutationFn: ({
+      item,
+      patch,
+    }: {
+      item: CollectionItem;
+      patch: Parameters<typeof updateCollectionItem>[2];
+    }) => updateCollectionItem(getClient(), item.id, patch),
+    onSuccess: succeeded,
+    onError: (error) => reportFailure('Could not change the copy', error),
+    onSettled: invalidate,
+  });
 }
 
 export function useAddToCollection() {

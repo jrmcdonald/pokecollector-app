@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   CONDITIONS,
@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/button';
 import { CardImage } from '@/components/card-image';
 import { Chips } from '@/components/chips';
+import { PrintingDetailsPicker } from '@/components/printing-details-picker';
 import { QuantityStepper } from '@/components/quantity-stepper';
 import { ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
@@ -29,13 +30,16 @@ import {
   useCollection,
   useIsOnline,
   useSetQuantity,
+  useUpdateCopy,
 } from '@/hooks/queries';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useOwnerLabel } from '@/hooks/use-owner-label';
 import { useSession } from '@/session/session';
 import { radius, spacing, useColors } from '@/theme';
 import { binderKind, bindersOnly, isPlanned } from '@/utils/binders';
 import { entriesForCard } from '@/utils/collection';
 import { pick } from '@/utils/pick';
+import { showToast } from '@/utils/toast';
 import { cardValue, formatPrice } from '@/utils/pricing';
 
 export default function CardDetail() {
@@ -43,6 +47,7 @@ export default function CardDetail() {
   const colors = useColors();
   const card = useCard(id);
   const collection = useCollection();
+  const pull = usePullToRefresh(() => Promise.all([card.refetch(), collection.refetch()]));
   const online = useIsOnline();
   const entries = entriesForCard(collection.data, id);
   const setName = useSetName(id, entries);
@@ -56,12 +61,17 @@ export default function CardDetail() {
           contentContainerStyle={styles.content}
           refreshControl={
             <RefreshControl
-              refreshing={card.isRefetching}
-              onRefresh={() => Promise.all([card.refetch(), collection.refetch()])}
+              refreshing={pull.refreshing}
+              onRefresh={pull.onRefresh}
               tintColor={colors.textSecondary}
             />
           }>
-          <CardImage card={c} size="large" style={styles.image} />
+          <CardImage
+            card={c}
+            size="large"
+            style={styles.image}
+            photoItemId={entries.find((e) => e.has_scan_photo)?.id}
+          />
           <View style={styles.heading}>
             <ThemedText variant="title">{c.name}</ThemedText>
             <View style={styles.tags}>
@@ -169,6 +179,7 @@ function Owned({ entries, disabled }: { entries: CollectionItem[]; disabled: boo
   const setQuantity = useSetQuantity();
   const colors = useColors();
   const owner = useOwnerLabel();
+  const [editing, setEditing] = useState<number | null>(null);
   if (entries.length === 0) return null;
 
   const change = (item: CollectionItem, quantity: number) => {
@@ -193,30 +204,99 @@ function Owned({ entries, disabled }: { entries: CollectionItem[]; disabled: boo
   return (
     <ThemedView background="surface" style={[styles.panel, { borderColor: colors.border }]}>
       <ThemedText variant="overline" color="textSecondary">
-        In your collection
+        {owner ? `In ${owner}` : 'In your collection'}
       </ThemedText>
-      {entries.map((item) => (
-        <View key={item.id} style={styles.ownedRow}>
-          <View style={styles.ownedText}>
-            <ThemedText variant="label">{item.variant ?? 'Normal'}</ThemedText>
-            <ThemedText variant="caption" color="textSecondary">
-              {item.condition} · {formatPrice(cardValue(item.card, item.variant))} each
-            </ThemedText>
+      {entries.map((item) => {
+        const details = (item.printing_details ?? []).map((d) => d.name);
+        const open = editing === item.id;
+        return (
+          <View key={item.id} style={styles.entry}>
+            <View style={styles.ownedRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${item.variant ?? 'Normal'}, ${item.condition}${details.length ? `, ${details.join(', ')}` : ''}`}
+                accessibilityHint={
+                  open ? 'Closes the editor' : 'Change variant, condition or printing details'
+                }
+                disabled={disabled}
+                onPress={() => setEditing(open ? null : item.id)}
+                style={({ pressed }) => [styles.ownedText, pressed && styles.pressed]}>
+                <ThemedText variant="label">
+                  {item.variant ?? 'Normal'}
+                  <ThemedText variant="label" style={{ color: colors.accent }}>
+                    {open ? '  ▴' : '  ✎'}
+                  </ThemedText>
+                </ThemedText>
+                <ThemedText variant="caption" color="textSecondary">
+                  {[item.condition, ...details].join(' · ')} ·{' '}
+                  {formatPrice(cardValue(item.card, item.variant))} each
+                </ThemedText>
+              </Pressable>
+              <QuantityStepper
+                label={`${item.variant ?? 'Normal'} ${item.condition}`}
+                value={item.quantity}
+                onChange={(q) => change(item, q)}
+                disabled={disabled}
+              />
+            </View>
+            {open ? <EditCopy item={item} onDone={() => setEditing(null)} /> : null}
           </View>
-          <QuantityStepper
-            label={`${item.variant ?? 'Normal'} ${item.condition}`}
-            value={item.quantity}
-            onChange={(q) => change(item, q)}
-            disabled={disabled}
-          />
-        </View>
-      ))}
+        );
+      })}
     </ThemedView>
   );
 }
 
-/** The variants this printing exists in, per the catalogue; all of them if it does not say. */
-function availableVariants(card: Card): Variant[] {
+/** Variant, condition and printing details of one copy, saved together. */
+function EditCopy({ item, onDone }: { item: CollectionItem; onDone(): void }) {
+  const update = useUpdateCopy();
+  const initialVariant = (VARIANTS as readonly string[]).includes(item.variant ?? 'Normal')
+    ? ((item.variant ?? 'Normal') as Variant)
+    : 'Normal';
+  const initialCondition = (CONDITIONS as readonly string[]).includes(item.condition)
+    ? (item.condition as Condition)
+    : 'NM';
+  const [variant, setVariant] = useState<Variant>(initialVariant);
+  const [condition, setCondition] = useState<Condition>(initialCondition);
+  const [details, setDetails] = useState<string[]>(
+    (item.printing_details ?? []).map((d) => d.name),
+  );
+
+  return (
+    <View style={styles.editor}>
+      <Chips<Variant>
+        label="Variant"
+        options={VARIANTS.map((v) => ({ value: v, label: v }))}
+        value={variant}
+        onChange={setVariant}
+      />
+      <Chips<Condition>
+        label="Condition"
+        options={CONDITIONS.map((c) => ({ value: c, label: c }))}
+        value={condition}
+        onChange={setCondition}
+      />
+      <PrintingDetailsPicker value={details} onChange={setDetails} />
+      <Button
+        title="Save changes"
+        busy={update.isPending}
+        onPress={() =>
+          update.mutate(
+            { item, patch: { variant, condition, printing_details: details } },
+            { onSuccess: onDone },
+          )
+        }
+      />
+    </View>
+  );
+}
+
+/**
+ * Every variant, the ones the catalogue says this printing exists in first.
+ * All four stay available: the catalogue's flags are often incomplete, and
+ * the copy in hand is what counts.
+ */
+function orderedVariants(card: Card): Variant[] {
   const flags: [Variant, boolean | null | undefined][] = [
     ['Normal', card.variants_normal],
     ['Holo', card.variants_holo],
@@ -224,13 +304,14 @@ function availableVariants(card: Card): Variant[] {
     ['First Edition', card.variants_first_edition],
   ];
   const known = flags.filter(([, flag]) => flag).map(([variant]) => variant);
-  return known.length > 0 ? known : [...VARIANTS];
+  return [...known, ...VARIANTS.filter((v) => !known.includes(v))];
 }
 
 function AddCopies({ card, disabled }: { card: Card; disabled: boolean }) {
-  const variants = useMemo(() => availableVariants(card), [card]);
+  const variants = useMemo(() => orderedVariants(card), [card]);
   const [variant, setVariant] = useState<Variant>(variants[0] ?? 'Normal');
   const [condition, setCondition] = useState<Condition>('NM');
+  const [details, setDetails] = useState<string[]>([]);
   const [quantity, setQuantity] = useState(1);
   const add = useAddToCollection();
   const wishlist = useAddToWishlist();
@@ -238,14 +319,7 @@ function AddCopies({ card, disabled }: { card: Card; disabled: boolean }) {
 
   return (
     <View style={styles.add}>
-      <View>
-        <ThemedText variant="heading">Add copies</ThemedText>
-        {owner ? (
-          <ThemedText variant="caption" color="textSecondary">
-            To {owner}
-          </ThemedText>
-        ) : null}
-      </View>
+      <ThemedText variant="heading">Add copies</ThemedText>
       <Chips<Variant>
         label="Variant"
         options={variants.map((v) => ({ value: v, label: v }))}
@@ -258,23 +332,25 @@ function AddCopies({ card, disabled }: { card: Card; disabled: boolean }) {
         value={condition}
         onChange={setCondition}
       />
+      <PrintingDetailsPicker value={details} onChange={setDetails} />
       <View style={styles.ownedRow}>
         <ThemedText>Quantity</ThemedText>
         <QuantityStepper label="Copies to add" value={quantity} onChange={setQuantity} min={1} />
       </View>
       <Button
-        title={`Add ${quantity} to collection`}
+        title={`Add ${quantity} to ${owner ?? 'collection'}`}
         busy={add.isPending}
         disabled={disabled}
         onPress={() =>
           add.mutate(
-            { card_id: card.id, variant, condition, quantity },
+            { card_id: card.id, variant, condition, quantity, printing_details: details },
             {
               onSuccess: () => {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
                   () => undefined,
                 );
                 setQuantity(1);
+                setDetails([]);
               },
             },
           )
@@ -321,10 +397,11 @@ function AddToBinder({
       return;
     }
     if (entries.length === 0) {
-      Alert.alert(
-        'Not in your collection',
-        `“${binder.name}” holds cards you own. Add a copy first, or use a planned binder.`,
-      );
+      showToast({
+        kind: 'info',
+        title: 'Not in your collection',
+        message: `“${binder.name}” holds cards you own. Add a copy first, or use a planned binder.`,
+      });
       return;
     }
     let entry = entries[0];
@@ -372,5 +449,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
   },
-  ownedText: { flex: 1, gap: 2 },
+  ownedText: { flex: 1, gap: 2, minHeight: 44, justifyContent: 'center' },
+  entry: { gap: spacing.sm },
+  editor: { gap: spacing.sm + 4, paddingTop: spacing.xs, paddingBottom: spacing.sm },
+  pressed: { opacity: 0.7 },
 });

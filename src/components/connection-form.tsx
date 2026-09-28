@@ -13,6 +13,7 @@ import { createClient } from '@/session/session';
 import { spacing } from '@/theme';
 
 import { Button } from './button';
+import { SecretField } from './secret-field';
 import { TextField } from './text-field';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -105,11 +106,8 @@ export function ConnectionForm({ initial, submitTitle, onVerified }: Props) {
         value={values.accessClientId}
         onChangeText={set('accessClientId')}
       />
-      <TextField
+      <SecretField
         label="Service token client secret"
-        textContentType="none"
-        autoComplete="off"
-        secureTextEntry
         value={values.accessClientSecret}
         onChangeText={set('accessClientSecret')}
       />

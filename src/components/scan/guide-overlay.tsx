@@ -1,39 +1,36 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
+import Svg, { Path, Rect } from 'react-native-svg';
 
 import { radius, useColors } from '@/theme';
-import type { Rect } from '@/utils/crop';
+import { roundedRectPath, type Rect as Box, type Size } from '@/utils/crop';
 
 /**
- * Dims everything but the card-shaped guide, and outlines the guide. Purely
- * visual: the crop uses the same `guideRect`, so what is inside the outline
- * is what gets uploaded (plus a small margin).
+ * Dims everything but the card-shaped guide, with the same rounded corners
+ * as its outline. Purely visual: the crop uses the same `guideRect`, so what
+ * is inside the outline is what gets uploaded (plus a small margin).
  */
-export function GuideOverlay({ guide, active }: { guide: Rect; active: boolean }) {
+export function GuideOverlay({ view, guide, active }: { view: Size; guide: Box; active: boolean }) {
   const colors = useColors();
-  const shade = { backgroundColor: 'rgba(13, 15, 20, 0.62)' };
+  const r = radius.md + 2;
+  const shade = `M0,0 H${view.width} V${view.height} H0 Z ${roundedRectPath(guide, r)}`;
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <View style={[shade, { height: guide.y }]} />
-      <View style={{ flexDirection: 'row', height: guide.height }}>
-        <View style={[shade, { width: guide.x }]} />
-        <View
-          style={[
-            styles.frame,
-            {
-              width: guide.width,
-              height: guide.height,
-              borderColor: active ? colors.holo : colors.textSecondary,
-            },
-          ]}
-        />
-        <View style={[shade, styles.fill]} />
-      </View>
-      <View style={[shade, styles.fill]} />
-    </View>
+    <Svg
+      pointerEvents="none"
+      width={view.width}
+      height={view.height}
+      style={StyleSheet.absoluteFill}>
+      <Path d={shade} fill="rgba(13, 15, 20, 0.62)" fillRule="evenodd" />
+      <Rect
+        x={guide.x}
+        y={guide.y}
+        width={guide.width}
+        height={guide.height}
+        rx={r}
+        ry={r}
+        fill="none"
+        stroke={active ? colors.holo : colors.textSecondary}
+        strokeWidth={2}
+      />
+    </Svg>
   );
 }
-
-const styles = StyleSheet.create({
-  fill: { flex: 1 },
-  frame: { borderWidth: 2, borderRadius: radius.md },
-});

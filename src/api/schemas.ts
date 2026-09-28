@@ -117,11 +117,24 @@ export const CollectionItemSchema = z.looseObject({
   lang: z.string().nullish(),
   added_at: z.string().nullish(),
   purchase_price: price,
+  /** The owner has a photo of this entry: `GET /api/collection/{id}/photo`. */
+  has_scan_photo: z.boolean().nullish(),
+  printing_details: z.array(z.looseObject({ id: z.number(), name: z.string() })).nullish(),
   card: CardSchema.nullish(),
 });
 export type CollectionItem = z.infer<typeof CollectionItemSchema>;
 
 export const CollectionSchema = z.array(CollectionItemSchema);
+
+/** The account's own labels for a copy: "Stamped", "Error print", and so on. */
+export const PrintingDetailTagSchema = z.looseObject({
+  id: z.number(),
+  name: z.string(),
+  usage_count: z.number().nullish(),
+});
+export type PrintingDetailTag = z.infer<typeof PrintingDetailTagSchema>;
+
+export const PrintingDetailTagsSchema = z.array(PrintingDetailTagSchema);
 
 const DashboardCardSchema = z.looseObject({
   collection_item_id: z.number().nullish(),
@@ -134,6 +147,7 @@ const DashboardCardSchema = z.looseObject({
   variant: z.string().nullish(),
   added_at: z.string().nullish(),
   price_market: price,
+  has_scan_photo: z.boolean().nullish(),
 });
 export type DashboardCard = z.infer<typeof DashboardCardSchema>;
 
@@ -247,6 +261,8 @@ export const BinderCardSchema = z.looseObject({
   missing_quantity: z.number().nullish(),
   variant: z.string().nullish(),
   condition: z.string().nullish(),
+  collection_item_id: z.number().nullish(),
+  has_scan_photo: z.boolean().nullish(),
 });
 export type BinderCard = z.infer<typeof BinderCardSchema>;
 

@@ -11,6 +11,7 @@ import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useCollection } from '@/hooks/queries';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { minTapTarget, radius, spacing, useColors } from '@/theme';
 import {
   NO_FILTER,
@@ -31,6 +32,7 @@ const SORTS = Object.keys(SORT_LABELS) as CollectionSort[];
 export default function Collection() {
   const colors = useColors();
   const collection = useCollection();
+  const pull = usePullToRefresh(() => collection.refetch());
   const [filter, setFilter] = useState<CollectionFilter>(NO_FILTER);
   const [sort, setSort] = useState<CollectionSort>('recent');
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
@@ -126,8 +128,8 @@ export default function Collection() {
           keyboardDismissMode="on-drag"
           refreshControl={
             <RefreshControl
-              refreshing={collection.isRefetching}
-              onRefresh={() => collection.refetch()}
+              refreshing={pull.refreshing}
+              onRefresh={pull.onRefresh}
               tintColor={colors.textSecondary}
             />
           }
@@ -137,6 +139,7 @@ export default function Collection() {
                 card={item.card ?? { id: item.card_id, name: item.card_id }}
                 detail={formatPrice(cardValue(item.card, item.variant))}
                 quantity={item.quantity}
+                photoItemId={item.has_scan_photo ? item.id : null}
               />
             ) : (
               <CollectionRow item={item} />
@@ -203,7 +206,12 @@ function CollectionRow({ item }: { item: CollectionItem }) {
       accessibilityRole="button"
       onPress={() => router.push({ pathname: '/card/[id]', params: { id: item.card_id } })}
       style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}>
-      <CardImage card={card} size="small" style={styles.rowImage} />
+      <CardImage
+        card={card}
+        size="small"
+        style={styles.rowImage}
+        photoItemId={item.has_scan_photo ? item.id : null}
+      />
       <View style={styles.rowText}>
         <ThemedText variant="label" numberOfLines={1}>
           {card.name}

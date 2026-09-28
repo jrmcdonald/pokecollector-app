@@ -9,10 +9,12 @@ import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useBinderCards, useIsOnline, useRemoveFromBinder } from '@/hooks/queries';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { spacing, useColors } from '@/theme';
 import { isPlanned } from '@/utils/binders';
 import { formatPrice, formatTotal } from '@/utils/pricing';
 import { completion } from '@/utils/sets';
+import { showToast } from '@/utils/toast';
 
 /**
  * One binder's cards. Planned binders show what is still missing, greyed
@@ -25,13 +27,14 @@ export default function BinderDetail() {
   const colors = useColors();
   const online = useIsOnline();
   const binder = useBinderCards(binderId);
+  const pull = usePullToRefresh(() => binder.refetch());
   const remove = useRemoveFromBinder();
   const data = binder.data;
   const planned = data ? isPlanned(data.binder) : false;
 
   function confirmRemove(card: BinderCard) {
     if (!online) {
-      Alert.alert('Offline', 'Changes need a connection.');
+      showToast({ kind: 'info', title: 'Offline', message: 'Changes need a connection.' });
       return;
     }
     const what = [card.variant, card.condition].filter(Boolean).join(', ');
@@ -60,8 +63,8 @@ export default function BinderDetail() {
           contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl
-              refreshing={binder.isRefetching}
-              onRefresh={() => binder.refetch()}
+              refreshing={pull.refreshing}
+              onRefresh={pull.onRefresh}
               tintColor={colors.textSecondary}
             />
           }
@@ -75,6 +78,7 @@ export default function BinderDetail() {
               }
               dimmed={planned && !card.owned}
               onLongPress={() => confirmRemove(card)}
+              photoItemId={card.has_scan_photo ? card.collection_item_id : null}
             />
           )}
           ListEmptyComponent={

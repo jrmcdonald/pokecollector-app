@@ -1,4 +1,4 @@
-import { avatarImageSource, cardImageSource } from '../images';
+import { avatarImageSource, cardImageSource, collectionPhotoSource } from '../images';
 
 const proxy = { baseUrl: 'https://pc.example.com', headers: { 'CF-Access-Client-Id': 'id' } };
 
@@ -53,5 +53,22 @@ describe('avatarImageSource', () => {
     expect(avatarImageSource(0, proxy)).toBeNull();
     expect(avatarImageSource(152, proxy)).toBeNull();
     expect(avatarImageSource(25, { baseUrl: '', headers: {} })).toBeNull();
+  });
+});
+
+describe('collectionPhotoSource', () => {
+  const withLogin = { ...proxy, token: 'jwt', scope: 'acct1' };
+
+  it('sends the login as well as the Access headers, keyed per account and entry', () => {
+    expect(collectionPhotoSource(42, withLogin)).toEqual({
+      uri: 'https://pc.example.com/api/collection/42/photo',
+      headers: { ...proxy.headers, Authorization: 'Bearer jwt' },
+      cacheKey: 'collection-photo-acct1-42',
+    });
+  });
+
+  it('has nothing without an entry or a login', () => {
+    expect(collectionPhotoSource(null, withLogin)).toBeNull();
+    expect(collectionPhotoSource(42, { ...withLogin, token: null })).toBeNull();
   });
 });

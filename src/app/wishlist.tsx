@@ -10,12 +10,14 @@ import { EmptyState, ErrorState, ListSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useIsOnline, useRemoveFromWishlist, useWishlist } from '@/hooks/queries';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { minTapTarget, spacing, useColors } from '@/theme';
 import { cardValue, formatPrice, formatTotal } from '@/utils/pricing';
 
 export default function Wishlist() {
   const colors = useColors();
   const wishlist = useWishlist();
+  const pull = usePullToRefresh(() => wishlist.refetch());
   const items = wishlist.data;
   const total = useMemo(
     () => (items ?? []).reduce((sum, item) => sum + cardValue(item.card) * item.quantity, 0),
@@ -30,8 +32,8 @@ export default function Wishlist() {
           keyExtractor={(item) => String(item.id)}
           refreshControl={
             <RefreshControl
-              refreshing={wishlist.isRefetching}
-              onRefresh={() => wishlist.refetch()}
+              refreshing={pull.refreshing}
+              onRefresh={pull.onRefresh}
               tintColor={colors.textSecondary}
             />
           }

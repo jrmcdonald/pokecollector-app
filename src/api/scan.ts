@@ -106,3 +106,10 @@ export function searchTermFor(recognized: Recognized | null | undefined): string
   if (code && number) return `${code} ${number}`;
   return (recognized?.name_en || recognized?.name || '').trim();
 }
+
+/**
+ * Upstream answers 400 when the scanner has no API key, and for Gemini its
+ * message is in German whatever the language setting, so that case gets the
+ * app's own words.
+ */
+export const MISSING_KEY = /api[ -]?key|schlüssel|konfiguriert|not configured|no scanner/i;

@@ -5,6 +5,7 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { QueryProvider } from '@/session/query';
+import { ToastHost } from '@/components/toast-host';
 import { SessionProvider, useSession } from '@/session/session';
 import { fonts, forceDarkAppearance, useColors } from '@/theme';
 import { useAppFonts } from '@/theme/fonts';
@@ -31,6 +32,7 @@ export default function RootLayout() {
         <SessionProvider>
           <QueryProvider>
             <RootStack />
+            <ToastHost />
           </QueryProvider>
         </SessionProvider>
       </ThemeProvider>

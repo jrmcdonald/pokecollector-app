@@ -1,4 +1,4 @@
-import { CARD_RATIO, cropForGuide, downscaleTo, guideRect } from '../crop';
+import { CARD_RATIO, cropForGuide, downscaleTo, guideRect, roundedRectPath } from '../crop';
 
 describe('guideRect', () => {
   it('is card-shaped and centred', () => {
@@ -38,5 +38,14 @@ describe('downscaleTo', () => {
   it('shrinks the long edge to the target and leaves small images alone', () => {
     expect(downscaleTo({ width: 1500, height: 2100 })).toEqual({ width: 857, height: 1200 });
     expect(downscaleTo({ width: 800, height: 1100 })).toBeNull();
+  });
+});
+
+describe('roundedRectPath', () => {
+  it('draws a closed rounded rectangle, with the radius capped at half a side', () => {
+    const d = roundedRectPath({ x: 10, y: 20, width: 100, height: 140 }, 12);
+    expect(d.startsWith('M22,20 H98 A12,12 0 0 1 110,32')).toBe(true);
+    expect(d.endsWith('Z')).toBe(true);
+    expect(roundedRectPath({ x: 0, y: 0, width: 10, height: 10 }, 99)).toContain('A5,5');
   });
 });

@@ -1,9 +1,9 @@
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Alert } from 'react-native';
 
 import { useSession } from '@/session/session';
 import { pick } from '@/utils/pick';
+import { showToast } from '@/utils/toast';
 
 /**
  * The action sheet behind the account name on Home: switch to another saved
@@ -29,7 +29,11 @@ export function useAccountMenu(): () => Promise<void> {
         await switchAccount(account.id);
         Haptics.selectionAsync().catch(() => undefined);
       } catch (error) {
-        Alert.alert('Could not switch', error instanceof Error ? error.message : String(error));
+        showToast({
+          kind: 'error',
+          title: 'Could not switch account',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
       return;
     }

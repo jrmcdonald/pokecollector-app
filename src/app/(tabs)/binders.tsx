@@ -8,12 +8,14 @@ import { EmptyState, ErrorState, ListSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useBinders } from '@/hooks/queries';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { radius, spacing, useColors } from '@/theme';
 import { binderColor, binderKind, bindersOnly } from '@/utils/binders';
 
 export default function Binders() {
   const colors = useColors();
   const binders = useBinders();
+  const pull = usePullToRefresh(() => binders.refetch());
   const list = binders.data ? bindersOnly(binders.data) : null;
 
   return (
@@ -28,8 +30,8 @@ export default function Binders() {
             keyExtractor={(b) => String(b.id)}
             refreshControl={
               <RefreshControl
-                refreshing={binders.isRefetching}
-                onRefresh={() => binders.refetch()}
+                refreshing={pull.refreshing}
+                onRefresh={pull.onRefresh}
                 tintColor={colors.textSecondary}
               />
             }

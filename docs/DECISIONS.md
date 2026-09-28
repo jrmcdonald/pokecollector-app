@@ -286,3 +286,28 @@ from PokeAPI's GitHub; the server's copy keeps the app to one origin.)
 - **Two taps after the shutter:** a candidate, then Add. Variant, condition
   and quantity default to Normal, NM and 1, and the camera comes straight back
   with a running tally. Binders stay on the card's page.
+
+## 2026-09-28 — After the first phone test
+
+- **Notices are in-app banners** (`src/utils/toast.ts`, `ToastHost`), themed
+  and dismissed with a tap, instead of system alerts. Questions before
+  something destructive (remove a copy, an account, a binder card) stay
+  native alerts.
+- **Pull-to-refresh shows only for the person's own pull.** Binding the
+  spinner to `isRefetching` showed it for background refreshes too, and iOS
+  could leave it stuck on a screen left mid-refresh.
+- **The owner's photo stands in for a missing card image**, as in the web UI:
+  when a card has no TCGdex or custom image and the entry has a photo
+  (`has_scan_photo`), `GET /api/collection/{id}/photo`, with the login, cached
+  per account and entry.
+- **Card art fills its frame** (`cover`): scans are slightly taller than
+  63 × 88, and `contain` left a sliver at the top and bottom.
+- **Every variant can be chosen**, the catalogue's first: its flags are
+  often incomplete. An owned copy's variant, condition and printing details
+  can be changed in place, and printing details can be set when adding (a new
+  name creates the tag upstream).
+- **The saved service token secret is not shown in a field**; it is a
+  masked summary with Replace, which sidesteps the field that kept wrapping.
+- **Scan screen sits above the tab bar** (bottom safe area), the shade's
+  cut-out has the guide's rounded corners, results can always be closed, and
+  upstream's missing-key error (German for Gemini) gets the app's own words.

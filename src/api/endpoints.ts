@@ -8,6 +8,7 @@ import {
   CollectionItemSchema,
   CollectionSchema,
   DashboardSchema,
+  PrintingDetailTagsSchema,
   ResolveAndAddSchema,
   ScanItemSchema,
   ScanJobSchema,
@@ -27,6 +28,7 @@ import {
   type CollectionItem,
   type Condition,
   type Dashboard,
+  type PrintingDetailTag,
   type SearchResponse,
   type User,
   type Variant,
@@ -78,6 +80,8 @@ export interface NewCollectionItem {
   quantity: number;
   variant: Variant;
   condition: Condition;
+  /** Printing detail names; a new name creates the tag upstream. */
+  printing_details?: string[];
 }
 
 /**
@@ -99,7 +103,12 @@ export function addToCollection(
 export function updateCollectionItem(
   client: PokeCollectorClient,
   id: number,
-  patch: { quantity?: number; condition?: Condition; variant?: Variant },
+  patch: {
+    quantity?: number;
+    condition?: Condition;
+    variant?: Variant;
+    printing_details?: string[];
+  },
 ): Promise<CollectionItem> {
   return client.request(`/api/collection/${id}`, {
     method: 'PUT',
@@ -244,4 +253,10 @@ export function retryScanItem(
 /** Drops a job and its photo, when the scan is abandoned or dismissed. */
 export function deleteScanJob(client: PokeCollectorClient, jobId: number): Promise<unknown> {
   return client.request(`/api/cards/recognize/jobs/${jobId}`, { method: 'DELETE' });
+}
+
+export function getPrintingDetailTags(client: PokeCollectorClient): Promise<PrintingDetailTag[]> {
+  return client.request('/api/collection/printing-detail-tags', {
+    schema: PrintingDetailTagsSchema,
+  });
 }

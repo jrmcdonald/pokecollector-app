@@ -16,10 +16,19 @@ type Props = {
   /** Greys the card out: not owned, in a checklist or planned binder. */
   dimmed?: boolean;
   onLongPress?(): void;
+  /** A collection entry whose own photo stands in when the card has no image. */
+  photoItemId?: number | null;
 };
 
 /** One card in a grid. Opens the card's detail screen. */
-export function CardTile({ card, detail, quantity = 0, dimmed = false, onLongPress }: Props) {
+export function CardTile({
+  card,
+  detail,
+  quantity = 0,
+  dimmed = false,
+  onLongPress,
+  photoItemId,
+}: Props) {
   const colors = useColors();
   return (
     <Pressable
@@ -29,7 +38,7 @@ export function CardTile({ card, detail, quantity = 0, dimmed = false, onLongPre
       onLongPress={onLongPress}
       style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
       <View>
-        <CardImage card={card} size="small" dimmed={dimmed} />
+        <CardImage card={card} size="small" dimmed={dimmed} photoItemId={photoItemId} />
         {quantity > 0 ? (
           <View
             style={[

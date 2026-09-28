@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { createScanJob, deleteScanJob, retryScanItem } from '@/api/endpoints';
 import { ApiError } from '@/api/errors';
-import { ScanCancelled, ScanTimedOut, waitForScan } from '@/api/scan';
+import { MISSING_KEY, ScanCancelled, ScanTimedOut, waitForScan } from '@/api/scan';
 import { candidatesOf, type Recognized, type ScanItem, type ScanMatch } from '@/api/schemas';
 import { useSession } from '@/session/session';
 import type { Size } from '@/utils/crop';
@@ -174,10 +174,10 @@ export function useScanFlow() {
 
 function uploadMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    // Upstream answers 400 when no scanner provider or key is configured.
-    return error.status === 400
-      ? `${error.message} Scanning needs a scanner set up in the PokeCollector web UI, under Settings → Scanner.`
-      : error.message;
+    if (error.status === 400 && MISSING_KEY.test(error.message)) {
+      return 'The scanner has no API key yet. Add one in the PokeCollector web UI under Settings → Scanner, then take the photo again.';
+    }
+    return error.message;
   }
   return error instanceof Error ? error.message : 'The photo could not be prepared.';
 }

@@ -16,6 +16,7 @@ import { clearQueryCache } from '@/session/query';
 import { useActiveRoute, useSession } from '@/session/session';
 import { radius, spacing, useColors } from '@/theme';
 import { pick } from '@/utils/pick';
+import { showToast } from '@/utils/toast';
 
 export default function Settings() {
   const { session, signIn, signOut, switchAccount, removeAccount } = useSession();
@@ -55,10 +56,11 @@ export default function Settings() {
               // Only this account's queries: every key starts with its id.
               queryClient.removeQueries({ queryKey: [id] });
             } catch (error) {
-              Alert.alert(
-                'Could not remove it',
-                error instanceof Error ? error.message : String(error),
-              );
+              showToast({
+                kind: 'error',
+                title: 'Could not remove the account',
+                message: error instanceof Error ? error.message : String(error),
+              });
             }
           },
         },
@@ -190,7 +192,11 @@ export default function Settings() {
             variant="secondary"
             onPress={async () => {
               await clearQueryCache();
-              Alert.alert('Cache cleared', 'Everything will be fetched fresh.');
+              showToast({
+                kind: 'success',
+                title: 'Cache cleared',
+                message: 'Everything will be fetched fresh.',
+              });
             }}
           />
           <Button title="Sign out" variant="destructive" onPress={confirmSignOut} />

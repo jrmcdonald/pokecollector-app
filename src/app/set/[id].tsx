@@ -10,6 +10,7 @@ import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useSetChecklist } from '@/hooks/queries';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { spacing, useColors } from '@/theme';
 import { formatPrice } from '@/utils/pricing';
 import { completion, isOwned } from '@/utils/sets';
@@ -21,6 +22,7 @@ export default function SetChecklist() {
   const { id = '', name } = useLocalSearchParams<{ id: string; name?: string }>();
   const colors = useColors();
   const checklist = useSetChecklist(id);
+  const pull = usePullToRefresh(() => checklist.refetch());
   const [show, setShow] = useState<Show>('all');
   const data = checklist.data;
   const shown = useMemo(
@@ -42,8 +44,8 @@ export default function SetChecklist() {
           contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl
-              refreshing={checklist.isRefetching}
-              onRefresh={() => checklist.refetch()}
+              refreshing={pull.refreshing}
+              onRefresh={pull.onRefresh}
               tintColor={colors.textSecondary}
             />
           }

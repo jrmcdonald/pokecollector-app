@@ -112,157 +112,184 @@ function Scanner() {
 
   return (
     <ThemedView style={styles.fill}>
-      <View
-        style={styles.fill}
-        onLayout={(e) =>
-          setView({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })
-        }>
-        <CameraView
-          ref={camera}
-          style={StyleSheet.absoluteFill}
-          facing="back"
-          active={focused}
-          enableTorch={torch && focused}
-          animateShutter
-          onCameraReady={() => setReady(true)}
-        />
-        {guide ? <GuideOverlay guide={guide} active={state.step === 'camera'} /> : null}
+      {/*
+        The bottom safe area of a tab's content includes the tab bar, so the
+        camera, the guide and every control sit above it. The crop is worked
+        out from this same view, so it still matches the guide.
+      */}
+      <SafeAreaView edges={['bottom']} style={styles.fill}>
+        <View
+          style={styles.fill}
+          onLayout={(e) =>
+            setView({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })
+          }>
+          <CameraView
+            ref={camera}
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            active={focused}
+            enableTorch={torch && focused}
+            animateShutter
+            onCameraReady={() => setReady(true)}
+          />
+          {guide && view ? (
+            <GuideOverlay view={view} guide={guide} active={state.step === 'camera'} />
+          ) : null}
 
-        <SafeAreaView edges={['top']} style={styles.top} pointerEvents="box-none">
-          <View style={styles.topRow} pointerEvents="box-none">
-            {tally > 0 ? (
+          <SafeAreaView edges={['top']} style={styles.top} pointerEvents="box-none">
+            <View style={styles.topRow} pointerEvents="box-none">
+              {tally > 0 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${tally} added this session. Reset the count`}
+                  onLongPress={() => setTally(0)}
+                  style={[
+                    styles.pill,
+                    { backgroundColor: colors.surface, borderColor: colors.holo },
+                  ]}>
+                  <ThemedText variant="figureSmall">+{tally} added</ThemedText>
+                </Pressable>
+              ) : (
+                <View />
+              )}
+              <Pressable
+                accessibilityRole="switch"
+                accessibilityLabel="Torch"
+                accessibilityState={{ checked: torch }}
+                onPress={() => setTorch((t) => !t)}
+                style={[
+                  styles.round,
+                  {
+                    backgroundColor: torch ? colors.accent : colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}>
+                <ThemedText style={{ color: torch ? colors.onAccent : colors.text }}>ϟ</ThemedText>
+              </Pressable>
+            </View>
+            {state.step === 'camera' && guide ? (
+              <ThemedText
+                variant="label"
+                style={[styles.hint, { top: guide.y - 34 - spacing.sm }]}
+                accessibilityLiveRegion="polite">
+                {online ? 'Fit the card inside the frame' : 'Offline: scanning needs a connection'}
+              </ThemedText>
+            ) : null}
+          </SafeAreaView>
+
+          {state.step === 'camera' ? (
+            <View style={styles.bottom} pointerEvents="box-none">
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`${tally} added this session. Reset the count`}
-                onLongPress={() => setTally(0)}
-                style={[
-                  styles.pill,
-                  { backgroundColor: colors.surface, borderColor: colors.holo },
+                accessibilityLabel="Take the photo"
+                disabled={!ready || !online || capturing}
+                onPress={shoot}
+                style={({ pressed }) => [
+                  styles.shutter,
+                  {
+                    borderColor: colors.text,
+                    opacity: !ready || !online ? 0.4 : pressed ? 0.7 : 1,
+                  },
                 ]}>
-                <ThemedText variant="figureSmall">+{tally} added</ThemedText>
+                <View style={[styles.shutterInner, { backgroundColor: colors.accent }]} />
               </Pressable>
-            ) : (
-              <View />
-            )}
-            <Pressable
-              accessibilityRole="switch"
-              accessibilityLabel="Torch"
-              accessibilityState={{ checked: torch }}
-              onPress={() => setTorch((t) => !t)}
-              style={[
-                styles.round,
-                {
-                  backgroundColor: torch ? colors.accent : colors.surface,
-                  borderColor: colors.border,
-                },
-              ]}>
-              <ThemedText style={{ color: torch ? colors.onAccent : colors.text }}>ϟ</ThemedText>
-            </Pressable>
-          </View>
-          {state.step === 'camera' && guide ? (
-            <ThemedText
-              variant="label"
-              style={[styles.hint, { top: guide.y - 34 - spacing.sm }]}
-              accessibilityLiveRegion="polite">
-              {online ? 'Fit the card inside the frame' : 'Offline: scanning needs a connection'}
-            </ThemedText>
+            </View>
           ) : null}
-        </SafeAreaView>
 
-        {state.step === 'camera' ? (
-          <View style={styles.bottom} pointerEvents="box-none">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Take the photo"
-              disabled={!ready || !online || capturing}
-              onPress={shoot}
-              style={({ pressed }) => [
-                styles.shutter,
-                { borderColor: colors.text, opacity: !ready || !online ? 0.4 : pressed ? 0.7 : 1 },
-              ]}>
-              <View style={[styles.shutterInner, { backgroundColor: colors.accent }]} />
-            </Pressable>
-          </View>
-        ) : null}
+          {busy ? (
+            <View style={styles.centre} pointerEvents="box-none">
+              <ThemedView
+                background="surface"
+                style={[styles.status, { borderColor: colors.border }]}>
+                <ActivityIndicator color={colors.accent} />
+                <ThemedText variant="label" accessibilityLiveRegion="polite">
+                  {state.step === 'uploading'
+                    ? 'Sending the photo…'
+                    : state.status === 'retrying'
+                      ? 'The scanner is busy; trying again shortly…'
+                      : 'Reading the card…'}
+                </ThemedText>
+                <Button title="Cancel" variant="secondary" onPress={() => flow.reset()} />
+              </ThemedView>
+            </View>
+          ) : null}
 
-        {busy ? (
-          <View style={styles.centre} pointerEvents="box-none">
+          {state.step === 'results' || state.step === 'failed' ? (
             <ThemedView
-              background="surface"
-              style={[styles.status, { borderColor: colors.border }]}>
-              <ActivityIndicator color={colors.accent} />
-              <ThemedText variant="label" accessibilityLiveRegion="polite">
-                {state.step === 'uploading'
-                  ? 'Sending the photo…'
-                  : state.status === 'retrying'
-                    ? 'The scanner is busy; trying again shortly…'
-                    : 'Reading the card…'}
-              </ThemedText>
-              <Button title="Cancel" variant="secondary" onPress={() => flow.reset()} />
-            </ThemedView>
-          </View>
-        ) : null}
-
-        {state.step === 'results' || state.step === 'failed' ? (
-          <ThemedView
-            background="background"
-            style={[styles.sheet, { borderColor: colors.border }]}>
-            <ScrollView contentContainerStyle={styles.sheetContent} bounces={false}>
-              {state.step === 'results' ? (
-                selected ? (
-                  <ScanConfirm
-                    match={selected}
-                    busy={add.isPending}
-                    disabled={!online}
-                    onAdd={(choice) => confirm(selected, choice)}
-                    onBack={() => setSelected(null)}
-                  />
-                ) : (
-                  <>
-                    <ScanCandidates
-                      candidates={state.candidates}
-                      recognized={state.recognized}
-                      onPick={setSelected}
+              background="background"
+              style={[styles.sheet, { borderColor: colors.border }]}>
+              <View style={styles.sheetHeader}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Close and scan another card"
+                  hitSlop={spacing.sm}
+                  onPress={() => {
+                    setSelected(null);
+                    flow.reset();
+                  }}
+                  style={[styles.close, { backgroundColor: colors.surfaceRaised }]}>
+                  <ThemedText color="textSecondary">✕</ThemedText>
+                </Pressable>
+              </View>
+              <ScrollView contentContainerStyle={styles.sheetContent} bounces={false}>
+                {state.step === 'results' ? (
+                  selected ? (
+                    <ScanConfirm
+                      match={selected}
+                      busy={add.isPending}
+                      disabled={!online}
+                      onAdd={(choice) => confirm(selected, choice)}
+                      onBack={() => setSelected(null)}
                     />
-                    <View style={styles.actions}>
-                      {term ? (
+                  ) : (
+                    <>
+                      <ScanCandidates
+                        candidates={state.candidates}
+                        recognized={state.recognized}
+                        onPick={setSelected}
+                      />
+                      <View style={styles.actions}>
+                        {term ? (
+                          <Button
+                            title="None of these: search"
+                            variant="secondary"
+                            style={styles.action}
+                            onPress={() => searchInstead(term)}
+                          />
+                        ) : null}
                         <Button
-                          title="None of these: search"
+                          title="Retake"
                           variant="secondary"
                           style={styles.action}
-                          onPress={() => searchInstead(term)}
+                          onPress={() => flow.reset()}
                         />
-                      ) : null}
+                      </View>
+                    </>
+                  )
+                ) : (
+                  <>
+                    <ThemedText variant="heading">
+                      {state.jobId === null ? 'Couldn’t scan' : 'No match'}
+                    </ThemedText>
+                    <ThemedText color="textSecondary">{state.message}</ThemedText>
+                    {state.canRetry ? (
+                      <Button title="Try this photo again" onPress={flow.retry} />
+                    ) : null}
+                    {term ? (
                       <Button
-                        title="Retake"
+                        title={`Search for “${term}”`}
                         variant="secondary"
-                        style={styles.action}
-                        onPress={() => flow.reset()}
+                        onPress={() => searchInstead(term)}
                       />
-                    </View>
+                    ) : null}
+                    <Button title="Retake" variant="secondary" onPress={() => flow.reset()} />
                   </>
-                )
-              ) : (
-                <>
-                  <ThemedText variant="heading">No match</ThemedText>
-                  <ThemedText color="textSecondary">{state.message}</ThemedText>
-                  {state.canRetry ? (
-                    <Button title="Try this photo again" onPress={flow.retry} />
-                  ) : null}
-                  {term ? (
-                    <Button
-                      title={`Search for “${term}”`}
-                      variant="secondary"
-                      onPress={() => searchInstead(term)}
-                    />
-                  ) : null}
-                  <Button title="Retake" variant="secondary" onPress={() => flow.reset()} />
-                </>
-              )}
-            </ScrollView>
-          </ThemedView>
-        ) : null}
-      </View>
+                )}
+              </ScrollView>
+            </ThemedView>
+          ) : null}
+        </View>
+      </SafeAreaView>
     </ThemedView>
   );
 }
@@ -336,7 +363,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderBottomWidth: 0,
   },
-  sheetContent: { padding: spacing.md + 4, gap: spacing.md },
+  sheetContent: { padding: spacing.md + 4, paddingTop: 0, gap: spacing.md },
+  sheetHeader: { alignItems: 'flex-end', padding: spacing.sm },
+  close: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   actions: { flexDirection: 'row', gap: spacing.sm },
   action: { flex: 1 },
 });

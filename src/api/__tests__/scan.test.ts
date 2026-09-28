@@ -1,5 +1,5 @@
 import { PokeCollectorClient } from '../client';
-import { ScanTimedOut, nextDelay, searchTermFor, waitForScan } from '../scan';
+import { MISSING_KEY, ScanTimedOut, nextDelay, searchTermFor, waitForScan } from '../scan';
 import { candidatesOf } from '../schemas';
 import { CREDENTIALS, fakeFetch, loginOk } from './fake-server';
 
@@ -100,5 +100,17 @@ describe('searchTermFor', () => {
       'Charizard',
     );
     expect(searchTermFor(null)).toBe('');
+  });
+});
+
+describe('MISSING_KEY', () => {
+  it("recognises upstream's missing-key messages, in German too", () => {
+    expect(
+      MISSING_KEY.test('Kein Gemini API Key konfiguriert. Bitte in den Einstellungen eintragen.'),
+    ).toBe(true);
+    expect(MISSING_KEY.test('No OpenAI API key configured. Add one in Settings first.')).toBe(true);
+    expect(MISSING_KEY.test('Only JPEG, PNG, WebP, and HEIC scan photos are supported.')).toBe(
+      false,
+    );
   });
 });

@@ -201,6 +201,18 @@ final class WalkthroughTests: XCTestCase {
   /// clipped text. Issues are collected rather than failing at once, so one
   /// run lists them all.
   private func audit(_ screen: String) {
+    // Element detection works from the screen image, and text caught mid
+    // fade or mid layout can trip it once. A screen with issues is audited
+    // again after settling, and only issues found both times are recorded.
+    let first = auditPass(screen)
+    guard !first.isEmpty else { return }
+    Thread.sleep(forTimeInterval: 2.0)
+    let second = auditPass(screen)
+    for issue in second where first.contains(issue) { record(issue) }
+  }
+
+  private func auditPass(_ screen: String) -> [[String]] {
+    var issues: [[String]] = []
     do {
       try app.performAccessibilityAudit(for: .all) { issue in
         let element = issue.element
@@ -208,13 +220,15 @@ final class WalkthroughTests: XCTestCase {
           .compactMap { $0 }
           .first { !$0.isEmpty } ?? "(no label)"
         let frame = element.map { String(describing: $0.frame) } ?? ""
-        self.record([screen, Self.name(of: issue.auditType), issue.compactDescription, label, frame])
+        issues.append([screen, Self.name(of: issue.auditType), issue.compactDescription, label, frame])
         return true
       }
     } catch {
-      record([screen, "error", "\(error)", "", ""])
+      issues.append([screen, "error", "\(error)", "", ""])
     }
+    return issues
   }
+
 
   /// Writes a finding out at once: a step that fails later ends the test
   /// there, and what was found up to then should not be lost with it.

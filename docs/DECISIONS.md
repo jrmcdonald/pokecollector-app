@@ -408,6 +408,10 @@ The third step of `PLAN.md` §8.2, in the `Simulator` workflow (`e2e/`).
   label or by hand. The largest-size screenshots are for reading, in the
   run's artifact: approving both would double the images kept in git for
   little more protection.
+- **An issue has to show up twice.** Element detection works from the
+  screen image, and once flagged text on a screen that passed the run
+  before, unchanged. A screen with issues is audited again after two
+  seconds, and only issues found both times fail the run.
 - **Approving commits from CI.** The `approve-screenshots` label makes a run
   commit its screenshots to the branch and remove the label, so approving
   never needs a Mac.

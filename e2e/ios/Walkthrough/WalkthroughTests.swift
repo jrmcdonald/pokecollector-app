@@ -122,6 +122,22 @@ final class WalkthroughTests: XCTestCase {
     back()
     back()
 
+    // A planned deck with cards missing, and the paste screen for adding a
+    // prebuilt one (looking cards up writes, which the fake server refuses).
+    tap(button(startingWith: "Decks"))
+    wait(for: button(startingWith: "Lost Box"), "Decks")
+    capture("decks")
+    tap(button(startingWith: "Lost Box"))
+    wait(for: button(startingWith: "Roaring Moon ex"), "Deck")
+    capture("deck")
+    back()
+    tap(app.navigationBars.buttons["Add a prebuilt deck"])
+    wait(for: app.textFields["Deck name"], "Add a prebuilt deck")
+    capture("deck-import")
+    tap(app.navigationBars.buttons["Cancel"])
+    wait(for: button(startingWith: "Lost Box"), "Decks, again")
+    back()
+
     tap(button(startingWith: "Settings"))
     wait(for: button(startingWith: "Server and login"), "Settings")
     capture("settings")

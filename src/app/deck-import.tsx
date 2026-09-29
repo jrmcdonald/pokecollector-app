@@ -62,7 +62,14 @@ function Paste({
 
   return (
     <ThemedView style={styles.fill}>
-      <Stack.Screen options={{ title: 'Add a prebuilt deck' }} />
+      <Stack.Screen
+        options={{
+          title: 'Add a prebuilt deck',
+          unstable_headerLeftItems: () => [
+            { type: 'button', label: 'Cancel', onPress: () => router.back() },
+          ],
+        }}
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"

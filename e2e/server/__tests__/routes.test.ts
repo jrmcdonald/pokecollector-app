@@ -10,6 +10,8 @@ import {
   ChecklistSchema,
   CollectionSchema,
   DashboardSchema,
+  DeckSchema,
+  DecksSchema,
   PrintingDetailTagsSchema,
   ScanJobListSchema,
   ScanJobSchema,
@@ -102,6 +104,16 @@ describe('fake PokeCollector', () => {
       expect(candidatesOf(item)).toHaveLength(item.matches?.length ?? 0);
     }
     expect(get('/api/cards/recognize/jobs/999').status).toBe(404);
+  });
+
+  it('has a planned deck with cards missing and a Real Deck', () => {
+    const decks = DecksSchema.parse(json(get('/api/decks/')));
+    expect(decks.map((d) => d.binder_type)).toEqual(['deck', 'physical_deck']);
+    expect(decks.every((d) => !d.entries)).toBe(true);
+    const [planned, real] = decks.map((d) => DeckSchema.parse(json(get(`/api/decks/${d.id}`))));
+    expect(planned?.entries?.some((e) => (e.shortage ?? 0) > 0)).toBe(true);
+    expect(real?.missing_copy_count).toBe(0);
+    expect(get('/api/decks/999').status).toBe(404);
   });
 
   it('serves a placeholder for every card image it hands out', () => {

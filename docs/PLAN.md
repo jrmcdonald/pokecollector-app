@@ -379,11 +379,11 @@ a revoked service token.
 
 ### 7.3 UX quality bar
 
-- [ ] Skeleton loaders rather than spinners, pull-to-refresh everywhere.
-- [ ] A useful empty state for every list.
+- [x] Skeleton loaders rather than spinners, pull-to-refresh everywhere.
+- [x] A useful empty state for every list.
 - [x] Haptic feedback on quantity change and on adding a card.
-- [ ] Tap targets 44 pt or larger; Dynamic Type supported sensibly.
-- [ ] Smooth scrolling in 500+ card grids (FlashList, correctly sized images).
+- [x] Tap targets 44 pt or larger; Dynamic Type supported sensibly.
+- [x] Smooth scrolling in 500+ card grids (FlashList, correctly sized images).
 
 **Done when:** the collection, wishlist and binders can be browsed and edited
 daily without opening the web UI, and a normal session never hits a 429.
@@ -521,10 +521,11 @@ that keep it there. In order:
       Contrast, Reduced Motion) and the BBC Mobile Accessibility Guidelines.
       Findings ranked by severity, with screenshots. All fixed but one; see
       `DECISIONS.md`, "Design review fixes".
-- [ ] **Larger Text**, left from the review: check every screen at the
+- [x] **Larger Text**, left from the review: check every screen at the
       largest Dynamic Type sizes and replace the fixed heights that clip.
-      Best done with the screenshot tests below.
-- [ ] **Screenshot tests on the iOS simulator**, once the review has settled
+      Done with the screenshot tests below, whose run at the largest
+      accessibility size audits Dynamic Type and clipped text on every screen.
+- [x] **Screenshot tests on the iOS simulator**, once the review has settled
       what the screens should look like: a macOS CI job builds for the
       simulator, runs the app against a fake server with made-up data, walks
       the main screens with an XCUITest, compares screenshots with approved
@@ -542,33 +543,35 @@ of those owned copies. PokeCollector has no catalogue of prebuilt decks, so
 the list has to come from somewhere else; everything after that is upstream
 endpoints that already exist.
 
-- [ ] **Find a source of deck lists.** Candidates, to check for coverage and
-      licence before choosing:
-  - `PokemonTCG/pokemon-tcg-data`, which has theme decks per set as JSON (the
-    older sets are well covered; the newer battle decks need checking). Its
-    card ids are pokemontcg.io's, which differ from TCGdex's for many sets
-    (`sv1-25` against `sv01-025`), so ids need mapping, by set and number.
-  - Decklists published as PTCGL export text (`4 Pikachu ex SVI 57`), which
-    many sites offer and people can paste. A paste box is the fallback in any
-    case: it works for any deck, including ones no source lists.
-- [ ] **Where the data lives.** Most likely a small JSON index bundled with
-      the app or fetched from a public URL, never the user's server. Nothing
-      in it is personal, so it can be public.
-- [ ] **Resolve each line to a catalogue card** with `/api/cards/search` by
-      set and number, and show anything unresolved for the user to pick or
-      skip before anything is written.
-- [ ] **Add in four requests, not sixty.** A 60-card deck is 20 to 40
-      distinct cards, and one request each would use the whole minute's rate
-      limit. Upstream already has the bulk paths:
-  1. `POST /api/collection/bulk-add` with every card and quantity.
-  2. `POST /api/decks/` to create a planned deck with the product's name.
-  3. `POST /api/binders/{id}/import-csv` with the list.
-  4. `POST /api/decks/{id}/convert-to-real`, which reserves the owned copies
-     just added, making it a "Real Deck": an owned deck card list.
-- [ ] **Options on confirm:** add to the collection only; or deck only, for
-      a deck being planned rather than opened.
-- [ ] **A Decks screen** to list and open decks, since the Binders screen
-      leaves them out today.
+- [x] **Find a source of deck lists.** Pasted text, as Pokémon TCG Live
+      exports it (`4 Pikachu ex SVI 57`), which Limitless and most deck sites
+      also offer. It works for any deck, current or not. The other candidate,
+      `PokemonTCG/pokemon-tcg-data`, was ruled out: it is deprecated, has no
+      licence, and its decks stop at Sword & Shield's fourth set (2020). See
+      `DECISIONS.md`, "Prebuilt decks".
+- [x] **Where the data lives.** Nowhere: the list is pasted, and nothing is
+      bundled or fetched from elsewhere. A bundled index can come later if a
+      good source appears; it would feed the same import.
+- [x] **Resolve each line to a catalogue card** without a search per line:
+      upstream's deck CSV import finds cards by set abbreviation and number,
+      which are exactly what the export names (promo codes are mapped, and
+      basic Energy goes to SVE). Lines it cannot find, and lines with no set,
+      are listed to find by search or leave out before anything is added.
+- [x] **Add in a handful of requests, not sixty:**
+  1. `POST /api/decks/` creates a planned deck with the product's name.
+  2. `POST /api/binders/{id}/import-csv` fills it; upstream writes nothing if
+     a row fails, so a second import leaves the failed rows out.
+  3. `GET /api/decks/{id}` is the preview: every card, its picture, and what
+     is already owned. Nothing has touched the collection yet.
+  4. `POST /api/collection/bulk-add` with every copy, Near Mint, each card's
+     usual variant.
+  5. `POST /api/decks/{id}/convert-to-real`, which reserves those copies,
+     making it a "Real Deck". If upstream refuses, the deck stays planned.
+- [x] **Options on confirm:** add everything and make it a Real Deck; keep
+      it as a planned deck only; or discard it, which deletes the deck. A
+      planned deck can be added to the collection later from its page.
+- [x] **A Decks screen** (More → Decks) to list and open decks, with each
+      card's copies and what is missing.
 
 **Done when:** choosing a prebuilt deck, or pasting a list, adds its cards to
 the collection and creates a Real Deck of them, in a handful of requests.

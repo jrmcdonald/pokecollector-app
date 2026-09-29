@@ -470,3 +470,44 @@ The third step of `PLAN.md` §8.2, in the `Simulator` workflow (`e2e/`).
   to the end, with a photo of each kind, and the walkthrough screenshots and
   audits the list, the review and one opened photo. Its first run found no
   audit issues on them at either text size.
+
+## 2026-09-29 — Prebuilt decks
+
+`PLAN.md` §9 (Phase 4), JavaScript only.
+
+- **Pasted lists, not a bundled catalogue.** The export text of Pokémon TCG
+  Live (`4 Pikachu ex SVI 57`), which Limitless and most deck sites also
+  give, covers any deck, new or old. `PokemonTCG/pokemon-tcg-data` was the
+  other candidate, and it does not hold up: it is deprecated (its API goes
+  offline in March 2027), has no licence, and its theme decks stop at
+  Sword & Shield's fourth set, so none of the current battle decks are in
+  it. A catalogue can be added later on top of the same import.
+- **Upstream finds the cards.** The deck CSV import looks a card up by set
+  abbreviation and number, and upstream's abbreviations are TCGdex's, which
+  are Pokémon TCG Live's set codes (SVI, PAL, MEG and so on). The parser
+  maps the few that differ (promo codes such as `PR-SV` → `SVP`) and puts
+  basic Energy, however it is written, in SVE by type. So resolving a
+  60-card list costs one request, not a search per line.
+- **The planned deck is the preview.** Looking the list up creates a planned
+  deck and imports into it, then shows that deck: every card, its picture,
+  and how many are already owned, with the lines upstream could not find
+  listed separately to search for or leave out. Nothing touches the
+  collection until "Add". Discarding deletes the deck. The review screen
+  has no swipe-to-dismiss, so the deck is never left behind by accident.
+- **The import is all or nothing upstream.** One unknown card makes it
+  write nothing, and report `row N`. The app then imports again without
+  those rows, so a list with a typo costs one request more, not a failure.
+- **Adding is two requests.** `bulk-add` with every copy, Near Mint, in each
+  card's usual variant (the first the catalogue lists, as on a card's page),
+  then `convert-to-real`, which reserves those copies. Upstream refuses the
+  conversion when a copy is missing or reserved by another deck; the cards
+  stay added and the deck stays planned, and the app says so.
+- **Decks are under More.** Binders still leave them out. A deck's page
+  lists its cards, copies and what is missing; a planned deck can be added
+  to the collection from there too, for a deck planned first and bought
+  later. Editing decks stays in the web UI.
+- **The simulator walkthrough covers it:** the fake server has a planned
+  deck with cards missing and a Real Deck, and the walkthrough screenshots
+  the list, the planned deck and the paste screen. Looking cards up writes,
+  which the fake server refuses, so the review is covered by component
+  tests instead.

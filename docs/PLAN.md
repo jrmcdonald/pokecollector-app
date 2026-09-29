@@ -280,12 +280,12 @@ empty app, and neither depends on the screens.
 
 ### 0.3 Sideload and connect (user, on Windows)
 
-- [ ] Install iTunes and iCloud **from Apple's website** (not the Microsoft
+- [x] Install iTunes and iCloud **from Apple's website** (not the Microsoft
       Store versions), then AltServer; install AltStore on the phone.
-- [ ] Download the dev IPA artifact and install it through AltStore.
-- [ ] Allow Node/Metro (port 8081) through the Windows firewall on the private
+- [x] Download the dev IPA artifact and install it through AltStore.
+- [x] Allow Node/Metro (port 8081) through the Windows firewall on the private
       network.
-- [ ] `npx expo start --dev-client` on the PC, open PokeCollector Dev, connect
+- [x] `npx expo start --dev-client` on the PC, open PokeCollector Dev, connect
       over the LAN, and use the connection screen to call `GET /api/auth/me` through
       Access.
 
@@ -313,6 +313,17 @@ bundle IDs: each new one uses one of the 10 App IDs a week.
       tell the user to change it in the web UI first.
 - [x] Settings: view the server and user, re-test the connection, replace
       credentials, clear the cache, sign out (wipes the Keychain entries).
+- [ ] **Connection settings that are not tied to Cloudflare.** Onboarding,
+      Settings and the error messages assume the server sits behind a
+      Cloudflare Tunnel with Access: they ask for a service token's client ID
+      and secret, and explain a rejected request as Access turning it away.
+      Make the proxy part generic: no extra authentication (a server on the
+      LAN, or behind a VPN such as Tailscale), a Cloudflare Access service
+      token, or custom request headers for any other reverse proxy, each
+      stored in the Keychain like the rest. The client already leaves the
+      Access headers out when no token is set; the work is in the forms, the
+      stored format (with a migration, as for multiple accounts) and the
+      wording of `AccessError`.
 
 ### 6.2 API client (`src/api/client.ts`)
 
@@ -433,7 +444,7 @@ account's collection.
 
 ## 8. Phase 3 — Scanning
 
-- [ ] **Prerequisite:** a scanner provider configured in PokeCollector for the
+- [x] **Prerequisite:** a scanner provider configured in PokeCollector for the
       account the app signs in as (Settings → Scanner in the web UI, on the LAN
       name because the configuration test outlasts Cloudflare's timeout).
 - [x] **Camera screen:** full-screen preview with a card-shaped guide
@@ -532,6 +543,15 @@ that keep it there. In order:
       ones, and runs Apple's accessibility audit (`performAccessibilityAudit`),
       at the default and the largest text size. Workflow `Simulator`, code in
       `e2e/`.
+- [ ] **Faster pull request checks, by running what can run at once.** A
+      `Simulator` run takes 35 to 50 minutes: about 13 to build the app, then
+      the walkthrough at the default text size and again at the largest, one
+      after the other. Candidates: run the two text sizes at the same time
+      (two simulators in the job, or two jobs sharing the built app as an
+      artifact), build the XCUITest runner alongside the app rather than
+      after it, and cache what the app build can reuse between runs. `ci.yml`
+      takes about a minute, so it matters less, though lint, typecheck and
+      tests could also run as parallel jobs.
 
 ---
 

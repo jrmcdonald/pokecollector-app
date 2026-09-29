@@ -312,6 +312,8 @@ export const SCAN_ITEM_STATUSES = ['pending', 'processing', 'retrying', 'done', 
 
 export const ScanItemSchema = z.looseObject({
   id: z.number(),
+  /** The photo's place in the upload, from 0. */
+  position: z.number().nullish(),
   // A string, not an enum: a new upstream status must not break polling.
   status: z.string(),
   resolved: z.boolean(),
@@ -322,16 +324,35 @@ export const ScanItemSchema = z.looseObject({
   matches: z.array(z.unknown()).nullish(),
   next_attempt_at: z.string().nullish(),
   retry_reason: z.string().nullish(),
+  /** Upstream still has the photo; resolving an item deletes it. */
+  has_image: z.boolean().nullish(),
 });
 export type ScanItem = z.infer<typeof ScanItemSchema>;
 
+/**
+ * A scan job and its progress counts (upstream's `job_progress`). Only the
+ * single job's endpoint includes `items`; the list leaves them out.
+ */
 export const ScanJobSchema = z.looseObject({
   id: z.number(),
   status: z.string(),
   total: z.number().nullish(),
+  /** Items done or failed. */
+  processed: z.number().nullish(),
+  /** Items still pending, processing or retrying. */
+  active: z.number().nullish(),
+  retrying: z.number().nullish(),
+  /** Items done or failed and not yet resolved: what is waiting for review. */
+  attention: z.number().nullish(),
+  next_retry_at: z.string().nullish(),
+  created_at: z.string().nullish(),
+  expires_at: z.string().nullish(),
   items: z.array(ScanItemSchema).nullish(),
 });
 export type ScanJob = z.infer<typeof ScanJobSchema>;
+
+/** The scan inbox: jobs with anything unresolved, newest first, at most 50. */
+export const ScanJobListSchema = z.looseObject({ jobs: z.array(ScanJobSchema) });
 
 export const ResolveAndAddSchema = z.looseObject({
   item: z.looseObject({ id: z.number() }),

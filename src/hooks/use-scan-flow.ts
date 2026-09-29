@@ -110,7 +110,7 @@ export function useScanFlow() {
       try {
         const file = await prepareScanPhoto(photo, view);
         try {
-          jobId = (await createScanJob(getClient(), file)).id;
+          jobId = (await createScanJob(getClient(), [file])).id;
         } finally {
           // Both copies are in the cache directory; neither is needed now.
           for (const uri of [file.uri, photo.uri]) {

@@ -3,6 +3,8 @@ import {
   addCardToPlannedBinder,
   addCollectionItemToBinder,
   createScanJob,
+  dismissScanItem,
+  listScanJobs,
   resolveAndAddScan,
   removeBinderEntry,
   removeFromCollection,
@@ -73,7 +75,7 @@ describe('endpoints', () => {
       };
     });
     const client = new PokeCollectorClient(CREDENTIALS, fetch);
-    await createScanJob(client, new Blob(['jpeg'], { type: 'image/jpeg' }));
+    await createScanJob(client, [new Blob(['jpeg'], { type: 'image/jpeg' })]);
     await resolveAndAddScan(client, 3, 7, {
       card_id: 'sv1-025_en',
       confirmedCardId: 'sv1-025',
@@ -96,5 +98,36 @@ describe('endpoints', () => {
       lang: 'en',
       confirmed_card_id: 'sv1-025',
     });
+  });
+
+  it('uploads a batch as one job, one files part per photo', async () => {
+    const { fetch, calls } = fakeFetch(({ url }) =>
+      url.endsWith('/login')
+        ? loginOk('t')
+        : { status: 200, body: { id: 4, status: 'pending', total: 3 } },
+    );
+    const photos = ['a', 'b', 'c'].map((b) => new Blob([b], { type: 'image/jpeg' }));
+    const job = await createScanJob(new PokeCollectorClient(CREDENTIALS, fetch), photos);
+    expect(job.total).toBe(3);
+    const form = calls[1]?.body as FormData;
+    expect(form.getAll('files')).toHaveLength(3);
+    expect(form.has('individual_positions')).toBe(false);
+  });
+
+  it('lists the scan inbox and dismisses an item with an empty choice', async () => {
+    const { fetch, calls } = fakeFetch(({ url }) => {
+      if (url.endsWith('/login')) return loginOk('t');
+      if (url.endsWith('/recognize/jobs'))
+        return { status: 200, body: { jobs: [{ id: 4, status: 'done', attention: 2 }] } };
+      return { status: 200, body: { id: 9, status: 'done', resolved: true } };
+    });
+    const client = new PokeCollectorClient(CREDENTIALS, fetch);
+    expect(await listScanJobs(client)).toEqual([{ id: 4, status: 'done', attention: 2 }]);
+    await dismissScanItem(client, 4, 9);
+    expect(calls.slice(1).map((c) => `${c.method} ${c.url}`)).toEqual([
+      'GET https://pc.example.com/api/cards/recognize/jobs',
+      'POST https://pc.example.com/api/cards/recognize/jobs/4/items/9/resolve',
+    ]);
+    expect(calls[2]?.body).toBe('{}');
   });
 });

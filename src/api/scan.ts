@@ -67,19 +67,22 @@ export function isFinished(item: Pick<ScanItem, 'status'>): boolean {
 /** The wait before poll number `attempt` (0-based), honouring a scheduled retry. */
 export function nextDelay(attempt: number, item: ScanItem | null, now: number): number {
   const backoff = POLL_DELAYS_MS[Math.min(attempt, POLL_DELAYS_MS.length - 1)] ?? 8_000;
-  if (item?.status === 'retrying' && item.next_attempt_at) {
-    // Upstream sends naive UTC ISO timestamps.
-    const at = Date.parse(
-      /[zZ]|[+-]\d\d:\d\d$/.test(item.next_attempt_at)
-        ? item.next_attempt_at
-        : `${item.next_attempt_at}Z`,
-    );
-    if (Number.isFinite(at)) return Math.min(MAX_DELAY_MS, Math.max(backoff, at - now + 500));
+  if (item?.status === 'retrying') {
+    const at = parseUpstreamTime(item.next_attempt_at);
+    if (at !== null) return Math.min(MAX_DELAY_MS, Math.max(backoff, at - now + 500));
   }
   return backoff;
 }
 
-const realSleep = (ms: number, signal?: AbortSignal) =>
+/** A time from upstream, which sends naive UTC ISO timestamps, as epoch ms. */
+export function parseUpstreamTime(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const at = Date.parse(/[zZ]|[+-]\d\d:\d\d$/.test(value) ? value : `${value}Z`);
+  return Number.isFinite(at) ? at : null;
+}
+
+/** Waits `ms`, or rejects with ScanCancelled as soon as `signal` aborts. */
+export const realSleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
     if (signal?.aborted) return reject(new ScanCancelled());
     const timer = setTimeout(() => {

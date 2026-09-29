@@ -11,6 +11,7 @@ import {
   PrintingDetailTagsSchema,
   ResolveAndAddSchema,
   ScanItemSchema,
+  ScanJobListSchema,
   ScanJobSchema,
   SearchResponseSchema,
   SetsSchema,
@@ -199,20 +200,30 @@ export function removeBinderEntry(
 }
 
 /**
- * Uploads one photo as a scan job and returns straight away; recognition
- * runs in the background upstream. `photo` is anything FormData can send
- * as a file: in the app, an expo-file-system File.
+ * Uploads photos as one scan job and returns straight away; recognition runs
+ * in the background upstream, one item per photo. Each photo is anything
+ * FormData can send as a file: in the app, an expo-file-system File. Upstream
+ * takes up to 50 photos and 200 MB in a job.
  */
-export function createScanJob(client: PokeCollectorClient, photo: Blob): Promise<ScanJob> {
+export function createScanJob(
+  client: PokeCollectorClient,
+  photos: readonly Blob[],
+): Promise<ScanJob> {
   const form = new FormData();
-  form.append('files', photo);
+  for (const photo of photos) form.append('files', photo);
   return client.request('/api/cards/recognize/jobs', {
     method: 'POST',
     form,
     schema: ScanJobSchema,
-    // A photo over a slow uplink, through the tunnel.
-    timeoutMs: 60_000,
+    // Photos over a slow uplink, through the tunnel: a minute for one, and
+    // more for a batch, which upstream also re-encodes photo by photo.
+    timeoutMs: Math.min(5 * 60_000, 60_000 + 6_000 * (photos.length - 1)),
   });
+}
+
+/** Jobs with anything still to review, newest first. No items, only counts. */
+export async function listScanJobs(client: PokeCollectorClient): Promise<ScanJob[]> {
+  return (await client.request('/api/cards/recognize/jobs', { schema: ScanJobListSchema })).jobs;
 }
 
 export function getScanJob(client: PokeCollectorClient, jobId: number): Promise<ScanJob> {
@@ -250,7 +261,24 @@ export function retryScanItem(
   });
 }
 
-/** Drops a job and its photo, when the scan is abandoned or dismissed. */
+/**
+ * Marks one photo handled without adding anything, and deletes the photo
+ * upstream: the web UI's "dismiss". Used for a skipped photo, and after a
+ * photo's card was added from a search instead of from its candidates.
+ */
+export function dismissScanItem(
+  client: PokeCollectorClient,
+  jobId: number,
+  itemId: number,
+): Promise<ScanItem> {
+  return client.request(`/api/cards/recognize/jobs/${jobId}/items/${itemId}/resolve`, {
+    method: 'POST',
+    json: {},
+    schema: ScanItemSchema,
+  });
+}
+
+/** Drops a job and its photos, when a scan or a whole batch is abandoned. */
 export function deleteScanJob(client: PokeCollectorClient, jobId: number): Promise<unknown> {
   return client.request(`/api/cards/recognize/jobs/${jobId}`, { method: 'DELETE' });
 }

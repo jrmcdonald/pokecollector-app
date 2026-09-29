@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import { Link, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import type { BinderCard, BinderCards } from '@/api/schemas';
@@ -18,7 +18,7 @@ import { showToast } from '@/utils/toast';
 
 /**
  * One binder's cards. Planned binders mark what is still missing; collection
- * binders only ever hold owned copies. A card's long-press menu takes it out
+ * binders only ever hold owned copies. Holding a card offers to take it out
  * of the binder (it stays in the collection).
  */
 export default function BinderDetail() {
@@ -32,7 +32,7 @@ export default function BinderDetail() {
   const data = binder.data;
   const planned = data ? isPlanned(data.binder) : false;
 
-  // Chosen from the long-press menu, which is already the deliberate second
+  // Chosen from the long-press sheet, which is already the deliberate second
   // step, so no confirmation: the copy stays in the collection either way.
   function removeCard(card: BinderCard) {
     if (!online) {
@@ -79,15 +79,11 @@ export default function BinderDetail() {
               missing={planned && !card.owned}
               variant={card.variant}
               photoItemId={card.has_scan_photo ? card.collection_item_id : null}
-              menu={
-                <Link.MenuAction icon="minus.circle" destructive onPress={() => removeCard(card)}>
-                  Take out of binder
-                </Link.MenuAction>
-              }
               actions={[
                 {
                   name: 'remove',
                   label: 'Take out of binder',
+                  destructive: true,
                   onAction: () => removeCard(card),
                 },
               ]}
@@ -116,7 +112,10 @@ function Summary({ data, planned }: { data: BinderCards; planned: boolean }) {
     <View style={styles.header}>
       {planned ? (
         <>
-          <View style={styles.row}>
+          <View
+            style={styles.row}
+            accessible
+            accessibilityLabel={`${owned} of ${total} owned, ${Math.round(completion(owned, total) * 100)} percent, ${formatTotal(data.cost_to_complete ?? 0)} to complete`}>
             <ThemedText variant="figure">
               {owned}
               <ThemedText variant="figureSmall" color="textSecondary">
@@ -128,7 +127,7 @@ function Summary({ data, planned }: { data: BinderCards; planned: boolean }) {
               {formatTotal(data.cost_to_complete ?? 0)} to complete
             </ThemedText>
           </View>
-          <ProgressBar value={completion(owned, total)} height={8} />
+          <ProgressBar value={completion(owned, total)} height={8} decorative />
         </>
       ) : (
         <View style={styles.row}>

@@ -13,6 +13,9 @@ import { EmptyState } from '../states';
 
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 
+const mockPick = jest.fn();
+jest.mock('@/utils/pick', () => ({ pick: (...args: unknown[]) => mockPick(...args) }));
+
 jest.mock('@/session/session', () => ({
   useSession: () => ({
     session: {
@@ -102,6 +105,20 @@ describe('CardTile', () => {
       { name: 'remove', label: 'Take out of binder' },
     ]);
     tile.props.onAccessibilityAction({ nativeEvent: { actionName: 'remove' } });
+    expect(onAction).toHaveBeenCalled();
+  });
+
+  it('offers the same actions in a sheet when held, destructive ones in red', async () => {
+    const onAction = jest.fn();
+    mockPick.mockResolvedValueOnce(0);
+    await render(
+      <CardTile
+        card={card}
+        actions={[{ name: 'remove', label: 'Take out of binder', destructive: true, onAction }]}
+      />,
+    );
+    await userEvent.setup().longPress(screen.getByRole('button', { name: 'Pikachu' }));
+    expect(mockPick).toHaveBeenCalledWith('Pikachu', ['Take out of binder'], { destructive: [0] });
     expect(onAction).toHaveBeenCalled();
   });
 });

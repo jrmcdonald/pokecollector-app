@@ -59,6 +59,10 @@ an iOS build.
 - `src/components/`, `src/hooks/`, `src/theme/`, `src/utils/`.
 - `openapi/` — upstream's spec, one file per pinned upstream version.
   `scripts/export-openapi.sh <version>` exports a new one.
+- `e2e/` — the simulator tests: a fake PokeCollector with made-up data, and
+  an XCUITest walkthrough that screenshots and audits each screen. See
+  `e2e/README.md`. Its Node code has its own `tsconfig.json`, so Node's types
+  stay out of the app's; `npm run typecheck` checks both.
 
 ## Rules
 

@@ -1,9 +1,9 @@
-import { Link, router } from 'expo-router';
-import type { ReactNode } from 'react';
+import { router } from 'expo-router';
 import { Pressable, StyleSheet, View, type AccessibilityActionEvent } from 'react-native';
 
 import { radius, spacing, useColors } from '@/theme';
 import type { CardImageFields } from '@/utils/images';
+import { pick } from '@/utils/pick';
 
 import { CardImage, frameForVariant } from './card-image';
 import { ThemedText } from './themed-text';
@@ -21,12 +21,13 @@ type Props = {
   /** A collection entry whose own photo stands in when the card has no image. */
   photoItemId?: number | null;
   /**
-   * Extra actions for the native long-press menu, as `Link.MenuAction`
-   * elements, and the same actions for VoiceOver's Actions rotor.
+   * Extra actions: an action sheet on long press, and the same actions in
+   * VoiceOver's Actions rotor, so no gesture is the only way (WCAG 2.5.1).
    */
-  menu?: ReactNode;
-  actions?: { name: string; label: string; onAction(): void }[];
+  actions?: TileAction[];
 };
+
+export type TileAction = { name: string; label: string; destructive?: boolean; onAction(): void };
 
 /** One card in a grid. Opens the card's detail screen. */
 export function CardTile({
@@ -36,14 +37,24 @@ export function CardTile({
   missing = false,
   variant,
   photoItemId,
-  menu,
   actions = [],
 }: Props) {
   const colors = useColors();
   const href = { pathname: '/card/[id]', params: { id: card.id } } as const;
   const label = `${card.name}${quantity > 0 ? `, ${quantity} owned` : missing ? ', missing' : ''}${detail ? `, ${detail}` : ''}`;
 
-  const tile = (
+  async function showActions() {
+    const index = await pick(
+      card.name,
+      actions.map((a) => a.label),
+      { destructive: actions.flatMap((a, i) => (a.destructive ? [i] : [])) },
+    );
+    if (index !== null) actions[index]?.onAction();
+  }
+
+  // Not expo-router's Link.Menu: its native preview wrapper hid every tile
+  // in a list from VoiceOver (the simulator audit found binders empty).
+  return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -51,8 +62,8 @@ export function CardTile({
       onAccessibilityAction={(event: AccessibilityActionEvent) =>
         actions.find((a) => a.name === event.nativeEvent.actionName)?.onAction()
       }
-      // Inside a Link the Link supplies onPress; on its own the tile navigates.
-      onPress={menu ? undefined : () => router.push(href)}
+      onPress={() => router.push(href)}
+      onLongPress={actions.length ? showActions : undefined}
       style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
       <View>
         <CardImage
@@ -89,14 +100,6 @@ export function CardTile({
         </ThemedText>
       ) : null}
     </Pressable>
-  );
-
-  if (!menu) return tile;
-  return (
-    <Link href={href} asChild>
-      <Link.Trigger>{tile}</Link.Trigger>
-      <Link.Menu>{menu}</Link.Menu>
-    </Link>
   );
 }
 

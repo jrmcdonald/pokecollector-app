@@ -40,7 +40,9 @@ export function TextField({ label, hint, style, ...rest }: Props) {
 const styles = StyleSheet.create({
   container: { gap: spacing.xs },
   input: {
-    height: minTapTarget,
+    // A minimum, not a height: at the largest text sizes the text is taller.
+    minHeight: minTapTarget,
+    paddingVertical: spacing.sm,
     borderRadius: radius.md,
     borderWidth: 1,
     paddingHorizontal: spacing.sm + 4,

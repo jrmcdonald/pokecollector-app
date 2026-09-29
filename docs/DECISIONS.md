@@ -344,9 +344,11 @@ Mobile Accessibility Guidelines found 3 high, 8 medium and 8 low findings.
 Every one was fixed except Larger Text (below).
 
 - **Hidden gestures have visible, native alternatives.** A long press on a
-  binder card, or on a wishlist row, opens an iOS context menu
-  (`Link.Menu` from expo-router, JavaScript only) with the action named, and
-  VoiceOver gets the same action from its Actions rotor. Taking a card out of
+  binder card, or on a wishlist row, opens an action sheet with the action
+  named, and VoiceOver gets the same action from its Actions rotor. (It was
+  expo-router's `Link.Menu` context menu at first, but its native preview
+  wrapper hid every tile in a list from VoiceOver, which the simulator audit
+  caught.) Taking a card out of
   a binder no longer asks first: it is undone by adding it back, the card
   stays in the collection, and a banner says so. Swipe to remove stays on the
   wishlist as a shortcut.
@@ -379,3 +381,41 @@ Every one was fixed except Larger Text (below).
   Dynamic Type sizes, and fixed heights (tiles, rows, the tab bar's
   neighbours) will clip. That needs screenshots at each size, so it waits for
   the simulator screenshot tests.
+
+## 2026-09-28 — Simulator screenshot tests and the accessibility audit
+
+The third step of `PLAN.md` §8.2, in the `Simulator` workflow (`e2e/`).
+
+- **One XCUITest, not Maestro.** Apple's `performAccessibilityAudit` only
+  runs inside an XCUITest, so the walkthrough that takes the screenshots is
+  one too: one tool, no Java, and the audit sees exactly the screen that was
+  photographed. The test drives the installed app by bundle ID, from a tiny
+  Xcode project that XcodeGen generates in CI, so nothing is added to the
+  app's native project.
+- **A fake server over real HTTPS.** The app refuses plain http, and that
+  rule stays. CI makes a throwaway certificate authority, adds it to the
+  simulator's trust store, and serves made-up fixtures from
+  `https://localhost`. The fixtures are typed against the app's schemas and
+  parsed through them in `npm test`, and card images are drawn placeholders,
+  so screenshots never depend on TCGdex or a real account.
+- **Two text sizes.** Each run erases the simulator, signs in through
+  onboarding, and walks the screens at the default size, then again at the
+  largest accessibility size. The audit's Dynamic Type and clipped-text
+  checks at the largest size are how Larger Text (M1 in the review) gets
+  checked.
+- **Only the default size is compared.** Its screenshots are approved into
+  `e2e/screenshots/`, and a change fails the run until approved again, by
+  label or by hand. The largest-size screenshots are for reading, in the
+  run's artifact: approving both would double the images kept in git for
+  little more protection.
+- **An issue has to show up twice.** Element detection works from the
+  screen image, and once flagged text on a screen that passed the run
+  before, unchanged. A screen with issues is audited again after two
+  seconds, and only issues found both times fail the run.
+- **Approving commits from CI.** The `approve-screenshots` label makes a run
+  commit its screenshots to the branch and remove the label, so approving
+  never needs a Mac.
+- **The walkthrough found real bugs on its first full runs:** Home's stat
+  tiles broke words at the largest text size, binder cards inside
+  `Link.Menu` were missing from the accessibility tree, and back buttons were
+  named "(tabs)". All three are fixed; see the commits on PR #6.

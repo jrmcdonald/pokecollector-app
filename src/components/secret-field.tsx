@@ -84,7 +84,7 @@ export function SecretField({
 const styles = StyleSheet.create({
   container: { gap: spacing.xs },
   row: {
-    height: minTapTarget,
+    minHeight: minTapTarget,
     borderRadius: radius.md,
     borderWidth: 1,
     flexDirection: 'row',
@@ -92,6 +92,6 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.sm + 4,
   },
   mask: { flex: 1 },
-  replace: { height: minTapTarget, paddingHorizontal: spacing.md, justifyContent: 'center' },
+  replace: { minHeight: minTapTarget, paddingHorizontal: spacing.md, justifyContent: 'center' },
   link: { minHeight: minTapTarget, justifyContent: 'center', alignSelf: 'flex-start' },
 });

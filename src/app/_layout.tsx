@@ -61,6 +61,9 @@ function RootStack() {
         // The back button otherwise shows the previous route's name, and the
         // tabs route is called "(tabs)". A chevron alone is the iOS norm.
         headerBackButtonDisplayMode: 'minimal',
+        // What VoiceOver reads for that chevron; otherwise it is the previous
+        // route's name, which for a tab is "(tabs)".
+        headerBackTitle: 'Back',
         headerTintColor: colors.text,
         headerTitleStyle: { fontFamily: fonts.semibold },
         headerLargeTitleStyle: { fontFamily: fonts.bold },

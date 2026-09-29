@@ -527,8 +527,10 @@ that keep it there. In order:
 - [ ] **Screenshot tests on the iOS simulator**, once the review has settled
       what the screens should look like: a macOS CI job builds for the
       simulator, runs the app against a fake server with made-up data, walks
-      the main screens with Maestro, compares screenshots with approved ones,
-      and runs Apple's accessibility audit (`performAccessibilityAudit`).
+      the main screens with an XCUITest, compares screenshots with approved
+      ones, and runs Apple's accessibility audit (`performAccessibilityAudit`),
+      at the default and the largest text size. Workflow `Simulator`, code in
+      `e2e/`.
 
 ---
 

@@ -7,6 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 const ITEMS: { title: string; subtitle: string; href: Href }[] = [
   { title: 'Wishlist', subtitle: 'Cards you want, and what they cost', href: '/wishlist' },
   { title: 'Sets', subtitle: 'Completion and checklists', href: '/sets' },
+  { title: 'Decks', subtitle: 'Your decks, and adding a prebuilt one', href: '/decks' },
   { title: 'Settings', subtitle: 'Accounts, connection and cache', href: '/settings' },
 ];
 

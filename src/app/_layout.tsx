@@ -78,6 +78,12 @@ function RootStack() {
         <Stack.Screen name="sets" options={{ title: 'Sets' }} />
         <Stack.Screen name="set/[id]" options={{ title: '' }} />
         <Stack.Screen name="binder/[id]" options={{ title: '' }} />
+        <Stack.Screen name="decks" options={{ title: 'Decks' }} />
+        <Stack.Screen name="deck/[id]" options={{ title: '' }} />
+        <Stack.Screen
+          name="deck-import"
+          options={{ title: 'Add a prebuilt deck', presentation: 'modal' }}
+        />
         <Stack.Screen name="scans/index" options={{ title: 'Scans to review' }} />
         <Stack.Screen name="scans/[id]" options={{ title: 'Review scans' }} />
         <Stack.Screen name="add-account" options={{ title: 'Add an account' }} />

@@ -134,7 +134,7 @@ final class WalkthroughTests: XCTestCase {
     tap(app.navigationBars.buttons["Add a prebuilt deck"])
     wait(for: app.textFields["Deck name"], "Add a prebuilt deck")
     capture("deck-import")
-    tap(app.navigationBars.buttons["Cancel"])
+    back()
     wait(for: button(startingWith: "Lost Box"), "Decks, again")
     back()
 

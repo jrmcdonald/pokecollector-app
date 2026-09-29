@@ -31,7 +31,7 @@ const EXAMPLE = 'Pikachu ex SVI 57';
 /**
  * Adds a prebuilt deck from its list. Pasting and looking the cards up makes
  * a planned deck, which is the preview: nothing is added to the collection
- * until "Add". Cancelling from the review deletes the planned deck.
+ * until "Add". Discarding from the review deletes the planned deck.
  */
 export default function DeckImport() {
   const [imported, setImported] = useState<{ deckId: number; unresolved: DeckLine[] } | null>(null);
@@ -62,14 +62,7 @@ function Paste({
 
   return (
     <ThemedView style={styles.fill}>
-      <Stack.Screen
-        options={{
-          title: 'Add a prebuilt deck',
-          unstable_headerLeftItems: () => [
-            { type: 'button', label: 'Cancel', onPress: () => router.back() },
-          ],
-        }}
-      />
+      <Stack.Screen options={{ title: 'Add a prebuilt deck' }} />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"

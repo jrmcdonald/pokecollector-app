@@ -493,7 +493,9 @@ The third step of `PLAN.md` §8.2, in the `Simulator` workflow (`e2e/`).
   and how many are already owned, with the lines upstream could not find
   listed separately to search for or leave out. Nothing touches the
   collection until "Add". Discarding deletes the deck. The review screen
-  has no swipe-to-dismiss, so the deck is never left behind by accident.
+  has no back button or back gesture, so the deck is never left behind by
+  accident. The import is a pushed screen, not a modal: a card opened from
+  the review would otherwise be presented as a sheet with no way back.
 - **The import is all or nothing upstream.** One unknown card makes it
   write nothing, and report `row N`. The app then imports again without
   those rows, so a list with a typo costs one request more, not a failure.

@@ -1,4 +1,9 @@
-import { avatarImageSource, cardImageSource, collectionPhotoSource } from '../images';
+import {
+  avatarImageSource,
+  cardImageSource,
+  collectionPhotoSource,
+  scanPhotoSource,
+} from '../images';
 
 const proxy = { baseUrl: 'https://pc.example.com', headers: { 'CF-Access-Client-Id': 'id' } };
 
@@ -70,5 +75,19 @@ describe('collectionPhotoSource', () => {
   it('has nothing without an entry or a login', () => {
     expect(collectionPhotoSource(null, withLogin)).toBeNull();
     expect(collectionPhotoSource(42, { ...withLogin, token: null })).toBeNull();
+  });
+});
+
+describe('scanPhotoSource', () => {
+  it('asks upstream for the photo with the login, cached per account, job and item', () => {
+    expect(scanPhotoSource(4, 9, { ...proxy, token: 't', scope: 'acct' })).toEqual({
+      uri: 'https://pc.example.com/api/cards/recognize/jobs/4/items/9/image',
+      headers: { ...proxy.headers, Authorization: 'Bearer t' },
+      cacheKey: 'scan-photo-acct-4-9',
+    });
+  });
+
+  it('needs a login', () => {
+    expect(scanPhotoSource(4, 9, { ...proxy, token: null, scope: 'acct' })).toBeNull();
   });
 });

@@ -81,12 +81,18 @@ export function createRouter(origin: string) {
     if (path === '/api/wishlist/') return ok(fixtures.wishlist);
     if (path === '/api/sets/') return ok(fixtures.sets);
     if (path === '/api/binders/') return ok(fixtures.binders);
+    if (path === '/api/cards/recognize/jobs') return ok({ jobs: fixtures.scanJobs });
     if (path === '/api/cards/search') {
       const page = Number(url.searchParams.get('page') ?? '1') || 1;
       const pageSize = Number(url.searchParams.get('page_size') ?? '30') || 30;
       return ok(fixtures.search(url.searchParams.get('q') ?? '', page, pageSize));
     }
 
+    const scanJob = path.match(/^\/api\/cards\/recognize\/jobs\/(\d+)$/);
+    if (scanJob) {
+      const found = fixtures.scanJob(Number(scanJob[1]));
+      return found ? ok(found) : notFound();
+    }
     const checklist = path.match(/^\/api\/sets\/([^/]+)\/checklist$/);
     if (checklist) {
       const found = fixtures.checklist(decodeURIComponent(checklist[1] ?? ''));

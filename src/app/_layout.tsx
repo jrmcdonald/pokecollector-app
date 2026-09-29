@@ -78,6 +78,8 @@ function RootStack() {
         <Stack.Screen name="sets" options={{ title: 'Sets' }} />
         <Stack.Screen name="set/[id]" options={{ title: '' }} />
         <Stack.Screen name="binder/[id]" options={{ title: '' }} />
+        <Stack.Screen name="scans/index" options={{ title: 'Scans to review' }} />
+        <Stack.Screen name="scans/[id]" options={{ title: 'Review scans' }} />
         <Stack.Screen name="add-account" options={{ title: 'Add an account' }} />
         <Stack.Screen name="connection" options={{ title: 'Server and login' }} />
       </Stack.Protected>

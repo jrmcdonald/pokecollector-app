@@ -366,3 +366,59 @@ export function candidatesOf(item: Pick<ScanItem, 'matches'>): ScanMatch[] {
     return parsed.success ? [parsed.data] : [];
   });
 }
+
+// ---------------------------------------------------------------------------
+// Decks and bulk adds. Upstream 1.51.0's `api/decks.py`, typed in the spec as
+// DeckResponse; the binder CSV import is an untyped dict.
+// ---------------------------------------------------------------------------
+
+export const DeckEntrySchema = z.looseObject({
+  id: z.number(),
+  card_id: z.string(),
+  required_quantity: z.number(),
+  owned_quantity: z.number().nullish(),
+  /** Copies the deck still needs that are not owned, or are reserved by another deck. */
+  shortage: z.number().nullish(),
+  card: CardSchema.nullish(),
+});
+export type DeckEntry = z.infer<typeof DeckEntrySchema>;
+
+/**
+ * A deck: `deck` is planned (a list of cards to collect), `physical_deck` a
+ * Real Deck, which reserves owned copies. The list endpoint leaves out
+ * `entries`.
+ */
+export const DeckSchema = z.looseObject({
+  id: z.number(),
+  name: z.string(),
+  binder_type: z.string().nullish(),
+  format: z.string().nullish(),
+  target_size: z.number().nullish(),
+  current_card_count: z.number().nullish(),
+  missing_copy_count: z.number().nullish(),
+  color: z.string().nullish(),
+  updated_at: z.string().nullish(),
+  entries: z.array(DeckEntrySchema).nullish(),
+});
+export type Deck = z.infer<typeof DeckSchema>;
+
+export const DecksSchema = z.array(DeckSchema);
+
+/** POST /api/binders/{id}/import-csv. All or nothing: any failed row writes nothing. */
+export const ImportResultSchema = z.looseObject({
+  added: z.number(),
+  updated: z.number().nullish(),
+  skipped: z.number().nullish(),
+  failed: z.number(),
+  errors: z.array(z.string()).nullish(),
+});
+export type ImportResult = z.infer<typeof ImportResultSchema>;
+
+/** POST /api/collection/bulk-add. Each item is committed on its own. */
+export const BulkAddResultSchema = z.looseObject({
+  added: z.number(),
+  updated: z.number(),
+  failed: z.number(),
+  errors: z.array(z.string()).nullish(),
+});
+export type BulkAddResult = z.infer<typeof BulkAddResultSchema>;

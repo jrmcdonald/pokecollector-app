@@ -13,17 +13,20 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import type { File } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { useSyncExternalStore } from 'react';
 
 import { batchPollDelay } from '@/api/batch';
+import { addDeckToCollection, importDecklist } from '@/api/decks';
 import {
   addCardToPlannedBinder,
   addCollectionItemToBinder,
+  addDeckEntry,
   addToCollection,
   addToWishlist,
   createScanJob,
+  deleteDeck,
   deleteScanJob,
   dismissScanItem,
   getBinderCards,
@@ -31,6 +34,8 @@ import {
   getCard,
   getCollection,
   getDashboard,
+  getDeck,
+  getDecks,
   getPrintingDetailTags,
   getScanJob,
   getSetChecklist,
@@ -47,9 +52,17 @@ import {
   type NewCollectionItem,
 } from '@/api/endpoints';
 import { ApiError } from '@/api/errors';
-import type { BinderCards, CollectionItem, ScanItem, ScanJob, WishlistItem } from '@/api/schemas';
+import type {
+  BinderCards,
+  CollectionItem,
+  Deck,
+  ScanItem,
+  ScanJob,
+  WishlistItem,
+} from '@/api/schemas';
 import { useSession } from '@/session/session';
 import { forgetBatchPhotos, keepBatchPhotos, pruneBatchPhotos } from '@/utils/batch-photos';
+import type { DeckLine } from '@/utils/decklist';
 import { showToast } from '@/utils/toast';
 
 const SEARCH_PAGE_SIZE = 30;
@@ -75,6 +88,9 @@ export function useKeys() {
       binders: [cacheId, 'binders'] as const,
       binder: (id: number) => [cacheId, 'binder', id] as const,
       binderAll: [cacheId, 'binder'] as const,
+      decks: [cacheId, 'decks'] as const,
+      deck: (id: number) => [cacheId, 'deck', id] as const,
+      deckAll: [cacheId, 'deck'] as const,
       printingDetails: [cacheId, 'printing-details'] as const,
       scanJobs: [cacheId, 'scan-jobs'] as const,
       scanJob: (id: number) => [cacheId, 'scan-job', id] as const,
@@ -206,6 +222,8 @@ export function useInvalidateOwnership() {
         keys.checklistAll,
         keys.binders,
         keys.binderAll,
+        keys.decks,
+        keys.deckAll,
         keys.printingDetails,
       ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
     );
@@ -542,5 +560,99 @@ export function useDiscardScanJob() {
     },
     onError: (error) => reportFailure('Could not discard the scans', error),
     onSettled: () => queryClient.invalidateQueries({ queryKey: keys.scanJobs }),
+  });
+}
+
+export function useDecks() {
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.decks,
+    queryFn: () => getDecks(getClient()),
+    enabled,
+  });
+}
+
+export function useDeck(id: number) {
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.deck(id),
+    queryFn: () => getDeck(getClient(), id),
+    enabled: enabled && Number.isInteger(id) && id > 0,
+  });
+}
+
+/** The CSV upstream's import reads, as a file FormData can send. */
+function csvFile(csv: string): File {
+  const file = new File(Paths.cache, 'deck-import.csv');
+  file.create({ overwrite: true });
+  file.write(csv);
+  return file;
+}
+
+/**
+ * Makes a planned deck from a pasted list: the preview the user confirms.
+ * The catalogue language is the one the account's sets are in.
+ */
+export function useImportDecklist() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  const sets = useSets();
+  return useMutation({
+    mutationFn: ({ name, cards }: { name: string; cards: readonly DeckLine[] }) =>
+      importDecklist(getClient(), {
+        name,
+        cards,
+        lang: sets.data?.[0]?.lang ?? 'en',
+        toFile: csvFile,
+      }),
+    onSuccess: ({ deck }) => queryClient.setQueryData(keys.deck(deck.id), deck),
+    onError: (error) => reportFailure('Could not read the deck list', error),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.decks }),
+  });
+}
+
+/** Adds a card the import could not find, once the user has found it. */
+export function useAddDeckEntry() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: ({
+      deckId,
+      cardId,
+      quantity,
+    }: {
+      deckId: number;
+      cardId: string;
+      quantity: number;
+    }) => addDeckEntry(getClient(), deckId, { card_id: cardId, required_quantity: quantity }),
+    onSuccess: (deck) => queryClient.setQueryData(keys.deck(deck.id), deck),
+    onError: (error) => reportFailure('Could not add the card to the deck', error),
+  });
+}
+
+/** Adds every copy of a planned deck to the collection and makes it a Real Deck. */
+export function useAddDeckToCollection() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  const invalidate = useInvalidateOwnership();
+  return useMutation({
+    mutationFn: (deck: Deck) => addDeckToCollection(getClient(), deck),
+    onSuccess: ({ deck }) => {
+      succeeded();
+      queryClient.setQueryData(keys.deck(deck.id), deck);
+    },
+    onError: (error) => reportFailure('Could not add the deck', error),
+    onSettled: invalidate,
+  });
+}
+
+export function useDeleteDeck() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: (deckId: number) => deleteDeck(getClient(), deckId),
+    onSuccess: (_result, deckId) => queryClient.removeQueries({ queryKey: keys.deck(deckId) }),
+    onError: (error) => reportFailure('Could not delete the deck', error),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.decks }),
   });
 }

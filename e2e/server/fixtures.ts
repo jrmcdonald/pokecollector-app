@@ -19,6 +19,9 @@ import type {
   CollectionItem,
   Dashboard,
   PrintingDetailTag,
+  ScanItem,
+  ScanJob,
+  ScanMatch,
   SearchCard,
   User,
   WishlistItem,
@@ -403,6 +406,78 @@ export function buildFixtures(origin: string) {
     };
   };
 
+  // One batch sent earlier and read to the end, so the review is still: three
+  // photos ready, one with no match, one the scanner gave up on, and one
+  // already added. The phone has none of the photos (the simulator never
+  // took them), so the review shows numbered placeholders.
+  const scanMatch = (id: string): ScanMatch => {
+    const c = card(id);
+    return {
+      id: c.id,
+      tcg_card_id: c.id.replace(/_en$/, ''),
+      name: c.name,
+      number: c.number,
+      rarity: c.rarity,
+      set_abbreviation: c.set_ref?.abbreviation?.toLowerCase() ?? null,
+      image: c.images_small,
+      image_hd: c.images_large,
+      lang: 'en',
+    };
+  };
+  const scanItem = (position: number, extra: Partial<ScanItem>): ScanItem => ({
+    id: 500 + position,
+    position,
+    status: 'done',
+    resolved: false,
+    error: null,
+    recognized: null,
+    matches: [],
+    has_image: false,
+    next_attempt_at: null,
+    retry_reason: null,
+    ...extra,
+  });
+  const scanItems: ScanItem[] = [
+    scanItem(0, {
+      recognized: { name: 'Pikachu', set_code: 'SVI', number_local: '063', language: 'en' },
+      matches: [scanMatch('sv1-063_en'), scanMatch('swsh1-025_en')],
+    }),
+    scanItem(1, {
+      recognized: { name: 'Charizard ex', set_code: 'MEW', number_local: '006', language: 'en' },
+      matches: [scanMatch('sv3pt5-006_en')],
+    }),
+    scanItem(2, {
+      recognized: { name: 'Iono', set_code: 'PAL', number_local: '231', language: 'en' },
+      matches: [scanMatch('sv2-231_en')],
+    }),
+    scanItem(3, {
+      recognized: { name: 'Snorlax', set_code: 'MEW', number_local: '143', language: 'en' },
+    }),
+    scanItem(4, {
+      status: 'failed',
+      error: 'The scanner could not find a card in this photo.',
+    }),
+    scanItem(5, {
+      resolved: true,
+      recognized: { name: 'Bulbasaur', set_code: 'MEW', number_local: '001', language: 'en' },
+      matches: [scanMatch('sv3pt5-001_en')],
+    }),
+  ];
+  const scanJobSummary: ScanJob = {
+    id: 12,
+    status: 'done',
+    total: scanItems.length,
+    processed: scanItems.length,
+    active: 0,
+    retrying: 0,
+    attention: scanItems.filter((i) => !i.resolved).length,
+    next_retry_at: null,
+    created_at: '2026-09-28T13:05:00',
+    expires_at: '2026-10-12T13:05:00',
+  };
+  const scanJob = (id: number): ScanJob | null =>
+    id === scanJobSummary.id ? { ...scanJobSummary, items: scanItems } : null;
+
   return {
     cards,
     card: (id: string) => cards.find((c) => c.id === id) ?? null,
@@ -415,6 +490,8 @@ export function buildFixtures(origin: string) {
     wishlist,
     printingDetailTags,
     search,
+    scanJobs: [scanJobSummary],
+    scanJob,
   };
 }
 

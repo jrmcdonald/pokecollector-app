@@ -80,6 +80,22 @@ final class WalkthroughTests: XCTestCase {
     wait(for: element(startingWith: "Camera access"), "Scan")
     capture("scan")
 
+    // A batch sent earlier and left for later (see the fake server's
+    // fixtures): the list, the review, and one photo opened. Reviewing needs
+    // no camera, so it is reachable from here too.
+    tap(button(startingWith: "5 scanned cards to review"))
+    wait(for: button(startingWith: "6 photos"), "Scans to review")
+    capture("scans")
+    tap(button(startingWith: "6 photos"))
+    wait(for: button(startingWith: "Photo 1, Pikachu"), "Scan review")
+    capture("scan-review")
+    tap(button(startingWith: "Photo 1, Pikachu"))
+    wait(for: app.buttons["Done"], "A scanned photo")
+    capture("scan-photo")
+    tap(app.buttons["Done"])
+    back()
+    back()
+
     tab("Binders")
     wait(for: button(startingWith: "151 master set"), "Binders")
     capture("binders")

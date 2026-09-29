@@ -11,12 +11,16 @@ import {
   CollectionSchema,
   DashboardSchema,
   PrintingDetailTagsSchema,
+  ScanJobListSchema,
+  ScanJobSchema,
   SearchResponseSchema,
   SetsSchema,
   TokenResponseSchema,
   UserSchema,
   WishlistSchema,
 } from '../../../src/api/schemas';
+import { batchProgress } from '../../../src/api/batch';
+import { candidatesOf } from '../../../src/api/schemas';
 import { bindersOnly } from '../../../src/utils/binders';
 import { PASSWORD, USERNAME } from '../fixtures.ts';
 import { createRouter, TOKEN, type Reply } from '../routes.ts';
@@ -86,6 +90,18 @@ describe('fake PokeCollector', () => {
     expect(search.data.map((c) => c.name)).toContain('Pikachu');
     const card = CardSchema.parse(json(get(`/api/cards/${encodeURIComponent('sv1-063_en')}`)));
     expect(card.name).toBe('Pikachu');
+  });
+
+  it('has a batch of scans read to the end, with one photo of each kind', () => {
+    const { jobs } = ScanJobListSchema.parse(json(get('/api/cards/recognize/jobs')));
+    expect(jobs).toHaveLength(1);
+    const job = ScanJobSchema.parse(json(get(`/api/cards/recognize/jobs/${jobs[0]?.id}`)));
+    // Nothing still being read: the review screenshot must not change with timing.
+    expect(batchProgress(job)).toMatchObject({ reading: 0, ready: 3, unmatched: 1, failed: 1 });
+    for (const item of job.items ?? []) {
+      expect(candidatesOf(item)).toHaveLength(item.matches?.length ?? 0);
+    }
+    expect(get('/api/cards/recognize/jobs/999').status).toBe(404);
   });
 
   it('serves a placeholder for every card image it hands out', () => {

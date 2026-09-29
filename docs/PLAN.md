@@ -543,15 +543,15 @@ that keep it there. In order:
       ones, and runs Apple's accessibility audit (`performAccessibilityAudit`),
       at the default and the largest text size. Workflow `Simulator`, code in
       `e2e/`.
-- [ ] **Faster pull request checks, by running what can run at once.** A
-      `Simulator` run takes 35 to 50 minutes: about 13 to build the app, then
-      the walkthrough at the default text size and again at the largest, one
-      after the other. Candidates: run the two text sizes at the same time
-      (two simulators in the job, or two jobs sharing the built app as an
-      artifact), build the XCUITest runner alongside the app rather than
-      after it, and cache what the app build can reuse between runs. `ci.yml`
-      takes about a minute, so it matters less, though lint, typecheck and
-      tests could also run as parallel jobs.
+- [x] **Faster pull request checks, by running what can run at once.** A
+      `Simulator` run took 35 to 50 minutes: about 13 to 23 to build the app,
+      then the walkthrough at the default text size and again at the
+      largest, one after the other. Now one runner builds (with ccache, so
+      unchanged native files are not compiled again), two runners walk the
+      two text sizes at the same time, and a Linux runner reports. See
+      `DECISIONS.md`, "Faster Simulator runs". `ci.yml` stays one job: it takes
+      about a minute, most of it `npm ci`, which each parallel job would
+      repeat.
 
 ---
 

@@ -7,7 +7,9 @@
 #
 # Expects what the workflow sets up: SIM_UDID, APP_PATH, APP_BUNDLE_ID,
 # CA_CERT, SERVER_URL and OUT, the fake server running, and the walkthrough
-# built for testing into build/walkthrough.
+# built for testing into build/walkthrough. It runs from the .xctestrun file
+# that build-for-testing wrote there, so it needs no Xcode project: the
+# workflow builds on one runner and walks on others.
 set -euo pipefail
 
 name=$1
@@ -35,6 +37,8 @@ xcrun simctl launch "$SIM_UDID" "$APP_BUNDLE_ID" > /dev/null
 sleep 5
 xcrun simctl terminate "$SIM_UDID" "$APP_BUNDLE_ID" || true
 
+xctestrun=$(ls build/walkthrough/Build/Products/*.xctestrun | head -n 1)
+
 mkdir -p "$OUT/$name"
 server_lines_before=$(wc -l < "$OUT/server.log")
 set +e
@@ -42,10 +46,8 @@ TEST_RUNNER_APP_BUNDLE_ID="$APP_BUNDLE_ID" \
 TEST_RUNNER_OUTPUT_DIR="$OUT/$name" \
 TEST_RUNNER_SERVER_URL="$SERVER_URL" \
   xcodebuild test-without-building \
-    -project e2e/ios/Walkthrough.xcodeproj \
-    -scheme Walkthrough \
+    -xctestrun "$xctestrun" \
     -destination "id=$SIM_UDID" \
-    -derivedDataPath build/walkthrough \
     -resultBundlePath "$OUT/$name.xcresult" \
     > "$OUT/$name.log" 2>&1
 status=$?

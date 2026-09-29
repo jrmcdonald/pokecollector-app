@@ -1,16 +1,24 @@
 # Screenshot tests and Apple's accessibility audit, on the iOS simulator.
 #
 # Builds the production app for the simulator, serves it made-up data from a
-# fake PokeCollector (e2e/server), and runs the walkthrough (e2e/ios) twice:
-# at the default text size and at the largest accessibility size. Each run
+# fake PokeCollector (e2e/server), and runs the walkthrough (e2e/ios) at the
+# default text size and at the largest accessibility size. Each run
 # screenshots every main screen and audits it. The default-size screenshots
 # are compared with the approved ones in e2e/screenshots.
+#
+# Three stages, so the slow parts overlap:
+#   build        one macOS runner builds the app and the walkthrough, with
+#                ccache keeping compiled native code between runs
+#   simulator    two macOS runners walk the app at the same time, one text
+#                size each, each with its own simulator and fake server
+#   walkthrough  a Linux runner compares, reports, and approves when asked;
+#                its result is the check to look at
 #
 # To approve a run's screenshots, add the approve-screenshots label to the
 # pull request, or run this workflow by hand with "approve" ticked. The run
 # commits them to the branch. See e2e/README.md.
 #
-# Free on a public repository, like every standard runner; about 40 minutes.
+# Free on a public repository, like every standard runner.
 name: Simulator
 
 on:
@@ -38,22 +46,21 @@ concurrency:
   group: simulator-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
+env:
+  EXPO_NO_TELEMETRY: 1
+
 jobs:
-  walkthrough:
-    # Other labels are not a reason to spend 40 minutes.
+  build:
+    # Other labels are not a reason to spend the time.
     if: github.event.action != 'labeled' || github.event.label.name == 'approve-screenshots'
     runs-on: macos-latest
-    timeout-minutes: 90
-    permissions:
-      # Only for approving: committing screenshots and removing the label.
-      contents: write
-      pull-requests: write
+    timeout-minutes: 60
     env:
       APP_VARIANT: production
-      EXPO_NO_TELEMETRY: 1
-      SERVER_URL: https://localhost:8443
-      OUT: ${{ github.workspace }}/e2e-output
-      APPROVE: ${{ inputs.approve || github.event.label.name == 'approve-screenshots' }}
+      # React Native's pods wrap clang in ccache when this is set and ccache
+      # is installed; see "Install pods".
+      USE_CCACHE: 1
+      CCACHE_MAXSIZE: 2G
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -66,13 +73,139 @@ jobs:
         run: |
           xcodebuild -version
           node --version
-          brew install xcodegen
+          brew install xcodegen ccache
+          echo "CCACHE_DIR=${HOME}/.ccache" >> "$GITHUB_ENV"
 
       - run: npm ci
 
-      # The newest "iPhone NN Pro" on the newest iOS. Its name goes next to the
-      # approved screenshots, since they only match on the same model.
-      - name: Pick a simulator
+      - name: Generate the native project
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: pods-production-${{ hashFiles('package-lock.json', 'app.config.ts') }}
+
+      # Compiled objects from earlier runs. ccache looks each one up by its
+      # inputs, so an older cache still serves every file that has not
+      # changed. A cache key cannot be overwritten, so each run saves under
+      # its own and restores the newest.
+      - name: Restore the compiler cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.ccache
+          key: ccache-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ hashFiles('package-lock.json') }}-
+            ccache-
+
+      # Expo's Podfile reads apple.ccacheEnabled; React Native's own default
+      # reads USE_CCACHE. Both are set, so either way the compiler is wrapped.
+      # This touches only the generated project on the runner, not the app's
+      # configuration.
+      - name: Install pods
+        working-directory: ios
+        run: |
+          jq '. + {"apple.ccacheEnabled": "true"}' Podfile.properties.json > Podfile.properties.tmp
+          mv Podfile.properties.tmp Podfile.properties.json
+          pod install | tee ../pod-install.log
+          grep -i ccache ../pod-install.log || echo "::warning::pod install did not mention ccache"
+
+      # Release, so the JavaScript is bundled in and no Metro is needed. Built
+      # for any simulator, so no simulator is needed here: the walkthrough
+      # runners have their own.
+      - name: Build the app for the simulator
+        run: |
+          set -o pipefail
+          ccache --zero-stats
+          mkdir -p build
+          workspace=$(ls -d ios/*.xcworkspace | head -n 1)
+          scheme=$(basename "${workspace}" .xcworkspace)
+          xcodebuild build \
+            -workspace "${workspace}" \
+            -scheme "${scheme}" \
+            -configuration Release \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/app \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+            | tee build/app-build.log | grep -E 'error:|\*\* BUILD' || true
+          ccache --show-stats
+          test -d build/app/Build/Products/Release-iphonesimulator/*.app
+
+      # Saved even if the build failed, so the next run still starts warmer.
+      - name: Save the compiler cache
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.ccache
+          key: ccache-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}
+
+      - name: Build the walkthrough
+        run: |
+          set -o pipefail
+          (cd e2e/ios && xcodegen generate)
+          xcodebuild build-for-testing \
+            -project e2e/ios/Walkthrough.xcodeproj \
+            -scheme Walkthrough \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/walkthrough \
+            | tee build/walkthrough-build.log | grep -E 'error:|\*\* TEST BUILD' || true
+          grep -q '\*\* TEST BUILD SUCCEEDED' build/walkthrough-build.log
+
+      # A tarball, because artifacts lose the executable bit, and an app
+      # without it does not launch.
+      - name: Pack the builds
+        run: |
+          tar -czf simulator-builds.tgz \
+            build/app/Build/Products/Release-iphonesimulator \
+            build/walkthrough/Build/Products
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: simulator-builds
+          path: simulator-builds.tgz
+          retention-days: 1
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: simulator-build-logs
+          path: |
+            build/*.log
+            pod-install.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  simulator:
+    name: simulator (${{ matrix.name }})
+    needs: build
+    runs-on: macos-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+            size: large
+          - name: largest
+            size: accessibility-extra-extra-extra-large
+    env:
+      SERVER_URL: https://localhost:8443
+      OUT: ${{ github.workspace }}/e2e-output
+    steps:
+      # First, because checkout empties a directory that is not yet a
+      # repository, and the next step writes into it.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # The newest "iPhone NN Pro" on the newest iOS, booted before anything
+      # else: a runner's first boot does one-off work that stalled the app for
+      # up to a minute at a time when left to the walkthrough, and the setup
+      # below gives it time to finish. The model's name goes next to the approved
+      # screenshots, since they only match on the same model.
+      - name: Pick and boot a simulator
         run: |
           read -r udid device < <(xcrun simctl list devices available --json | jq -r '
             [.devices | to_entries[] | select(.key | test("iOS")) | .key as $runtime
@@ -89,56 +222,24 @@ jobs:
           mkdir -p "${OUT}"
           echo "${device}" > "${OUT}/device.txt"
           echo "SIM_UDID=${udid}" >> "$GITHUB_ENV"
-          # Booted now, so the first boot's one-off work on this runner happens
-          # during the build. Left to the first walkthrough, it stalled the app
-          # for up to a minute at a time, and the second walkthrough never.
           xcrun simctl boot "${udid}"
 
-      - name: Generate the native project
-        run: npx expo prebuild --platform ios --clean --no-install
-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # The fake server uses nothing but Node itself: no npm install here.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          path: |
-            ios/Pods
-            ~/Library/Caches/CocoaPods
-          key: pods-production-${{ hashFiles('package-lock.json', 'app.config.ts') }}
+          node-version-file: .nvmrc
 
-      - name: Install pods
-        working-directory: ios
-        run: pod install
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: simulator-builds
 
-      # Release, so the JavaScript is bundled in and no Metro is needed.
-      - name: Build the app for the simulator
+      - name: Unpack the builds
         run: |
-          set -o pipefail
-          mkdir -p build
-          workspace=$(ls -d ios/*.xcworkspace | head -n 1)
-          scheme=$(basename "${workspace}" .xcworkspace)
-          xcodebuild build \
-            -workspace "${workspace}" \
-            -scheme "${scheme}" \
-            -configuration Release \
-            -destination "id=${SIM_UDID}" \
-            -derivedDataPath build/app \
-            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
-            | tee build/app-build.log | grep -E 'error:|\*\* BUILD' || true
+          tar -xzf simulator-builds.tgz
           app=$(ls -d build/app/Build/Products/Release-iphonesimulator/*.app | head -n 1)
           test -d "${app}"
           echo "APP_PATH=${PWD}/${app}" >> "$GITHUB_ENV"
           echo "APP_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "${app}/Info.plist")" >> "$GITHUB_ENV"
-
-      - name: Build the walkthrough
-        run: |
-          set -o pipefail
-          (cd e2e/ios && xcodegen generate)
-          xcodebuild build-for-testing \
-            -project e2e/ios/Walkthrough.xcodeproj \
-            -scheme Walkthrough \
-            -destination "id=${SIM_UDID}" \
-            -derivedDataPath build/walkthrough \
-            | tee build/walkthrough-build.log | grep -E 'error:|\*\* TEST BUILD' || true
-          grep -q '\*\* TEST BUILD SUCCEEDED' build/walkthrough-build.log
 
       # A throwaway certificate authority, made fresh for each run, and a
       # certificate for localhost signed by it. iOS wants a SAN, serverAuth
@@ -167,19 +268,79 @@ jobs:
           cat "${OUT}/server.log"
           exit 1
 
-      - name: Walkthrough at the default text size
-        id: default
-        continue-on-error: true
-        run: e2e/walkthrough.sh default large
+      - name: Walkthrough at the ${{ matrix.name }} text size
+        run: e2e/walkthrough.sh ${{ matrix.name }} ${{ matrix.size }}
 
-      - name: Walkthrough at the largest text size
-        id: largest
-        continue-on-error: true
-        run: e2e/walkthrough.sh largest accessibility-extra-extra-extra-large
+      # Everything the report needs, whether or not the walkthrough passed.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: simulator-output-${{ matrix.name }}
+          path: |
+            e2e-output
+            !e2e-output/*.xcresult
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: simulator-results-${{ matrix.name }}
+          path: e2e-output/*.xcresult
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # The check to look at, under the name it has always had: it compares the
+  # screenshots, reports both audits, approves when asked, and fails if
+  # either walkthrough or the comparison did.
+  walkthrough:
+    needs: [build, simulator]
+    # Also when a walkthrough failed, to report it; not when the run was
+    # cancelled (a newer push replaces it), so a partial run never approves.
+    if: ${{ !cancelled() && needs.build.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Only for approving: committing screenshots and removing the label.
+      contents: write
+      pull-requests: write
+    env:
+      OUT: ${{ github.workspace }}/e2e-output
+      APPROVE: ${{ inputs.approve || github.event.label.name == 'approve-screenshots' }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # Both runs' outputs side by side, as one run used to leave them:
+      # default/ and largest/, with the default run's device name on top.
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: simulator-output-*
+          path: ${{ runner.temp }}/outputs
+
+      - name: Gather the outputs
+        run: |
+          mkdir -p "${OUT}"
+          for name in default largest; do
+            dir="${RUNNER_TEMP}/outputs/simulator-output-${name}"
+            if [ -d "${dir}" ]; then
+              cp -R "${dir}/." "${OUT}/"
+              cp "${dir}/server.log" "${OUT}/server-${name}.log" 2>/dev/null || true
+            fi
+          done
+          if [ -f "${RUNNER_TEMP}/outputs/simulator-output-default/device.txt" ]; then
+            cp "${RUNNER_TEMP}/outputs/simulator-output-default/device.txt" "${OUT}/device.txt"
+          fi
+          ls -R "${OUT}" | head -n 80
 
       - name: Report
         id: report
-        if: always()
         continue-on-error: true
         run: node e2e/report.ts --output "${OUT}" --approved e2e/screenshots
 
@@ -187,19 +348,8 @@ jobs:
         if: always()
         with:
           name: simulator-screenshots
-          path: |
-            e2e-output
-            !e2e-output/*.xcresult
-            build/*.log
+          path: e2e-output
           retention-days: 14
-          if-no-files-found: ignore
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: failure() || steps.default.outcome == 'failure' || steps.largest.outcome == 'failure'
-        with:
-          name: simulator-results
-          path: e2e-output/*.xcresult
-          retention-days: 7
           if-no-files-found: ignore
 
       - name: Approve these screenshots
@@ -237,14 +387,17 @@ jobs:
 
       - name: Result
         if: always()
+        env:
+          BUILD: ${{ needs.build.result }}
+          WALKS: ${{ needs.simulator.result }}
         run: |
           failed=0
-          if [ "${{ steps.default.outcome }}" != success ]; then
-            echo "::error::The walkthrough at the default text size failed; see the summary and its log"
-            failed=1
+          if [ "${BUILD}" != success ]; then
+            echo "::error::The build failed; see the build job's log"
+            exit 1
           fi
-          if [ "${{ steps.largest.outcome }}" != success ]; then
-            echo "::error::The walkthrough at the largest text size failed; see the summary and its log"
+          if [ "${WALKS}" != success ]; then
+            echo "::error::A walkthrough failed; see the simulator jobs and the summary"
             failed=1
           fi
           if [ "${{ steps.report.outcome }}" != success ] && [ "${APPROVE}" != true ]; then

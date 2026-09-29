@@ -182,9 +182,7 @@ final class WalkthroughTests: XCTestCase {
 
   /// A screenshot for comparison, then the audit of the same screen.
   private func capture(_ name: String) {
-    // Card images fade in and lists settle after scrolling.
-    Thread.sleep(forTimeInterval: 1.0)
-    let shot = XCUIScreen.main.screenshot()
+    let shot = settledScreenshot()
     do {
       try shot.pngRepresentation.write(to: outputDir.appendingPathComponent("\(name).png"))
     } catch {
@@ -195,6 +193,25 @@ final class WalkthroughTests: XCTestCase {
     attachment.lifetime = .keepAlways
     add(attachment)
     audit(name)
+  }
+
+  /// The screen once it stops changing: card images load and fade in, and
+  /// lists settle after scrolling, in their own time. A fixed second once
+  /// caught the card screen before its image arrived. Three identical frames,
+  /// half a second apart, count as settled; a screen that never settles (a
+  /// blinking cursor) is taken after ten seconds.
+  private func settledScreenshot() -> XCUIScreenshot {
+    Thread.sleep(forTimeInterval: 1.0)
+    var shot = XCUIScreen.main.screenshot()
+    var steady = 0
+    let deadline = Date().addingTimeInterval(10)
+    while steady < 2, Date() < deadline {
+      Thread.sleep(forTimeInterval: 0.5)
+      let next = XCUIScreen.main.screenshot()
+      steady = next.pngRepresentation == shot.pngRepresentation ? steady + 1 : 0
+      shot = next
+    }
+    return shot
   }
 
   /// Apple's audit: contrast, hit regions, labels, traits, Dynamic Type,

@@ -89,6 +89,10 @@ jobs:
           mkdir -p "${OUT}"
           echo "${device}" > "${OUT}/device.txt"
           echo "SIM_UDID=${udid}" >> "$GITHUB_ENV"
+          # Booted now, so the first boot's one-off work on this runner happens
+          # during the build. Left to the first walkthrough, it stalled the app
+          # for up to a minute at a time, and the second walkthrough never.
+          xcrun simctl boot "${udid}"
 
       - name: Generate the native project
         run: npx expo prebuild --platform ios --clean --no-install

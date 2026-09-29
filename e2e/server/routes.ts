@@ -81,6 +81,7 @@ export function createRouter(origin: string) {
     if (path === '/api/wishlist/') return ok(fixtures.wishlist);
     if (path === '/api/sets/') return ok(fixtures.sets);
     if (path === '/api/binders/') return ok(fixtures.binders);
+    if (path === '/api/decks/') return ok(fixtures.decks);
     if (path === '/api/cards/recognize/jobs') return ok({ jobs: fixtures.scanJobs });
     if (path === '/api/cards/search') {
       const page = Number(url.searchParams.get('page') ?? '1') || 1;
@@ -101,6 +102,11 @@ export function createRouter(origin: string) {
     const binder = path.match(/^\/api\/binders\/(\d+)\/cards$/);
     if (binder) {
       const found = fixtures.binderCards(Number(binder[1]));
+      return found ? ok(found) : notFound();
+    }
+    const deck = path.match(/^\/api\/decks\/(\d+)$/);
+    if (deck) {
+      const found = fixtures.deck(Number(deck[1]));
       return found ? ok(found) : notFound();
     }
     const card = path.match(/^\/api\/cards\/([^/]+)$/);

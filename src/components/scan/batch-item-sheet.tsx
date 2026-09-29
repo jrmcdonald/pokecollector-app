@@ -1,14 +1,5 @@
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { itemState, type BatchChoice } from '@/api/batch';
@@ -16,23 +7,16 @@ import { searchTermFor } from '@/api/scan';
 import { candidatesOf, type ScanItem, type SearchCard } from '@/api/schemas';
 import { Button } from '@/components/button';
 import { CardImage } from '@/components/card-image';
+import { CardSearchPane } from '@/components/card-search-pane';
 import { Icon } from '@/components/icon';
-import { ListRow } from '@/components/list-row';
-import { SearchField } from '@/components/search-field';
-import { EmptyState, ErrorState } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useCardSearch } from '@/hooks/queries';
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { spacing, useColors } from '@/theme';
 import { photoName, pickCard } from '@/utils/batch-review';
 
 import { CopyDetailsFields } from './copy-details';
 import { ScanCandidates } from './scan-candidates';
 import { ScanPhoto } from './scan-photo';
-
-/** The same wait as the Search tab: one request per word typed, not per letter. */
-const DEBOUNCE_MS = 400;
 
 /**
  * One photo of a batch, opened: the photo beside the chosen card, the other
@@ -149,7 +133,7 @@ function SheetContent({
       </View>
 
       {searching ? (
-        <SearchPane
+        <CardSearchPane
           initial={searchTermFor(item.recognized)}
           onPick={pickFromSearch}
           onCancel={candidates.length > 0 || picked ? () => setSearching(false) : undefined}
@@ -236,87 +220,6 @@ function SheetContent({
   );
 }
 
-/**
- * The catalogue search, inside the sheet so the review keeps its place. A
- * card picked here is added with a plain collection add, and the photo is
- * then marked handled, since upstream only confirms its own candidates.
- */
-function SearchPane({
-  initial,
-  onPick,
-  onCancel,
-}: {
-  initial: string;
-  onPick(card: SearchCard): void;
-  onCancel?: () => void;
-}) {
-  const colors = useColors();
-  const [text, setText] = useState(initial);
-  const query = useDebouncedValue(text.trim(), DEBOUNCE_MS);
-  const search = useCardSearch(query);
-  const results = query.length >= 2 ? (search.data?.pages.flatMap((p) => p.data) ?? []) : [];
-
-  return (
-    <FlatList
-      data={results}
-      keyExtractor={(card) => card.id}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag"
-      contentContainerStyle={styles.searchList}
-      ListHeaderComponent={
-        <View style={styles.searchHeader}>
-          <SearchField
-            value={text}
-            onChangeText={setText}
-            placeholder="Card name, or a code like PFL 001"
-            accessibilityLabel="Search the catalogue"
-          />
-          {onCancel ? (
-            <Button title="Back to the matches" variant="secondary" onPress={onCancel} />
-          ) : null}
-        </View>
-      }
-      onEndReachedThreshold={0.5}
-      onEndReached={() => {
-        if (search.hasNextPage && !search.isFetchingNextPage) search.fetchNextPage();
-      }}
-      renderItem={({ item: card }) => {
-        const code = [card.set_ref?.abbreviation ?? card.set_id?.toUpperCase(), card.number]
-          .filter(Boolean)
-          .join(' ');
-        return (
-          <ListRow
-            title={card.name}
-            subtitle={[code, card.rarity].filter(Boolean).join(' · ')}
-            leading={<CardImage card={card} size="small" style={styles.resultImage} />}
-            kind="action"
-            accessibilityLabel={[card.name, code, card.rarity, 'Use this card']
-              .filter(Boolean)
-              .join(', ')}
-            onPress={() => onPick(card)}
-          />
-        );
-      }}
-      ListFooterComponent={
-        search.isFetchingNextPage ? (
-          <ActivityIndicator style={styles.footer} color={colors.textSecondary} />
-        ) : null
-      }
-      ListEmptyComponent={
-        query.length < 2 ? (
-          <EmptyState title="Search the catalogue" message="Type a name or a set code." />
-        ) : search.error ? (
-          <ErrorState error={search.error} onRetry={() => search.refetch()} />
-        ) : !search.data ? (
-          <ActivityIndicator style={styles.footer} color={colors.textSecondary} />
-        ) : (
-          <EmptyState title="No cards found" message={`Nothing matches “${query}”.`} />
-        )
-      }
-    />
-  );
-}
-
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   flex: { flex: 1 },
@@ -347,8 +250,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   actions: { gap: spacing.sm },
-  searchList: { paddingBottom: spacing.lg },
-  searchHeader: { padding: spacing.md, gap: spacing.sm },
-  resultImage: { width: 40 },
-  footer: { padding: spacing.lg },
 });

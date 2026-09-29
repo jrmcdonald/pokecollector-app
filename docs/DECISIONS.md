@@ -470,3 +470,80 @@ The third step of `PLAN.md` §8.2, in the `Simulator` workflow (`e2e/`).
   to the end, with a photo of each kind, and the walkthrough screenshots and
   audits the list, the review and one opened photo. Its first run found no
   audit issues on them at either text size.
+
+## 2026-09-29 — Prebuilt decks
+
+`PLAN.md` §9 (Phase 4), JavaScript only.
+
+- **Pasted lists, not a bundled catalogue.** The export text of Pokémon TCG
+  Live (`4 Pikachu ex SVI 57`), which Limitless and most deck sites also
+  give, covers any deck, new or old. `PokemonTCG/pokemon-tcg-data` was the
+  other candidate, and it does not hold up: it is deprecated (its API goes
+  offline in March 2027), has no licence, and its theme decks stop at
+  Sword & Shield's fourth set, so none of the current battle decks are in
+  it. A catalogue can be added later on top of the same import.
+- **Upstream finds the cards.** The deck CSV import looks a card up by set
+  abbreviation and number, and upstream's abbreviations are TCGdex's, which
+  are Pokémon TCG Live's set codes (SVI, PAL, MEG and so on). The parser
+  maps the few that differ (promo codes such as `PR-SV` → `SVP`) and puts
+  basic Energy, however it is written, in SVE by type. So resolving a
+  60-card list costs one request, not a search per line.
+- **The planned deck is the preview.** Looking the list up creates a planned
+  deck and imports into it, then shows that deck: every card, its picture,
+  and how many are already owned, with the lines upstream could not find
+  listed separately to search for or leave out. Nothing touches the
+  collection until "Add". Discarding deletes the deck. The review screen
+  has no back button or back gesture, so the deck is never left behind by
+  accident. The import is a pushed screen, not a modal: a card opened from
+  the review would otherwise be presented as a sheet with no way back.
+- **The import is all or nothing upstream.** One unknown card makes it
+  write nothing, and report `row N`. The app then imports again without
+  those rows, so a list with a typo costs one request more, not a failure.
+- **Adding is two requests.** `bulk-add` with every copy, Near Mint, in each
+  card's usual variant (the first the catalogue lists, as on a card's page),
+  then `convert-to-real`, which reserves those copies. Upstream refuses the
+  conversion when a copy is missing or reserved by another deck; the cards
+  stay added and the deck stays planned, and the app says so.
+- **Decks are under More.** Binders still leave them out. A deck's page
+  lists its cards, copies and what is missing; a planned deck can be added
+  to the collection from there too, for a deck planned first and bought
+  later. Editing decks stays in the web UI.
+- **The simulator walkthrough covers it:** the fake server has a planned
+  deck with cards missing and a Real Deck, and the walkthrough screenshots
+  the list, the planned deck and the paste screen. Looking cards up writes,
+  which the fake server refuses, so the review is covered by component
+  tests instead.
+
+## 2026-09-29 — Faster Simulator runs
+
+`PLAN.md` §8.2. A run took 35 to 50 minutes, one job doing everything in
+turn: prebuild and pods (about 6), the Release app build (13 to 23), then the
+walkthrough at the default text size (about 11) and at the largest (about 9).
+
+- **The two text sizes run at the same time, on separate runners.** A
+  `simulator` matrix job per size, after a `build` job that hands over the app
+  and the walkthrough as one artifact. Two simulators on one runner would
+  have been simpler, but a hosted macOS runner has three cores, and the
+  walkthrough already has timing-sensitive steps (typing, launch); sharing
+  them would make those flakier.
+- **The walkthrough runs from its `.xctestrun` file**, so the walkthrough
+  runners need no Xcode project, XcodeGen or npm install: the fake server is
+  Node alone.
+- **The builds travel as a tarball.** Artifacts drop the executable bit, and
+  an app without it does not launch.
+- **ccache for the native build.** React Native's pods wrap clang in ccache
+  when asked (`USE_CCACHE`, and `apple.ccacheEnabled` in the generated
+  `Podfile.properties.json`); the workflow sets both on the runner only, so
+  the app's configuration, and the phone's build, are unchanged. The cache is
+  restored before the build and saved even when a later step fails, under a
+  key per run, restoring the newest. Swift is not cached by ccache, so the
+  Expo modules still compile each time.
+- **Each walkthrough runner boots its simulator straight after checkout.** A runner's
+  first boot does one-off work that once stalled the app when left to the
+  walkthrough; setting up the runner now overlaps it. `walkthrough.sh` still
+  launches the app once before the test, for the launch timeout.
+- **The check keeps its name.** The final job, on Linux, is still called
+  `walkthrough`: it compares, reports, approves, and fails if the build, either
+  walkthrough or the comparison did.
+- **`ci.yml` stays one job.** It takes about a minute, most of it `npm ci`,
+  which each parallel job would repeat.

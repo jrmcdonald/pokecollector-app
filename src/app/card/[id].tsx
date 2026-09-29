@@ -43,6 +43,7 @@ import { entriesForCard } from '@/utils/collection';
 import { pick } from '@/utils/pick';
 import { showToast } from '@/utils/toast';
 import { cardValue, formatPrice } from '@/utils/pricing';
+import { defaultVariant } from '@/utils/variants';
 
 export default function CardDetail() {
   const { id = '' } = useLocalSearchParams<{ id: string }>();
@@ -305,21 +306,6 @@ function EditCopy({ item, onDone }: { item: CollectionItem; onDone(): void }) {
       />
     </View>
   );
-}
-
-/**
- * The variant to preselect: the first one the catalogue says this printing
- * exists in. All four are always offered, in a fixed order, because the
- * catalogue's flags are often incomplete and the copy in hand is what counts.
- */
-function defaultVariant(card: Card): Variant {
-  const flags: [Variant, boolean | null | undefined][] = [
-    ['Normal', card.variants_normal],
-    ['Holo', card.variants_holo],
-    ['Reverse Holo', card.variants_reverse],
-    ['First Edition', card.variants_first_edition],
-  ];
-  return flags.find(([, flag]) => flag)?.[0] ?? 'Normal';
 }
 
 function AddCopies({ card, disabled }: { card: Card; disabled: boolean }) {

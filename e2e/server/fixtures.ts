@@ -18,6 +18,8 @@ import type {
   Checklist,
   CollectionItem,
   Dashboard,
+  Deck,
+  DeckEntry,
   PrintingDetailTag,
   ScanItem,
   ScanJob,
@@ -327,6 +329,7 @@ export function buildFixtures(origin: string) {
     },
     // Decks share the endpoint; the app leaves them out of Binders.
     { id: 3, name: 'Lost Box', binder_type: 'deck', card_count: 60 },
+    { id: 4, name: 'Pikachu ex Battle Deck', binder_type: 'physical_deck', card_count: 60 },
   ];
 
   const binderCard = (c: Card, n: number, extra: Partial<BinderCard> = {}): BinderCard => ({
@@ -389,6 +392,57 @@ export function buildFixtures(origin: string) {
         Math.round(list.reduce((sum, c) => sum + (c.price_market ?? 0), 0) * 100) / 100,
     };
   };
+
+  // A planned deck with some cards missing, and a Real Deck, whose copies are
+  // all reserved. Short lists: the screens are the same for sixty cards.
+  const deckEntry = (n: number, id: string, required: number): DeckEntry => {
+    const owned = ownedQuantity(id);
+    return {
+      id: 700 + n,
+      card_id: id,
+      required_quantity: required,
+      owned_quantity: owned,
+      shortage: Math.max(required - owned, 0),
+      card: card(id),
+    };
+  };
+  const deckList: Deck[] = [
+    {
+      id: 3,
+      name: 'Lost Box',
+      binder_type: 'deck',
+      format: 'Standard',
+      target_size: 60,
+      color: '#8A4FD8',
+      entries: [
+        deckEntry(1, 'sv4-124_en', 3),
+        deckEntry(2, 'sv2-231_en', 4),
+        deckEntry(3, 'sv1-063_en', 4),
+        deckEntry(4, 'sv3pt5-004_en', 2),
+      ],
+    },
+    {
+      id: 4,
+      name: 'Pikachu ex Battle Deck',
+      binder_type: 'physical_deck',
+      format: 'Casual',
+      target_size: 60,
+      color: '#F2C522',
+      entries: [deckEntry(5, 'sv5-051_en', 1), deckEntry(6, 'sv1-063_en', 2)],
+    },
+  ].map((deck) => {
+    const entries = deck.entries;
+    const real = deck.binder_type === 'physical_deck';
+    return {
+      ...deck,
+      entries: real ? entries.map((e) => ({ ...e, shortage: 0 })) : entries,
+      current_card_count: entries.reduce((sum, e) => sum + e.required_quantity, 0),
+      missing_copy_count: real ? 0 : entries.reduce((sum, e) => sum + (e.shortage ?? 0), 0),
+    };
+  });
+  // The list leaves out each deck's cards, as upstream's does.
+  const decks = deckList.map(({ entries: _entries, ...deck }) => deck);
+  const deck = (id: number): Deck | null => deckList.find((d) => d.id === id) ?? null;
 
   const printingDetailTags: PrintingDetailTag[] = [
     { id: 1, name: 'Stamped', usage_count: 2 },
@@ -487,6 +541,8 @@ export function buildFixtures(origin: string) {
     checklist,
     binders,
     binderCards,
+    decks,
+    deck,
     wishlist,
     printingDetailTags,
     search,

@@ -3,11 +3,15 @@ import {
   AuthModeSchema,
   BinderCardsSchema,
   BindersSchema,
+  BulkAddResultSchema,
   CardSchema,
   ChecklistSchema,
   CollectionItemSchema,
   CollectionSchema,
   DashboardSchema,
+  DeckSchema,
+  DecksSchema,
+  ImportResultSchema,
   PrintingDetailTagsSchema,
   ResolveAndAddSchema,
   ScanItemSchema,
@@ -21,6 +25,7 @@ import {
   type AuthMode,
   type Binder,
   type BinderCards,
+  type BulkAddResult,
   type Card,
   type CardSet,
   type Checklist,
@@ -29,6 +34,8 @@ import {
   type CollectionItem,
   type Condition,
   type Dashboard,
+  type Deck,
+  type ImportResult,
   type PrintingDetailTag,
   type SearchResponse,
   type User,
@@ -287,4 +294,91 @@ export function getPrintingDetailTags(client: PokeCollectorClient): Promise<Prin
   return client.request('/api/collection/printing-detail-tags', {
     schema: PrintingDetailTagsSchema,
   });
+}
+
+/**
+ * Adds many cards in one request. Upstream commits each on its own and
+ * reports the ones that failed, so a bad card does not stop the rest.
+ */
+export function bulkAddToCollection(
+  client: PokeCollectorClient,
+  items: readonly (NewCollectionItem & { lang: string })[],
+): Promise<BulkAddResult> {
+  return client.request('/api/collection/bulk-add', {
+    method: 'POST',
+    json: { items },
+    schema: BulkAddResultSchema,
+    timeoutMs: 60_000,
+  });
+}
+
+/** Every deck, planned and real, without their cards. */
+export function getDecks(client: PokeCollectorClient): Promise<Deck[]> {
+  return client.request('/api/decks/', { schema: DecksSchema });
+}
+
+/** A deck with its cards, and how many of each are owned. */
+export function getDeck(client: PokeCollectorClient, deckId: number): Promise<Deck> {
+  return client.request(`/api/decks/${deckId}`, { schema: DeckSchema });
+}
+
+/** Creates an empty planned deck. */
+export function createDeck(
+  client: PokeCollectorClient,
+  deck: { name: string; target_size?: 20 | 40 | 60 },
+): Promise<Deck> {
+  return client.request('/api/decks/', {
+    method: 'POST',
+    json: { format: 'Casual', ...deck },
+    schema: DeckSchema,
+  });
+}
+
+/**
+ * Fills a planned deck from a CSV of set codes and numbers (see
+ * `deckCsv`). Upstream finds each card, fetching a set from TCGdex if it
+ * has not yet, and writes nothing if any row fails. The file must be named
+ * `*.csv`.
+ */
+export function importDeckCsv(
+  client: PokeCollectorClient,
+  deckId: number,
+  file: Blob,
+): Promise<ImportResult> {
+  const form = new FormData();
+  form.append('file', file);
+  return client.request(`/api/binders/${deckId}/import-csv`, {
+    method: 'POST',
+    form,
+    schema: ImportResultSchema,
+    // Sets new to the server are fetched from TCGdex on the way.
+    timeoutMs: 90_000,
+  });
+}
+
+export function addDeckEntry(
+  client: PokeCollectorClient,
+  deckId: number,
+  entry: { card_id: string; required_quantity: number },
+): Promise<Deck> {
+  return client.request(`/api/decks/${deckId}/entries`, {
+    method: 'POST',
+    json: entry,
+    schema: DeckSchema,
+  });
+}
+
+/**
+ * Makes a planned deck a Real Deck, reserving an owned copy for every card.
+ * Upstream refuses (409) unless every copy is owned and not in another deck.
+ */
+export function convertDeckToReal(client: PokeCollectorClient, deckId: number): Promise<Deck> {
+  return client.request(`/api/decks/${deckId}/convert-to-real`, {
+    method: 'POST',
+    schema: DeckSchema,
+  });
+}
+
+export function deleteDeck(client: PokeCollectorClient, deckId: number): Promise<unknown> {
+  return client.request(`/api/decks/${deckId}`, { method: 'DELETE' });
 }

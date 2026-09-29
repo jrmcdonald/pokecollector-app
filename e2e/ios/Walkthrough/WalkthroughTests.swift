@@ -59,6 +59,9 @@ final class WalkthroughTests: XCTestCase {
     wait(for: app.staticTexts["Charizard ex"].firstMatch, "Card")
     capture("card")
     app.swipeUp()
+    // The scroll indicator stays a moment after the scroll stops, then fades.
+    // Holding still, it can pass for a settled screen, so let it go first.
+    Thread.sleep(forTimeInterval: 3.0)
     capture("card-scrolled")
     back()
     back()

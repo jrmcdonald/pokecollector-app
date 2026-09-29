@@ -3,7 +3,7 @@
  * and accessible name, with their state.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, userEvent } from '@testing-library/react-native';
+import { act, render, screen, userEvent } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 import { Alert } from 'react-native';
 
@@ -232,5 +232,8 @@ describe('BatchItemSheet', () => {
       ),
     );
     expect(screen.getByLabelText('Search the catalogue')).toHaveDisplayValue('MEW 133');
+    // Let the search's debounce and its (failing) request finish inside the
+    // test, so their state updates are not reported as outside act().
+    await act(() => new Promise((resolve) => setTimeout(resolve, 500)));
   });
 });

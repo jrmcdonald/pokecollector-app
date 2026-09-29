@@ -105,6 +105,9 @@ plugin for the permission string. vision-camera earns its place only with
 frame processors, for auto-capture; that is a later phase, and the rebuild it
 costs then is accepted.
 
+Superseded on 2026-09-29, when auto-capture came: see "Auto-capture and
+library photos".
+
 ## 2026-09-27 — Routes in `src/app/`
 
 The SDK 57 template puts Expo Router's routes in `src/app/` rather than
@@ -547,3 +550,46 @@ walkthrough at the default text size (about 11) and at the largest (about 9).
   walkthrough or the comparison did.
 - **`ci.yml` stays one job.** It takes about a minute, most of it `npm ci`,
   which each parallel job would repeat.
+
+## 2026-09-29 — Auto-capture and library photos
+
+`PLAN.md` §8 (auto-capture) and §8.1 (photos from the library), together so
+they cost one iOS build and one AltStore reinstall.
+
+- **vision-camera replaces `expo-camera`, rather than joining it.** Frame
+  processors need `react-native-vision-camera` (v5, with
+  `react-native-vision-camera-worklets`, `react-native-nitro-modules` and
+  `react-native-nitro-image`); two camera libraries would ship two capture
+  stacks for one screen. Versions are pinned exactly, since Expo's version map
+  does not cover them. vision-camera has no config plugin, so the camera
+  usage string is set in `ios.infoPlist`. Its frame worklets run on
+  `react-native-worklets`, already there for Reanimated.
+- **Edge detection that knows where to look.** No rectangle detector, native
+  or bundled: the guide already says where the card should be. On each 640 ×
+  480 luma frame the worklet makes a dozen short cuts across each side of the
+  guide, finds the strongest change in brightness on each, and counts a side
+  when most of them fall on one straight line. All four sides, holding within
+  a fifth of the search band for five checks in a row (about half a second at
+  ten checks a second), takes the photo. Pure JavaScript, so it is unit-tested
+  on made-up frames (`utils/card-detect.ts`). It finds the card, not whether
+  it is in focus; the half second of holding still is meant to give iOS's
+  continuous autofocus time to settle. To be checked on the phone.
+- **One photo per card left in the guide.** After a photo, auto-capture waits
+  until the card has been gone for three checks, so a card left on the table
+  is not photographed over and over. Turning Auto on takes a card already in
+  the guide.
+- **Off by default, a switch beside the torch.** The shutter still works with
+  it on. While a card is found and held, the guide turns yellow and thicker
+  and the hint says "Hold still…"; in a batch, "Got it. Next card" once it is
+  taken. The frame output is attached only while Auto is on.
+- **Library photos are shrunk, not cropped.** Nothing lined them up with the
+  guide, so the model gets the whole photo, down to 1200 px on the long edge
+  like a camera photo. iOS's picker runs outside the app and returns only
+  what was chosen, so there is no photo-library permission prompt; the usage
+  string is there in case iOS ever asks.
+- **Only for batches.** Picking is a way to add many photos at once: a
+  library button where the tray goes while it is empty, and "Add from your
+  photos" in the tray. Without camera access, "Scan photos from your library"
+  sends the chosen photos straight off as a batch, since there is no tray to
+  collect them in. That button is on the simulator's Scan screenshot, which
+  needs approving again.

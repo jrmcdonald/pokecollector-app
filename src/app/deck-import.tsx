@@ -22,6 +22,7 @@ import {
   useIsOnline,
 } from '@/hooks/queries';
 import { useOwnerLabel } from '@/hooks/use-owner-label';
+import { usePrefetchCardImages } from '@/hooks/use-prefetch-card-images';
 import { minTapTarget, spacing, useColors } from '@/theme';
 import { lineCode, parseDecklist, type DeckLine } from '@/utils/decklist';
 import { showToast } from '@/utils/toast';
@@ -132,6 +133,7 @@ function Review({ deckId, unresolved }: { deckId: number; unresolved: DeckLine[]
   const colors = useColors();
   const online = useIsOnline();
   const deck = useDeck(deckId);
+  usePrefetchCardImages(deck.data?.entries);
   const remove = useDeleteDeck();
   const [handled, setHandled] = useState<ReadonlySet<number>>(new Set());
   const [finding, setFinding] = useState<DeckLine | null>(null);

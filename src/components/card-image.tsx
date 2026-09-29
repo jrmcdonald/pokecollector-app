@@ -11,6 +11,8 @@ import {
   type ImageSize,
 } from '@/utils/images';
 
+import { Icon } from './icon';
+
 /** A card's printed proportions, 63 × 88 mm. */
 export const CARD_ASPECT = 63 / 88;
 
@@ -76,7 +78,18 @@ export function CardImage({ card, size, style, frame = 'plain', photoItemId }: P
           recyclingKey={card.id}
           cachePolicy="disk"
         />
-      ) : null}
+      ) : (
+        // TCGdex has no picture for some cards, the Scarlet & Violet basic
+        // Energy among them. A mark says so, rather than an empty box that
+        // looks like it is still loading.
+        <View style={styles.missing}>
+          <Icon
+            name={card.supertype === 'Energy' ? 'bolt.fill' : 'photo'}
+            size={size === 'large' ? 40 : 16}
+            color="textSecondary"
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -88,5 +101,6 @@ export function frameForVariant(variant: string | null | undefined): CardFrame {
 
 const styles = StyleSheet.create({
   frame: { aspectRatio: CARD_ASPECT, borderRadius: radius.sm, overflow: 'hidden' },
+  missing: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   faded: { opacity: 0.35 },
 });

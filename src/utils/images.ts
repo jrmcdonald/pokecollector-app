@@ -14,6 +14,8 @@ export interface CardImageFields {
   images_small?: string | null;
   images_large?: string | null;
   custom_image_url?: string | null;
+  /** For the placeholder of a card with no picture: Energy gets its own. */
+  supertype?: string | null;
 }
 
 export type ImageSize = 'small' | 'large';

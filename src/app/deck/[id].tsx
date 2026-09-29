@@ -10,6 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAddDeckToCollection, useDeck, useIsOnline } from '@/hooks/queries';
 import { useOwnerLabel } from '@/hooks/use-owner-label';
+import { usePrefetchCardImages } from '@/hooks/use-prefetch-card-images';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { spacing, useColors } from '@/theme';
 import { deckSummary, isRealDeck } from '@/utils/decks';
@@ -23,6 +24,7 @@ export default function DeckDetail() {
   const { id = '', name } = useLocalSearchParams<{ id: string; name?: string }>();
   const colors = useColors();
   const deck = useDeck(Number(id));
+  usePrefetchCardImages(deck.data?.entries);
   const pull = usePullToRefresh(() => deck.refetch());
   const data = deck.data;
 

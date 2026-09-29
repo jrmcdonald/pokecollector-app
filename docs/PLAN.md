@@ -136,7 +136,7 @@ Differences from the first plan, all forced by the API:
 | 60 requests/minute per client IP | backend (slowapi)    | Everything through the tunnel shares **one** IP, and so one budget, with any browser using the external name. Keep requests few: long `staleTime`, persisted cache, no speculative prefetch, images from TCGdex. On 429, back off with `Retry-After` and say so in the UI |
 | 5 login attempts/minute per IP   | backend              | Same sharing. Only one re-login may be in flight at a time; never retry a 401 from the login itself                                                                                                                                                                       |
 | ~100 s response timeout          | Cloudflare           | Synchronous `/api/cards/recognize` can run far longer (upstream allows 1000 s). Use the job endpoints and poll                                                                                                                                                            |
-| 100 MB request body              | Cloudflare free plan | Irrelevant for single photos; a reason not to build batch upload                                                                                                                                                                                                          |
+| 100 MB request body              | Cloudflare free plan | Irrelevant for single photos; a 50-photo batch of cropped JPEGs is about 15 MB                                                                                                                                                                                            |
 | 7-day JWT                        | backend              | Re-login on 401, transparently                                                                                                                                                                                                                                            |
 
 ### 2.3 How failures look on the wire
@@ -478,23 +478,23 @@ web UI already works this way, and the jobs API the app uses is built for it:
 
 The app:
 
-- [ ] **Batch mode on the Scan tab.** The shutter adds the cropped photo to a
+- [x] **Batch mode on the Scan tab.** The shutter adds the cropped photo to a
       tray of thumbnails instead of uploading: remove any, see the count, then
       "Scan N cards". Photos stay on the phone until then.
-- [ ] **One multipart upload** with a `files` part per photo. At a few hundred
+- [x] **One multipart upload** with a `files` part per photo. At a few hundred
       KB each, 50 photos are about 15 MB, well inside Cloudflare's 100 MB
       body limit.
-- [ ] **Progress while it works:** "12 of 30 read", polling more slowly than
+- [x] **Progress while it works:** "12 of 30 read", polling more slowly than
       a single scan (every 3 s, easing to 10 s), and cards that are ready can
       be reviewed before the rest finish.
-- [ ] **Review list:** every photo in order, using the phone's own thumbnail
+- [x] **Review list:** every photo in order, using the phone's own thumbnail
       (fetching each photo back from the server would cost a request each),
       with the best candidate preselected. Tap to pick another candidate, set
       variant, condition and quantity, or search instead.
-- [ ] **Add in a paced queue.** Confirming is still one `resolve-and-add` per
+- [x] **Add in a paced queue.** Confirming is still one `resolve-and-add` per
       card, so "Add all" sends them one after another and backs off on a 429,
       showing how many are left, rather than firing 30 at once.
-- [ ] **Come back later.** Jobs persist upstream, so a batch can be left and
+- [x] **Come back later.** Jobs persist upstream, so a batch can be left and
       reviewed later, in the app or in the web UI (`/scans/{id}`).
       `GET /api/cards/recognize/jobs` lists the ones still needing attention;
       the Scan tab shows a count and opens them.

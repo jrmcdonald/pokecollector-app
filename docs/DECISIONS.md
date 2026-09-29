@@ -419,3 +419,53 @@ The third step of `PLAN.md` §8.2, in the `Simulator` workflow (`e2e/`).
   tiles broke words at the largest text size, binder cards inside
   `Link.Menu` were missing from the accessibility tree, and back buttons were
   named "(tabs)". All three are fixed; see the commits on PR #6.
+
+## 2026-09-29 — Bulk scanning
+
+`PLAN.md` §8.1, on the jobs API the single scan already uses.
+
+- **A mode on the Scan tab, not a separate screen.** "One card" and "Batch"
+  share the camera, guide and crop. In a batch the shutter puts the cropped
+  photo in a tray (bottom left, where iOS's camera keeps its own), and "Scan
+  N" sends them. Photos stay on the phone until then, so a batch can be
+  photographed offline; only sending needs a connection.
+- **One job, one poll for all of it.** The batch goes up as one multipart
+  request, and `GET /api/cards/recognize/jobs/{id}` returns every item, so
+  thirty photos cost the same to wait on as one. The review polls every 3 s,
+  easing to 10 s, and stops when nothing is left to read (`batchPollDelay`).
+  Photos that are ready can be reviewed while the rest are read.
+- **The phone's own photos in the review.** Upstream serves each photo, but
+  one request apiece. The app moves the cropped photos into the cache
+  directory, one folder per account and job, and shows those. If iOS has
+  cleared them, or the batch came from the web UI, the list shows numbered
+  placeholders and only the photo opened for review is fetched. The folders
+  go when a job is finished, discarded, or no longer in the inbox.
+- **"Add all" is a paced queue.** `resolve-and-add` is one request per card,
+  so the queue sends them one after another, a second apart, and waits out a
+  429 for as long as `Retry-After` says (or 15 s) before trying the same card
+  again. It stops on a lost connection or a rejected login rather than
+  failing every card in turn; whatever is left stays in the job. A repeat of
+  a card whose request landed is refused by upstream with 409, which the
+  queue counts as handled, so running it again never adds twice. Ownership
+  queries are refreshed once at the end, not once per card.
+- **Search from inside the review.** "Search instead" in a single scan opens
+  the Search tab, which would lose a batch's place. In a batch it is a
+  search in the photo's sheet. `resolve-and-add` only takes the item's own
+  candidates, so a card found this way is added with `POST /api/collection/`
+  and the photo then resolved with an empty body. The queue remembers a card
+  already added this way, so a retry after a dropped connection only
+  resolves.
+- **Skipping a photo resolves it upstream**, as the web UI's "dismiss" does,
+  after asking: the photo is deleted there. Discarding the batch deletes the
+  job; cards already added stay.
+- **Left for later.** Unfinished jobs, from the app or the web UI, are listed
+  by `GET /api/cards/recognize/jobs`. The Scan tab shows how many photos are
+  waiting ("5 to review"), also on the camera-permission screen, since
+  reviewing needs no camera, and opens the list. It is not a tab badge: that
+  would cost a request on every launch, and the count is only useful on the
+  Scan tab.
+- **Photos from the library wait for a native build** (`expo-image-picker`),
+  as planned.
+- **The simulator walkthrough covers it:** the fake server has a batch read
+  to the end, with a photo of each kind, and the walkthrough screenshots and
+  audits the list, the review and one opened photo.

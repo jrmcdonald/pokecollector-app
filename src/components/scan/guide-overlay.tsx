@@ -7,9 +7,21 @@ import { roundedRectPath, type Rect as Box, type Size } from '@/utils/crop';
 /**
  * Dims everything but the card-shaped guide, with the same rounded corners
  * as its outline. Purely visual: the crop uses the same `guideRect`, so what
- * is inside the outline is what gets uploaded (plus a small margin).
+ * is inside the outline is what gets uploaded (plus a small margin). With
+ * auto-capture on, the outline turns yellow and thicker while a card found in
+ * it is held still: that, and the hint above it, say a photo is coming.
  */
-export function GuideOverlay({ view, guide, active }: { view: Size; guide: Box; active: boolean }) {
+export function GuideOverlay({
+  view,
+  guide,
+  active,
+  found = false,
+}: {
+  view: Size;
+  guide: Box;
+  active: boolean;
+  found?: boolean;
+}) {
   const colors = useColors();
   const r = radius.md + 2;
   const shade = `M0,0 H${view.width} V${view.height} H0 Z ${roundedRectPath(guide, r)}`;
@@ -28,8 +40,8 @@ export function GuideOverlay({ view, guide, active }: { view: Size; guide: Box; 
         rx={r}
         ry={r}
         fill="none"
-        stroke={active ? colors.holo : colors.textSecondary}
-        strokeWidth={2}
+        stroke={!active ? colors.textSecondary : found ? colors.accent : colors.holo}
+        strokeWidth={found && active ? 4 : 2}
       />
     </Svg>
   );

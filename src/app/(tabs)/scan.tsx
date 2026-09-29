@@ -1,10 +1,15 @@
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { router, useIsFocused } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  Camera,
+  useCameraDevice,
+  useCameraPermission,
+  usePhotoOutput,
+} from 'react-native-vision-camera';
 
 import { MAX_BATCH_PHOTOS } from '@/api/batch';
 import { searchTermFor } from '@/api/scan';
@@ -21,9 +26,12 @@ import { EmptyState } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAddFromScan, useIsOnline, useScanJobs, useStartBatch } from '@/hooks/queries';
+import { useAutoCapture } from '@/hooks/use-auto-capture';
 import { useScanFlow } from '@/hooks/use-scan-flow';
 import { minTapTarget, radius, spacing, useColors } from '@/theme';
+import type { AutoStatus } from '@/utils/card-detect';
 import { guideRect, type Size } from '@/utils/crop';
+import { photosFromLibrary } from '@/utils/library';
 import { prepareScanPhoto } from '@/utils/scan-photo';
 import { showToast } from '@/utils/toast';
 
@@ -39,43 +47,92 @@ const MODES = [
  * confirm, and the camera is ready for the next card. A running tally counts
  * what this visit has added.
  *
- * Or a batch: photograph a stack of cards, one photo each, then send them all
- * as one job and review them together (`/scans/[id]`). Batches not finished
- * wait in the scan inbox, which this tab links to.
+ * Or a batch: photograph a stack of cards, one photo each, or choose photos
+ * from the library, then send them all as one job and review them together
+ * (`/scans/[id]`). Batches not finished wait in the scan inbox, which this
+ * tab links to.
+ *
+ * With Auto on, the photo takes itself once a card has sat still in the
+ * guide for half a second (`useAutoCapture`).
  */
 export default function Scan() {
-  const [permission, requestPermission] = useCameraPermissions();
+  const permission = useCameraPermission();
+  const device = useCameraDevice('back');
 
-  if (!permission) return <ThemedView style={styles.fill} />;
-  if (!permission.granted) {
+  if (!permission.hasPermission) {
     return (
-      <ThemedView style={styles.fill}>
-        <SafeAreaView style={styles.fill}>
-          <EmptyState
-            title="Camera access"
-            message="Scanning takes a photo of a card and sends it to your PokeCollector server to recognize. Nothing else is recorded."
-            action={
-              permission.canAskAgain
-                ? { title: 'Allow the camera', onPress: () => requestPermission() }
-                : { title: 'Open Settings', onPress: () => Linking.openSettings() }
-            }
-          />
-          <Inbox />
-        </SafeAreaView>
-      </ThemedView>
+      <NoCamera
+        title="Camera access"
+        message="Scanning takes a photo of a card and sends it to your PokeCollector server to recognize. Nothing else is recorded."
+        action={
+          permission.canRequestPermission
+            ? { title: 'Allow the camera', onPress: () => permission.requestPermission() }
+            : { title: 'Open Settings', onPress: () => Linking.openSettings() }
+        }
+      />
+    );
+  }
+  if (!device) {
+    return (
+      <NoCamera
+        title="No camera"
+        message="This device has no back camera to scan with. Photos from the library can still be scanned."
+      />
     );
   }
   return <Scanner />;
 }
 
-/** Scans waiting for review can be reviewed without the camera. */
-function Inbox() {
+/**
+ * In place of the camera: why, and what works without it. Photos from the
+ * library need no camera, and nor does reviewing scans already sent.
+ */
+function NoCamera({
+  title,
+  message,
+  action,
+}: {
+  title: string;
+  message: string;
+  action?: { title: string; onPress(): void };
+}) {
   const focused = useIsFocused();
+  const online = useIsOnline();
   const jobs = useScanJobs({ subscribed: focused });
+  const startBatch = useStartBatch();
+  const [picking, setPicking] = useState(false);
+
+  async function scanFromLibrary() {
+    setPicking(true);
+    try {
+      const { files, failed } = await photosFromLibrary(MAX_BATCH_PHOTOS);
+      if (failed > 0) showToast({ kind: 'error', title: couldNotRead(failed) });
+      if (files.length === 0) return;
+      startBatch.mutate(files, {
+        onSuccess: (job) =>
+          router.push({ pathname: '/scans/[id]', params: { id: String(job.id) } }),
+      });
+    } finally {
+      setPicking(false);
+    }
+  }
+
   return (
-    <View style={styles.inbox}>
-      <ReviewEntry jobs={jobs.data} />
-    </View>
+    <ThemedView style={styles.fill}>
+      <SafeAreaView style={styles.fill}>
+        <EmptyState title={title} message={message} action={action} />
+        <View style={styles.inbox}>
+          <Button
+            title="Scan photos from your library"
+            variant="secondary"
+            busy={picking || startBatch.isPending}
+            disabled={!online}
+            onPress={scanFromLibrary}
+          />
+          <ReviewEntry jobs={jobs.data} />
+        </View>
+      </SafeAreaView>
+    </ThemedView>
   );
 }
 
@@ -87,11 +144,17 @@ function Scanner() {
   const add = useAddFromScan();
   const jobs = useScanJobs({ subscribed: focused });
   const startBatch = useStartBatch();
-  const camera = useRef<CameraView>(null);
+  const device = useCameraDevice('back');
+  const photoOutput = usePhotoOutput({
+    containerFormat: 'jpeg',
+    qualityPrioritization: 'balanced',
+  });
   const [view, setView] = useState<Size | null>(null);
   const [ready, setReady] = useState(false);
   const [torch, setTorch] = useState(false);
+  const [auto, setAuto] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [tally, setTally] = useState(0);
   const [selected, setSelected] = useState<ScanMatch | null>(null);
   const [mode, setMode] = useState<Mode>('single');
@@ -102,30 +165,63 @@ function Scanner() {
   const batch = mode === 'batch';
   const trayFull = tray.length >= MAX_BATCH_PHOTOS;
   // A batch photo stays on the phone, so batch mode works offline until "Scan".
-  const canShoot = ready && !capturing && (batch ? !trayFull && !startBatch.isPending : online);
+  const canShoot =
+    ready && !capturing && !picking && (batch ? !trayFull && !startBatch.isPending : online);
+  const autoCapture = useAutoCapture({
+    on: auto,
+    ready: canShoot && state.step === 'camera' && !trayOpen && focused,
+    view,
+    onCapture: () => shoot(),
+  });
+  const outputs = auto ? [photoOutput, autoCapture.output] : [photoOutput];
 
   async function shoot() {
-    if (!camera.current || !view || !canShoot) return;
+    if (!view || !canShoot) return;
     setCapturing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
+    let uri: string;
     try {
-      const photo = await camera.current.takePictureAsync({ quality: 0.9, shutterSound: false });
-      if (batch) await keepForBatch(photo, view);
-      else await flow.capture(photo, view);
+      const photo = await photoOutput.capturePhotoToFile(
+        { flashMode: 'off', enableShutterSound: false },
+        {},
+      );
+      uri = `file://${photo.filePath}`;
+    } catch {
+      setCapturing(false);
+      showToast({ kind: 'error', title: 'Couldn’t take the photo', message: 'Try again.' });
+      return;
+    }
+    try {
+      if (batch) await keepForBatch(uri, view);
+      else await flow.capture(uri, view);
     } finally {
       setCapturing(false);
     }
   }
 
   /** Crops the photo as a single scan would, and puts it in the tray. */
-  async function keepForBatch(photo: { uri: string; width: number; height: number }, size: Size) {
+  async function keepForBatch(uri: string, size: Size) {
     try {
-      const file = await prepareScanPhoto(photo, size);
+      const file = await prepareScanPhoto(uri, size);
       setTray((photos) => [...photos, { key: file.uri, uri: file.uri }]);
     } catch {
       showToast({ kind: 'error', title: 'Couldn’t keep that photo', message: 'Take it again.' });
     } finally {
-      deleteQuietly(photo.uri);
+      deleteQuietly(uri);
+    }
+  }
+
+  /** Photos from the library into the tray, as many as it has room for. */
+  async function addFromLibrary() {
+    if (picking || trayFull) return;
+    setPicking(true);
+    try {
+      const { files, failed } = await photosFromLibrary(MAX_BATCH_PHOTOS - tray.length);
+      if (failed > 0) showToast({ kind: 'error', title: couldNotRead(failed) });
+      const added = files.map((file) => ({ key: file.uri, uri: file.uri }));
+      setTray((photos) => [...photos, ...added].slice(0, MAX_BATCH_PHOTOS));
+    } finally {
+      setPicking(false);
     }
   }
 
@@ -205,17 +301,26 @@ function Scanner() {
           onLayout={(e) =>
             setView({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })
           }>
-          <CameraView
-            ref={camera}
-            style={StyleSheet.absoluteFill}
-            facing="back"
-            active={focused}
-            enableTorch={torch && focused}
-            animateShutter
-            onCameraReady={() => setReady(true)}
-          />
+          {device ? (
+            <Camera
+              style={StyleSheet.absoluteFill}
+              device={device}
+              isActive={focused}
+              outputs={outputs}
+              resizeMode="cover"
+              torchMode={torch && focused ? 'on' : 'off'}
+              onStarted={() => setReady(true)}
+              onStopped={() => setReady(false)}
+              onError={() => setReady(false)}
+            />
+          ) : null}
           {guide && view ? (
-            <GuideOverlay view={view} guide={guide} active={state.step === 'camera'} />
+            <GuideOverlay
+              view={view}
+              guide={guide}
+              active={state.step === 'camera'}
+              found={auto && autoCapture.status === 'holding'}
+            />
           ) : null}
 
           <SafeAreaView edges={['top']} style={styles.top} pointerEvents="box-none">
@@ -232,31 +337,48 @@ function Scanner() {
               ) : (
                 <View />
               )}
-              <Pressable
-                accessibilityRole="switch"
-                accessibilityLabel="Torch"
-                accessibilityState={{ checked: torch }}
-                onPress={() => setTorch((t) => !t)}
-                style={[
-                  styles.round,
-                  {
-                    backgroundColor: torch ? colors.accent : colors.surface,
-                    borderColor: torch ? colors.accent : colors.outline,
-                  },
-                ]}>
-                <Icon
-                  name={torch ? 'flashlight.on.fill' : 'flashlight.off.fill'}
-                  size={18}
-                  color={torch ? 'onAccent' : 'text'}
-                />
-              </Pressable>
+              <View style={styles.toggles}>
+                <Pressable
+                  accessibilityRole="switch"
+                  accessibilityLabel="Auto-capture"
+                  accessibilityHint="Takes the photo once a card sits still in the frame"
+                  accessibilityState={{ checked: auto }}
+                  onPress={() => setAuto((a) => !a)}
+                  style={[
+                    styles.round,
+                    {
+                      backgroundColor: auto ? colors.accent : colors.surface,
+                      borderColor: auto ? colors.accent : colors.outline,
+                    },
+                  ]}>
+                  <Icon name="viewfinder" size={20} color={auto ? 'onAccent' : 'text'} />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="switch"
+                  accessibilityLabel="Torch"
+                  accessibilityState={{ checked: torch }}
+                  onPress={() => setTorch((t) => !t)}
+                  style={[
+                    styles.round,
+                    {
+                      backgroundColor: torch ? colors.accent : colors.surface,
+                      borderColor: torch ? colors.accent : colors.outline,
+                    },
+                  ]}>
+                  <Icon
+                    name={torch ? 'flashlight.on.fill' : 'flashlight.off.fill'}
+                    size={18}
+                    color={torch ? 'onAccent' : 'text'}
+                  />
+                </Pressable>
+              </View>
             </View>
             {state.step === 'camera' && guide ? (
               <ThemedText
                 variant="label"
                 style={[styles.hint, { top: guide.y - 34 - spacing.sm }]}
                 accessibilityLiveRegion="polite">
-                {hintFor(mode, online, trayFull)}
+                {hintFor(mode, online, trayFull, auto ? autoCapture.status : null)}
               </ThemedText>
             ) : null}
           </SafeAreaView>
@@ -264,8 +386,24 @@ function Scanner() {
           {state.step === 'camera' ? (
             <View style={styles.bottom} pointerEvents="box-none">
               <View style={styles.side}>
-                {batch ? (
+                {batch && tray.length > 0 ? (
                   <TrayButton photos={tray} onPress={() => setTrayOpen(true)} />
+                ) : batch ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose photos from your library"
+                    disabled={picking}
+                    onPress={addFromLibrary}
+                    style={[
+                      styles.round,
+                      { backgroundColor: colors.surface, borderColor: colors.outline },
+                    ]}>
+                    {picking ? (
+                      <ActivityIndicator color={colors.accent} />
+                    ) : (
+                      <Icon name="photo.on.rectangle" size={20} color="text" />
+                    )}
+                  </Pressable>
                 ) : tally > 0 ? (
                   <Pressable
                     accessibilityRole="button"
@@ -407,6 +545,8 @@ function Scanner() {
         photos={tray}
         sending={startBatch.isPending}
         canSend={online}
+        adding={picking}
+        onAdd={addFromLibrary}
         onRemove={removeFromTray}
         onClear={clearTray}
         onSend={sendBatch}
@@ -416,12 +556,18 @@ function Scanner() {
   );
 }
 
-function hintFor(mode: Mode, online: boolean, trayFull: boolean): string {
+function hintFor(mode: Mode, online: boolean, trayFull: boolean, auto: AutoStatus | null): string {
+  if (auto === 'holding' && (mode === 'batch' ? !trayFull : online)) return 'Hold still…';
+  if (auto === 'remove' && mode === 'batch' && !trayFull) return 'Got it. Next card';
   if (mode === 'single') {
     return online ? 'Fit the card inside the frame' : 'Offline: scanning needs a connection';
   }
   if (trayFull) return `${MAX_BATCH_PHOTOS} photos is the most in one batch`;
   return online ? 'One card per photo' : 'Offline: photos wait here until you’re connected';
+}
+
+function couldNotRead(n: number): string {
+  return n === 1 ? 'One photo couldn’t be read' : `${n} photos couldn’t be read`;
 }
 
 function deleteQuietly(uri: string) {
@@ -458,6 +604,7 @@ const styles = StyleSheet.create({
   },
   hint: { position: 'absolute', left: 0, right: 0, textAlign: 'center', lineHeight: 34 },
   mode: { width: 208 },
+  toggles: { flexDirection: 'row', gap: spacing.sm },
   inbox: { alignItems: 'center', padding: spacing.md },
   bottom: {
     position: 'absolute',

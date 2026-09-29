@@ -18,6 +18,8 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 type Variant = 'development' | 'production';
 
+const CAMERA_USAGE = 'PokeCollector uses the camera to scan cards into your collection.';
+
 function variant(): Variant {
   const value = process.env.APP_VARIANT ?? 'development';
   if (value !== 'development' && value !== 'production') {
@@ -62,6 +64,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       infoPlist: {
         // Sideloaded, never submitted, but this stops Xcode asking.
         ITSAppUsesNonExemptEncryption: false,
+        // react-native-vision-camera has no config plugin to set this.
+        NSCameraUsageDescription: CAMERA_USAGE,
       },
     },
     plugins: [
@@ -76,12 +80,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ],
       // No biometrics: the Keychain item is protected by the device passcode.
       ['expo-secure-store', { faceIDPermission: false }],
+      // Only the library picker is used. iOS's picker needs no access to the
+      // library, but the string is there should iOS ever ask. The camera
+      // string is repeated so the plugin's default does not replace it, and
+      // `false` leaves out the microphone.
       [
-        'expo-camera',
+        'expo-image-picker',
         {
-          cameraPermission: 'PokeCollector uses the camera to scan cards into your collection.',
+          photosPermission: 'PokeCollector reads the photos you choose, to scan the cards in them.',
+          cameraPermission: CAMERA_USAGE,
           microphonePermission: false,
-          recordAudioAndroid: false,
         },
       ],
     ],

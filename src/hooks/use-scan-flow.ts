@@ -102,20 +102,24 @@ export function useScanFlow() {
     [getClient, settle],
   );
 
+  /**
+   * Scans one photo: from the camera, with the view it was taken in so it is
+   * cropped to the guide, or from the library, with no view.
+   */
   const capture = useCallback(
-    async (photo: { uri: string; width: number; height: number }, view: Size) => {
+    async (uri: string, view: Size | null) => {
       const run = runRef.current;
       setState({ step: 'uploading' });
       let jobId: number;
       try {
-        const file = await prepareScanPhoto(photo, view);
+        const file = await prepareScanPhoto(uri, view);
         try {
           jobId = (await createScanJob(getClient(), [file])).id;
         } finally {
           // Both copies are in the cache directory; neither is needed now.
-          for (const uri of [file.uri, photo.uri]) {
+          for (const copy of [file.uri, uri]) {
             try {
-              new File(uri).delete();
+              new File(copy).delete();
             } catch {
               // Best effort: iOS clears the cache directory itself.
             }

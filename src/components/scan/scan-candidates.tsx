@@ -16,10 +16,13 @@ export function ScanCandidates({
   candidates,
   recognized,
   onPick,
+  selectedId,
 }: {
   candidates: ScanMatch[];
-  recognized: Recognized | null;
+  recognized: Recognized | null | undefined;
   onPick(match: ScanMatch): void;
+  /** The candidate already chosen, in a batch; marked, and read as selected. */
+  selectedId?: string | null;
 }) {
   const colors = useColors();
   const ranked = rankCandidates(candidates, recognized).slice(0, 8);
@@ -49,9 +52,11 @@ export function ScanCandidates({
           const code = [match.set_abbreviation?.toUpperCase(), match.number]
             .filter(Boolean)
             .join(' ');
+          const selected = selectedId === match.id;
           return (
             <Pressable
               accessibilityRole="button"
+              accessibilityState={selectedId === undefined ? undefined : { selected }}
               accessibilityLabel={[
                 match.name,
                 code,
@@ -65,6 +70,7 @@ export function ScanCandidates({
               <CardImage
                 card={{ id: match.id, images_small: match.image, images_large: match.image_hd }}
                 size="small"
+                style={selected && [styles.selected, { borderColor: colors.holo }]}
               />
               {numberMatches ? (
                 <View style={[styles.matchMark, { backgroundColor: colors.success }]}>
@@ -100,6 +106,7 @@ const styles = StyleSheet.create({
   list: { gap: spacing.sm + 4 },
   tile: { width: 112, gap: spacing.xs },
   pressed: { opacity: 0.7 },
+  selected: { borderWidth: 3 },
   matchMark: {
     flexDirection: 'row',
     alignItems: 'center',

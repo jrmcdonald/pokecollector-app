@@ -37,6 +37,7 @@ const PAIRS: [fg: Role, bg: Role[], minimum: number, what: string][] = [
   ['success', ['surfaceRaised'], AA.nonText, 'a complete progress bar, and the success stripe'],
   ['outline', ['background', 'surface'], AA.nonText, 'the dashed outline of a missing card'],
   ['danger', ['surfaceRaised'], AA.nonText, 'the error stripe on a notice'],
+  ['success', ['background', 'surface'], AA.nonText, 'the Added check on a batch scan row'],
 ];
 
 describe('theme contrast (WCAG 2.2 AA)', () => {

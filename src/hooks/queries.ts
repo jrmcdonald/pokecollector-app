@@ -13,43 +13,53 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import type { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { useSyncExternalStore } from 'react';
 
+import { batchPollDelay } from '@/api/batch';
 import {
   addCardToPlannedBinder,
   addCollectionItemToBinder,
   addToCollection,
   addToWishlist,
+  createScanJob,
+  deleteScanJob,
+  dismissScanItem,
   getBinderCards,
   getBinders,
   getCard,
   getCollection,
   getDashboard,
   getPrintingDetailTags,
+  getScanJob,
   getSetChecklist,
   getSets,
   getWishlist,
+  listScanJobs,
   removeBinderEntry,
   removeFromCollection,
   removeFromWishlist,
   resolveAndAddScan,
+  retryScanItem,
   searchCards,
   updateCollectionItem,
   type NewCollectionItem,
 } from '@/api/endpoints';
 import { ApiError } from '@/api/errors';
-import type { BinderCards, CollectionItem, WishlistItem } from '@/api/schemas';
+import type { BinderCards, CollectionItem, ScanItem, ScanJob, WishlistItem } from '@/api/schemas';
 import { useSession } from '@/session/session';
+import { forgetBatchPhotos, keepBatchPhotos, pruneBatchPhotos } from '@/utils/batch-photos';
 import { showToast } from '@/utils/toast';
 
 const SEARCH_PAGE_SIZE = 30;
 
-function useKeys() {
+export function useKeys() {
   const { session, getClient } = useSession();
   const cacheId = session.status === 'signedIn' ? session.cacheId : null;
   return {
     enabled: cacheId !== null,
+    cacheId,
     getClient,
     keys: {
       all: [cacheId] as const,
@@ -66,6 +76,8 @@ function useKeys() {
       binder: (id: number) => [cacheId, 'binder', id] as const,
       binderAll: [cacheId, 'binder'] as const,
       printingDetails: [cacheId, 'printing-details'] as const,
+      scanJobs: [cacheId, 'scan-jobs'] as const,
+      scanJob: (id: number) => [cacheId, 'scan-job', id] as const,
     },
   };
 }
@@ -181,7 +193,7 @@ export function useBinderCards(id: number) {
  * Refetches what a change to the collection affects. Only screens on show
  * refetch straight away; the rest are marked stale and refetch when opened.
  */
-function useInvalidateOwnership() {
+export function useInvalidateOwnership() {
   const queryClient = useQueryClient();
   const { keys } = useKeys();
   return () =>
@@ -200,11 +212,11 @@ function useInvalidateOwnership() {
 }
 
 /** A success tap. Never allowed to fail the mutation it follows. */
-function succeeded() {
+export function succeeded() {
   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
 }
 
-function reportFailure(title: string, error: unknown) {
+export function reportFailure(title: string, error: unknown) {
   showToast({
     kind: 'error',
     title,
@@ -404,4 +416,131 @@ export function useIsOnline(): boolean {
     (listener) => onlineManager.subscribe(listener),
     () => onlineManager.isOnline(),
   );
+}
+
+/**
+ * The scan inbox: jobs with photos still to review. `poll` keeps it fresh
+ * every 10 s while any of them is still being read, for the screen that
+ * lists them; elsewhere it refreshes only when stale or changed.
+ */
+export function useScanJobs({
+  poll = false,
+  subscribed = true,
+}: {
+  poll?: boolean;
+  /** False while its screen is out of sight; coming back refetches it if stale. */
+  subscribed?: boolean;
+} = {}) {
+  const { enabled, cacheId, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.scanJobs,
+    queryFn: async () => {
+      const jobs = await listScanJobs(getClient());
+      if (cacheId)
+        pruneBatchPhotos(
+          cacheId,
+          jobs.map((job) => job.id),
+        );
+      return jobs;
+    },
+    enabled,
+    subscribed,
+    staleTime: 60 * 1000,
+    refetchInterval: (query) =>
+      poll && query.state.data?.some((job) => (job.active ?? 0) > 0) ? 10_000 : false,
+  });
+}
+
+/** Photos waiting for review across the inbox, for the Scan tab's count. */
+export function reviewCount(jobs: readonly ScanJob[] | undefined): number {
+  return (jobs ?? []).reduce((sum, job) => sum + (job.attention ?? 0), 0);
+}
+
+/**
+ * One job with every item, polled while upstream is still reading: every
+ * 3 s at first, easing to 10 s (see batchPollDelay). One poll covers the
+ * whole batch.
+ */
+export function useScanJob(id: number) {
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.scanJob(id),
+    queryFn: () => getScanJob(getClient(), id),
+    enabled: enabled && Number.isInteger(id) && id > 0,
+    staleTime: 15 * 1000,
+    refetchInterval: (query) =>
+      batchPollDelay(query.state.dataUpdateCount, query.state.data, Date.now()),
+  });
+}
+
+/** Writes one item of a cached job, as a change upstream would. */
+export function useUpdateScanItem() {
+  const queryClient = useQueryClient();
+  const { keys } = useKeys();
+  return (jobId: number, itemId: number, change: (item: ScanItem) => ScanItem) =>
+    queryClient.setQueryData<ScanJob>(keys.scanJob(jobId), (job) =>
+      job?.items
+        ? { ...job, items: job.items.map((item) => (item.id === itemId ? change(item) : item)) }
+        : job,
+    );
+}
+
+/**
+ * Sends a batch of photos as one job. The phone keeps its copies for the
+ * review's thumbnails; upstream's are only fetched when one is opened.
+ */
+export function useStartBatch() {
+  const queryClient = useQueryClient();
+  const { cacheId, getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: async (photos: File[]) => {
+      const job = await createScanJob(getClient(), photos);
+      if (cacheId) await keepBatchPhotos(cacheId, job.id, photos);
+      return job;
+    },
+    onError: (error) => reportFailure('Could not send the photos', error),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.scanJobs }),
+  });
+}
+
+/** Skips a photo: marks it handled upstream without adding anything. */
+export function useDismissScanItem() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  const update = useUpdateScanItem();
+  return useMutation({
+    mutationFn: ({ jobId, itemId }: { jobId: number; itemId: number }) =>
+      dismissScanItem(getClient(), jobId, itemId),
+    onSuccess: (_item, { jobId, itemId }) =>
+      update(jobId, itemId, (item) => ({ ...item, resolved: true, has_image: false })),
+    onError: (error) => reportFailure('Could not skip the photo', error),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.scanJobs }),
+  });
+}
+
+/** Asks upstream to read a failed photo again; the job polls until it has. */
+export function useRetryScanItem() {
+  const { getClient } = useKeys();
+  const update = useUpdateScanItem();
+  return useMutation({
+    mutationFn: ({ jobId, itemId }: { jobId: number; itemId: number }) =>
+      retryScanItem(getClient(), jobId, itemId),
+    onSuccess: (item, { jobId, itemId }) => update(jobId, itemId, (old) => ({ ...old, ...item })),
+    onError: (error) => reportFailure('Could not try the photo again', error),
+  });
+}
+
+/** Deletes a whole job, and its photos, upstream and on the phone. */
+export function useDiscardScanJob() {
+  const queryClient = useQueryClient();
+  const { cacheId, getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: (jobId: number) => deleteScanJob(getClient(), jobId),
+    onSuccess: (_result, jobId) => {
+      if (cacheId) forgetBatchPhotos(cacheId, jobId);
+      queryClient.removeQueries({ queryKey: keys.scanJob(jobId) });
+    },
+    onError: (error) => reportFailure('Could not discard the scans', error),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.scanJobs }),
+  });
 }

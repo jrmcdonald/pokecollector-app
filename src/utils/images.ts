@@ -74,3 +74,21 @@ export function collectionPhotoSource(
     cacheKey: `collection-photo-${proxy.scope}-${itemId}`,
   };
 }
+
+/**
+ * Upstream's copy of a scanned photo, for a batch photo the phone no longer
+ * has (taken in the web UI, or the cache was cleared). It needs the login
+ * and costs a request, so only a photo opened for review asks for it.
+ */
+export function scanPhotoSource(
+  jobId: number,
+  itemId: number,
+  proxy: { baseUrl: string; headers: Record<string, string>; token: string | null; scope: string },
+): ImageSource | null {
+  if (!proxy.baseUrl || !proxy.token) return null;
+  return {
+    uri: `${proxy.baseUrl}/api/cards/recognize/jobs/${jobId}/items/${itemId}/image`,
+    headers: { ...proxy.headers, Authorization: `Bearer ${proxy.token}` },
+    cacheKey: `scan-photo-${proxy.scope}-${jobId}-${itemId}`,
+  };
+}

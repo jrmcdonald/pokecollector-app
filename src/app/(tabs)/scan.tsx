@@ -1,29 +1,47 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { router, useIsFocused } from 'expo-router';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { MAX_BATCH_PHOTOS } from '@/api/batch';
 import { searchTermFor } from '@/api/scan';
 import type { ScanMatch } from '@/api/schemas';
 import { Button } from '@/components/button';
 import { Icon } from '@/components/icon';
+import { TrayButton, TraySheet, type TrayPhoto } from '@/components/scan/batch-tray';
 import { GuideOverlay } from '@/components/scan/guide-overlay';
+import { ReviewEntry } from '@/components/scan/review-entry';
 import { ScanCandidates } from '@/components/scan/scan-candidates';
 import { ScanConfirm, type ScanChoice } from '@/components/scan/scan-confirm';
+import { Segmented } from '@/components/segmented';
 import { EmptyState } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useAddFromScan, useIsOnline } from '@/hooks/queries';
+import { useAddFromScan, useIsOnline, useScanJobs, useStartBatch } from '@/hooks/queries';
 import { useScanFlow } from '@/hooks/use-scan-flow';
 import { minTapTarget, radius, spacing, useColors } from '@/theme';
 import { guideRect, type Size } from '@/utils/crop';
+import { prepareScanPhoto } from '@/utils/scan-photo';
+import { showToast } from '@/utils/toast';
+
+type Mode = 'single' | 'batch';
+
+const MODES = [
+  { value: 'single', label: 'One card' },
+  { value: 'batch', label: 'Batch' },
+] as const;
 
 /**
  * Scan a card: fit it in the guide, take the photo, pick the right match,
  * confirm, and the camera is ready for the next card. A running tally counts
  * what this visit has added.
+ *
+ * Or a batch: photograph a stack of cards, one photo each, then send them all
+ * as one job and review them together (`/scans/[id]`). Batches not finished
+ * wait in the scan inbox, which this tab links to.
  */
 export default function Scan() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -42,11 +60,23 @@ export default function Scan() {
                 : { title: 'Open Settings', onPress: () => Linking.openSettings() }
             }
           />
+          <Inbox />
         </SafeAreaView>
       </ThemedView>
     );
   }
   return <Scanner />;
+}
+
+/** Scans waiting for review can be reviewed without the camera. */
+function Inbox() {
+  const focused = useIsFocused();
+  const jobs = useScanJobs({ subscribed: focused });
+  return (
+    <View style={styles.inbox}>
+      <ReviewEntry jobs={jobs.data} />
+    </View>
+  );
 }
 
 function Scanner() {
@@ -55,6 +85,8 @@ function Scanner() {
   const online = useIsOnline();
   const flow = useScanFlow();
   const add = useAddFromScan();
+  const jobs = useScanJobs({ subscribed: focused });
+  const startBatch = useStartBatch();
   const camera = useRef<CameraView>(null);
   const [view, setView] = useState<Size | null>(null);
   const [ready, setReady] = useState(false);
@@ -62,19 +94,68 @@ function Scanner() {
   const [capturing, setCapturing] = useState(false);
   const [tally, setTally] = useState(0);
   const [selected, setSelected] = useState<ScanMatch | null>(null);
+  const [mode, setMode] = useState<Mode>('single');
+  const [tray, setTray] = useState<TrayPhoto[]>([]);
+  const [trayOpen, setTrayOpen] = useState(false);
   const { state } = flow;
   const guide = view ? guideRect(view) : null;
+  const batch = mode === 'batch';
+  const trayFull = tray.length >= MAX_BATCH_PHOTOS;
+  // A batch photo stays on the phone, so batch mode works offline until "Scan".
+  const canShoot = ready && !capturing && (batch ? !trayFull && !startBatch.isPending : online);
 
   async function shoot() {
-    if (!camera.current || !view || capturing) return;
+    if (!camera.current || !view || !canShoot) return;
     setCapturing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
     try {
       const photo = await camera.current.takePictureAsync({ quality: 0.9, shutterSound: false });
-      await flow.capture(photo, view);
+      if (batch) await keepForBatch(photo, view);
+      else await flow.capture(photo, view);
     } finally {
       setCapturing(false);
     }
+  }
+
+  /** Crops the photo as a single scan would, and puts it in the tray. */
+  async function keepForBatch(photo: { uri: string; width: number; height: number }, size: Size) {
+    try {
+      const file = await prepareScanPhoto(photo, size);
+      setTray((photos) => [...photos, { key: file.uri, uri: file.uri }]);
+    } catch {
+      showToast({ kind: 'error', title: 'Couldn’t keep that photo', message: 'Take it again.' });
+    } finally {
+      deleteQuietly(photo.uri);
+    }
+  }
+
+  function removeFromTray(photo: TrayPhoto) {
+    deleteQuietly(photo.uri);
+    setTray((photos) => photos.filter((p) => p.key !== photo.key));
+  }
+
+  function clearTray() {
+    for (const photo of tray) deleteQuietly(photo.uri);
+    setTray([]);
+    setTrayOpen(false);
+  }
+
+  function sendBatch() {
+    if (tray.length === 0 || startBatch.isPending) return;
+    setTrayOpen(false);
+    startBatch.mutate(
+      tray.map((photo) => new File(photo.uri)),
+      {
+        onSuccess: (job) => {
+          // The photos have moved to the job's folder; the tray is empty.
+          setTray([]);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+            () => undefined,
+          );
+          router.push({ pathname: '/scans/[id]', params: { id: String(job.id) } });
+        },
+      },
+    );
   }
 
   function confirm(match: ScanMatch, choice: ScanChoice) {
@@ -139,17 +220,15 @@ function Scanner() {
 
           <SafeAreaView edges={['top']} style={styles.top} pointerEvents="box-none">
             <View style={styles.topRow} pointerEvents="box-none">
-              {tally > 0 ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`${tally} added this session. Reset the count`}
-                  onLongPress={() => setTally(0)}
-                  style={[
-                    styles.pill,
-                    { backgroundColor: colors.surface, borderColor: colors.holo },
-                  ]}>
-                  <ThemedText variant="figureSmall">+{tally} added</ThemedText>
-                </Pressable>
+              {state.step === 'camera' ? (
+                <View style={styles.mode}>
+                  <Segmented<Mode>
+                    label="Scan mode"
+                    options={MODES}
+                    value={mode}
+                    onChange={setMode}
+                  />
+                </View>
               ) : (
                 <View />
               )}
@@ -177,27 +256,55 @@ function Scanner() {
                 variant="label"
                 style={[styles.hint, { top: guide.y - 34 - spacing.sm }]}
                 accessibilityLiveRegion="polite">
-                {online ? 'Fit the card inside the frame' : 'Offline: scanning needs a connection'}
+                {hintFor(mode, online, trayFull)}
               </ThemedText>
             ) : null}
           </SafeAreaView>
 
           {state.step === 'camera' ? (
             <View style={styles.bottom} pointerEvents="box-none">
+              <View style={styles.side}>
+                {batch ? (
+                  <TrayButton photos={tray} onPress={() => setTrayOpen(true)} />
+                ) : tally > 0 ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${tally} added this session. Reset the count`}
+                    onLongPress={() => setTally(0)}
+                    style={[
+                      styles.pill,
+                      { backgroundColor: colors.surface, borderColor: colors.holo },
+                    ]}>
+                    <ThemedText variant="figureSmall">+{tally} added</ThemedText>
+                  </Pressable>
+                ) : null}
+              </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Take the photo"
-                disabled={!ready || !online || capturing}
+                accessibilityLabel={batch ? 'Take a photo for the batch' : 'Take the photo'}
+                disabled={!canShoot}
                 onPress={shoot}
                 style={({ pressed }) => [
                   styles.shutter,
                   {
                     borderColor: colors.text,
-                    opacity: !ready || !online ? 0.4 : pressed ? 0.7 : 1,
+                    opacity: !canShoot && !capturing ? 0.4 : pressed ? 0.7 : 1,
                   },
                 ]}>
                 <View style={[styles.shutterInner, { backgroundColor: colors.accent }]} />
               </Pressable>
+              <View style={[styles.side, styles.sideEnd]}>
+                {batch && tray.length > 0 ? (
+                  <Button
+                    title={`Scan ${tray.length}`}
+                    busy={startBatch.isPending}
+                    disabled={!online}
+                    onPress={sendBatch}
+                  />
+                ) : (
+                  <ReviewEntry jobs={jobs.data} />
+                )}
+              </View>
             </View>
           ) : null}
 
@@ -295,8 +402,34 @@ function Scanner() {
           ) : null}
         </View>
       </SafeAreaView>
+      <TraySheet
+        visible={trayOpen}
+        photos={tray}
+        sending={startBatch.isPending}
+        canSend={online}
+        onRemove={removeFromTray}
+        onClear={clearTray}
+        onSend={sendBatch}
+        onClose={() => setTrayOpen(false)}
+      />
     </ThemedView>
   );
+}
+
+function hintFor(mode: Mode, online: boolean, trayFull: boolean): string {
+  if (mode === 'single') {
+    return online ? 'Fit the card inside the frame' : 'Offline: scanning needs a connection';
+  }
+  if (trayFull) return `${MAX_BATCH_PHOTOS} photos is the most in one batch`;
+  return online ? 'One card per photo' : 'Offline: photos wait here until you’re connected';
+}
+
+function deleteQuietly(uri: string) {
+  try {
+    new File(uri).delete();
+  } catch {
+    // Best effort: iOS clears the cache directory itself.
+  }
 }
 
 const styles = StyleSheet.create({
@@ -324,13 +457,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   hint: { position: 'absolute', left: 0, right: 0, textAlign: 'center', lineHeight: 34 },
+  mode: { width: 208 },
+  inbox: { alignItems: 'center', padding: spacing.md },
   bottom: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: spacing.lg,
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
   },
+  side: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  sideEnd: { justifyContent: 'flex-end' },
   shutter: {
     width: 76,
     height: 76,

@@ -468,4 +468,5 @@ The third step of `PLAN.md` §8.2, in the `Simulator` workflow (`e2e/`).
   as planned.
 - **The simulator walkthrough covers it:** the fake server has a batch read
   to the end, with a photo of each kind, and the walkthrough screenshots and
-  audits the list, the review and one opened photo.
+  audits the list, the review and one opened photo. Its first run found no
+  audit issues on them at either text size.

@@ -162,7 +162,8 @@ follows redirects by default, so without care an expired token looks like a
 | Validation       | `zod` at the boundary                                                 | For the fields the app relies on; the spec is the fuller description                            |
 | Lists            | `@shopify/flash-list`                                                 | Big card grids                                                                                  |
 | Images           | `expo-image`                                                          | Disk cache; `low.webp` in grids and `high.webp` in detail                                       |
-| Camera           | `expo-camera`                                                         | Shutter capture; version-matched to the SDK. See DECISIONS.md for why not vision-camera         |
+| Camera           | `react-native-vision-camera` v5                                       | Shutter and auto-capture (frame processors). Replaced `expo-camera`; see DECISIONS.md           |
+| Photo library    | `expo-image-picker`                                                   | Scanning photos already taken; iOS's picker, so no library permission                           |
 | Image processing | `expo-image-manipulator`                                              | Crop and resize before upload                                                                   |
 | Secrets          | `expo-secure-store`                                                   | iOS Keychain                                                                                    |
 | Haptics          | `expo-haptics`                                                        |                                                                                                 |
@@ -260,7 +261,8 @@ empty app, and neither depends on the screens.
   - `development` → `<prefix>.pokecollector.dev`, "PokeCollector Dev", dev client
   - `production` → `<prefix>.pokecollector`, "PokeCollector"
   - `<prefix>` is `BUNDLE_ID_PREFIX`, defaulting to `io.github.jrmcdonald`
-- [x] Camera usage description (through `expo-camera`'s config plugin).
+- [x] Camera usage description (in `ios.infoPlist`; it came from `expo-camera`'s
+      config plugin until vision-camera replaced it).
 - [x] `ci.yml` on every push/PR: lint, typecheck, tests.
 - [x] `ios-build.yml`, manual (`workflow_dispatch`) with a `variant` input:
   1. `runs-on: macos-latest` (or the newest Xcode image Expo SDK 57 supports)
@@ -463,9 +465,22 @@ account's collection.
       two taps.
 - [x] **Quick-scan mode:** after confirming, straight back to the camera, with
       a running tally.
-- [ ] **Later:** auto-capture with edge detection. That needs frame
-      processors, which means adding `react-native-vision-camera` and a CI
-      rebuild.
+- [x] **Auto-capture with edge detection.** An Auto switch beside the torch.
+      A frame processor looks for the card's four edges along the guide in a
+      small luma frame, and the photo takes itself once they have held still
+      for half a second; a card left in the guide is taken once. Needed
+      `react-native-vision-camera` in place of `expo-camera`, so a CI
+      rebuild. See `DECISIONS.md`, "Auto-capture and library photos".
+- [ ] **Review the Scan screen's bottom edge.** The camera stops at the top
+      of the tab bar, so the preview ends in a hard straight line above the
+      floating bar and the band behind it is plain background. Look at
+      running the preview full screen, behind the tab bar and the home
+      indicator, while the shutter, tray and hint stay above the bar. The
+      crop must follow: `guideRect` and `cropForGuide` are worked out from
+      the camera view's size, so a taller view moves the guide, and a guide
+      measured in a different view from the preview would crop the wrong
+      part of the photo. Check it at the largest text size too, where the
+      tab bar is taller. JavaScript only.
 
 **Done when:** a sleeved or unsleeved card on a table gives the right card in
 the top 3 most of the time, and adding it takes 2 taps or fewer after the scan.
@@ -509,8 +524,11 @@ The app:
       reviewed later, in the app or in the web UI (`/scans/{id}`).
       `GET /api/cards/recognize/jobs` lists the ones still needing attention;
       the Scan tab shows a count and opens them.
-- [ ] **Later, needs a native build:** adding photos from the photo library
-      (`expo-image-picker`).
+- [x] **Adding photos from the photo library** (`expo-image-picker`): in
+      batch mode, a library button where the tray goes, and "Add from your
+      photos" in the tray. Without the camera, "Scan photos from your
+      library" sends the chosen photos straight off as a batch. Library
+      photos are shrunk but not cropped: nothing lined them up with the guide.
 
 **Done when:** thirty cards can be photographed in a minute or two, sent as
 one job, and added after a review that is mostly one tap each.
@@ -617,10 +635,11 @@ versioned. So:
 
 ## 11. Later ideas (only if the app gets heavy use)
 
-- Decks, trades and sealed product screens
+- Trades and sealed product screens
 - Price history charts and top movers
-- Auto-capture (§8) and a "rip mode" that scans each card as it is flipped
-  onto the table, on top of bulk scanning (§8.1)
+- A "rip mode" that scans each card as it is flipped onto the table: batch
+  mode with Auto on (§8) comes close; what is left is sending each photo as
+  it is taken rather than all at the end
 - Upstream PRs for API tokens or cursor pagination, if their absence starts to
   hurt
 - Revisit native Swift or a paid Apple account if widgets start to matter

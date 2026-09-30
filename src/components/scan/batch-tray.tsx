@@ -49,14 +49,16 @@ export function TrayButton({ photos, onPress }: { photos: readonly TrayPhoto[]; 
 }
 
 /**
- * Every photo in the batch, each with a way to drop it, and the button that
- * sends them. Nothing has left the phone yet.
+ * Every photo in the batch, each with a way to drop it, more from the
+ * library, and the button that sends them. Nothing has left the phone yet.
  */
 export function TraySheet({
   visible,
   photos,
   sending,
   canSend,
+  adding,
+  onAdd,
   onRemove,
   onClear,
   onSend,
@@ -66,6 +68,9 @@ export function TraySheet({
   photos: readonly TrayPhoto[];
   sending: boolean;
   canSend: boolean;
+  /** Photos from the library are being picked or shrunk. */
+  adding: boolean;
+  onAdd(): void;
   onRemove(photo: TrayPhoto): void;
   onClear(): void;
   onSend(): void;
@@ -142,6 +147,13 @@ export function TraySheet({
               busy={sending}
               disabled={!canSend || n === 0}
               onPress={onSend}
+            />
+            <Button
+              title="Add from your photos"
+              variant="secondary"
+              busy={adding}
+              disabled={sending || n >= MAX_BATCH_PHOTOS}
+              onPress={onAdd}
             />
             <Button
               title="Discard these photos"

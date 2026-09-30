@@ -7,7 +7,7 @@ import { act, render, screen, userEvent } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 import { Alert } from 'react-native';
 
-import { defaultChoice } from '@/api/batch';
+import { defaultChoice, MAX_BATCH_PHOTOS } from '@/api/batch';
 import type { ScanItem } from '@/api/schemas';
 
 import { BatchItemSheet } from '../scan/batch-item-sheet';
@@ -160,6 +160,8 @@ describe('the batch tray', () => {
         photos={photos}
         sending={false}
         canSend={false}
+        adding={false}
+        onAdd={jest.fn()}
         onRemove={onRemove}
         onClear={jest.fn()}
         onSend={jest.fn()}
@@ -169,6 +171,34 @@ describe('the batch tray', () => {
     await userEvent.setup().press(screen.getByRole('button', { name: 'Remove photo 2' }));
     expect(onRemove).toHaveBeenCalledWith(photos[1]);
     expect(screen.getByRole('button', { name: 'Scan 2 cards' })).toBeDisabled();
+  });
+
+  it('adds photos from the library, offline too, until the batch is full', async () => {
+    const onAdd = jest.fn();
+    const sheet = (list: typeof photos) => (
+      <TraySheet
+        visible
+        photos={list}
+        sending={false}
+        canSend={false}
+        adding={false}
+        onAdd={onAdd}
+        onRemove={jest.fn()}
+        onClear={jest.fn()}
+        onSend={jest.fn()}
+        onClose={jest.fn()}
+      />
+    );
+    await render(sheet(photos));
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Add from your photos' }));
+    expect(onAdd).toHaveBeenCalled();
+
+    const full = Array.from({ length: MAX_BATCH_PHOTOS }, (_, i) => ({
+      key: String(i),
+      uri: `file:///${i}.jpg`,
+    }));
+    await render(sheet(full));
+    expect(screen.getByRole('button', { name: 'Add from your photos' })).toBeDisabled();
   });
 });
 

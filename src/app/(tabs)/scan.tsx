@@ -345,13 +345,19 @@ function Scanner() {
                   accessibilityState={{ checked: auto }}
                   onPress={() => setAuto((a) => !a)}
                   style={[
-                    styles.round,
+                    styles.autoPill,
                     {
                       backgroundColor: auto ? colors.accent : colors.surface,
                       borderColor: auto ? colors.accent : colors.outline,
                     },
                   ]}>
-                  <Icon name="viewfinder" size={20} color={auto ? 'onAccent' : 'text'} />
+                  {/* A word, as iOS's own camera labels its auto modes: no symbol says "auto". */}
+                  <ThemedText
+                    variant="label"
+                    numberOfLines={1}
+                    style={{ color: auto ? colors.onAccent : colors.text }}>
+                    Auto
+                  </ThemedText>
                 </Pressable>
                 <Pressable
                   accessibilityRole="switch"
@@ -605,6 +611,15 @@ const styles = StyleSheet.create({
   hint: { position: 'absolute', left: 0, right: 0, textAlign: 'center', lineHeight: 34 },
   mode: { width: 208 },
   toggles: { flexDirection: 'row', gap: spacing.sm },
+  autoPill: {
+    minWidth: minTapTarget,
+    height: minTapTarget,
+    borderRadius: minTapTarget / 2,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   inbox: { alignItems: 'center', padding: spacing.md },
   bottom: {
     position: 'absolute',

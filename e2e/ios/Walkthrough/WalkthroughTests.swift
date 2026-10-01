@@ -223,6 +223,13 @@ final class WalkthroughTests: XCTestCase {
     // On a slow runner the offer to save the password can come later than
     // signIn waits for it, over whatever screen is next.
     dismissSystemSheets()
+    // No screenshot is of a keyboard. On a slow runner one has been found
+    // open over Server and login, the form scrolled to make room for it.
+    // Return closes it, as in type().
+    if app.keyboards.firstMatch.exists {
+      app.typeText("\n")
+      _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 5)
+    }
     let shot = settledScreenshot()
     do {
       try shot.pngRepresentation.write(to: outputDir.appendingPathComponent("\(name).png"))

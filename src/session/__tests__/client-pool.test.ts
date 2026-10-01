@@ -6,8 +6,7 @@ import { ClientPool } from '../client-pool';
 const creds: ServerCredentials = {
   primaryUrl: 'https://home.example.com',
   fallbackUrl: 'https://pc.example.com',
-  accessClientId: 'id.access',
-  accessClientSecret: 'secret',
+  proxy: { kind: 'cloudflare', clientId: 'id.access', clientSecret: 'secret' },
   username: 'ash',
   password: 'pikachu',
 };
@@ -75,9 +74,15 @@ describe('ClientPool', () => {
   it('retires every client when the server changes', () => {
     const { pool, created, two } = setup();
     pool.activate(two, { fresh: true });
-    const changed = { ...two, server: { ...two.server, accessClientSecret: 'rotated' } };
+    const changed = {
+      ...two,
+      server: {
+        ...two.server,
+        proxy: { kind: 'cloudflare' as const, clientId: 'id.access', clientSecret: 'rotated' },
+      },
+    };
     const client = pool.activate(withActive(changed, 'id1'));
-    expect(client.accessHeaders['CF-Access-Client-Secret']).toBe('rotated');
+    expect(client.proxyHeaders['CF-Access-Client-Secret']).toBe('rotated');
     expect(created.map((c) => c.credentials.username)).toEqual(['misty', 'ash']);
   });
 });

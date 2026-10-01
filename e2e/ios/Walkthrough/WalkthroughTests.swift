@@ -71,7 +71,10 @@ final class WalkthroughTests: XCTestCase {
     wait(for: field, "Search")
     capture("search")
     type("pika", into: field)
-    wait(for: button(startingWith: "Pikachu"), "Search results")
+    // The count, not a Pikachu: typed slowly, the search can go out for "pi"
+    // first, and those results have Pikachus too, among Pidgey and Caterpie.
+    // Only "pika" finds exactly the fake server's four.
+    wait(for: element(startingWith: "4 cards"), "Search results")
     capture("search-results")
 
     // No camera on the simulator, and the permission is never granted, so
@@ -217,6 +220,16 @@ final class WalkthroughTests: XCTestCase {
 
   /// A screenshot for comparison, then the audit of the same screen.
   private func capture(_ name: String) {
+    // On a slow runner the offer to save the password can come later than
+    // signIn waits for it, over whatever screen is next.
+    dismissSystemSheets()
+    // No screenshot is of a keyboard. On a slow runner one has been found
+    // open over Server and login, the form scrolled to make room for it.
+    // Return closes it, as in type().
+    if app.keyboards.firstMatch.exists {
+      app.typeText("\n")
+      _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 5)
+    }
     let shot = settledScreenshot()
     do {
       try shot.pngRepresentation.write(to: outputDir.appendingPathComponent("\(name).png"))

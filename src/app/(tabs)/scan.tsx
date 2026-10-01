@@ -1,9 +1,9 @@
 import { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { router, useIsFocused } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Camera,
   useCameraDevice,
@@ -30,7 +30,7 @@ import { useAutoCapture } from '@/hooks/use-auto-capture';
 import { useScanFlow } from '@/hooks/use-scan-flow';
 import { minTapTarget, radius, spacing, useColors } from '@/theme';
 import type { AutoStatus } from '@/utils/card-detect';
-import { guideRect, type Size } from '@/utils/crop';
+import { guideRect, type CameraFrame, type Size } from '@/utils/crop';
 import { photosFromLibrary } from '@/utils/library';
 import { prepareScanPhoto } from '@/utils/scan-photo';
 import { showToast } from '@/utils/toast';
@@ -161,7 +161,15 @@ function Scanner() {
   const [tray, setTray] = useState<TrayPhoto[]>([]);
   const [trayOpen, setTrayOpen] = useState(false);
   const { state } = flow;
-  const guide = view ? guideRect(view) : null;
+  const insets = useSafeAreaInsets();
+  // The camera fills the screen, behind the tab bar too; the guide stays
+  // clear of the shutter row, which sits above the tab bar.
+  const frame = useMemo<CameraFrame | null>(() => {
+    if (!view) return null;
+    const controlsTop = view.height - insets.bottom - spacing.lg - SHUTTER;
+    return { view, guide: guideRect(view, controlsTop - spacing.md) };
+  }, [view, insets.bottom]);
+  const guide = frame?.guide ?? null;
   const batch = mode === 'batch';
   const trayFull = tray.length >= MAX_BATCH_PHOTOS;
   // A batch photo stays on the phone, so batch mode works offline until "Scan".
@@ -170,13 +178,13 @@ function Scanner() {
   const autoCapture = useAutoCapture({
     on: auto,
     ready: canShoot && state.step === 'camera' && !trayOpen && focused,
-    view,
+    frame,
     onCapture: () => shoot(),
   });
   const outputs = auto ? [photoOutput, autoCapture.output] : [photoOutput];
 
   async function shoot() {
-    if (!view || !canShoot) return;
+    if (!frame || !canShoot) return;
     setCapturing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
     let uri: string;
@@ -192,17 +200,17 @@ function Scanner() {
       return;
     }
     try {
-      if (batch) await keepForBatch(uri, view);
-      else await flow.capture(uri, view);
+      if (batch) await keepForBatch(uri, frame);
+      else await flow.capture(uri, frame);
     } finally {
       setCapturing(false);
     }
   }
 
   /** Crops the photo as a single scan would, and puts it in the tray. */
-  async function keepForBatch(uri: string, size: Size) {
+  async function keepForBatch(uri: string, taken: CameraFrame) {
     try {
-      const file = await prepareScanPhoto(uri, size);
+      const file = await prepareScanPhoto(uri, taken);
       setTray((photos) => [...photos, { key: file.uri, uri: file.uri }]);
     } catch {
       showToast({ kind: 'error', title: 'Couldn’t keep that photo', message: 'Take it again.' });
@@ -291,261 +299,265 @@ function Scanner() {
   return (
     <ThemedView style={styles.fill}>
       {/*
-        The bottom safe area of a tab's content includes the tab bar, so the
-        camera, the guide and every control sit above it. The crop is worked
-        out from this same view, so it still matches the guide.
+        The camera and the guide fill the whole screen, behind the tab bar,
+        so the preview has no hard edge above it. The controls sit inside the
+        bottom safe area, which for a tab's content includes the tab bar. The
+        crop is worked out from this same full-screen view and guide.
       */}
-      <SafeAreaView edges={['bottom']} style={styles.fill}>
-        <View
-          style={styles.fill}
-          onLayout={(e) =>
-            setView({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })
-          }>
-          {device ? (
-            <Camera
-              style={StyleSheet.absoluteFill}
-              device={device}
-              isActive={focused}
-              outputs={outputs}
-              resizeMode="cover"
-              torchMode={torch && focused ? 'on' : 'off'}
-              onStarted={() => setReady(true)}
-              onStopped={() => setReady(false)}
-              onError={() => setReady(false)}
-            />
-          ) : null}
-          {guide && view ? (
-            <GuideOverlay
-              view={view}
-              guide={guide}
-              active={state.step === 'camera'}
-              found={auto && autoCapture.status === 'holding'}
-            />
-          ) : null}
+      <View
+        style={styles.fill}
+        onLayout={(e) =>
+          setView({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })
+        }>
+        {device ? (
+          <Camera
+            style={StyleSheet.absoluteFill}
+            device={device}
+            isActive={focused}
+            outputs={outputs}
+            resizeMode="cover"
+            torchMode={torch && focused ? 'on' : 'off'}
+            onStarted={() => setReady(true)}
+            onStopped={() => setReady(false)}
+            onError={() => setReady(false)}
+          />
+        ) : null}
+        {guide && view ? (
+          <GuideOverlay
+            view={view}
+            guide={guide}
+            active={state.step === 'camera'}
+            found={auto && autoCapture.status === 'holding'}
+          />
+        ) : null}
 
-          <SafeAreaView edges={['top']} style={styles.top} pointerEvents="box-none">
-            <View style={styles.topRow} pointerEvents="box-none">
-              {state.step === 'camera' ? (
-                <View style={styles.mode}>
-                  <Segmented<Mode>
-                    label="Scan mode"
-                    options={MODES}
-                    value={mode}
-                    onChange={setMode}
-                  />
-                </View>
-              ) : (
-                <View />
-              )}
-              <View style={styles.toggles}>
-                <Pressable
-                  accessibilityRole="switch"
-                  accessibilityLabel="Auto-capture"
-                  accessibilityHint="Takes the photo once a card sits still in the frame"
-                  accessibilityState={{ checked: auto }}
-                  onPress={() => setAuto((a) => !a)}
-                  style={[
-                    styles.autoPill,
-                    {
-                      backgroundColor: auto ? colors.accent : colors.surface,
-                      borderColor: auto ? colors.accent : colors.outline,
-                    },
-                  ]}>
-                  {/* A word, as iOS's own camera labels its auto modes: no symbol says "auto". */}
-                  <ThemedText
-                    variant="label"
-                    numberOfLines={1}
-                    style={{ color: auto ? colors.onAccent : colors.text }}>
-                    Auto
-                  </ThemedText>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="switch"
-                  accessibilityLabel="Torch"
-                  accessibilityState={{ checked: torch }}
-                  onPress={() => setTorch((t) => !t)}
-                  style={[
-                    styles.round,
-                    {
-                      backgroundColor: torch ? colors.accent : colors.surface,
-                      borderColor: torch ? colors.accent : colors.outline,
-                    },
-                  ]}>
-                  <Icon
-                    name={torch ? 'flashlight.on.fill' : 'flashlight.off.fill'}
-                    size={18}
-                    color={torch ? 'onAccent' : 'text'}
-                  />
-                </Pressable>
-              </View>
-            </View>
-            {state.step === 'camera' && guide ? (
-              <ThemedText
-                variant="label"
-                style={[styles.hint, { top: guide.y - 34 - spacing.sm }]}
-                accessibilityLiveRegion="polite">
-                {hintFor(mode, online, trayFull, auto ? autoCapture.status : null)}
-              </ThemedText>
-            ) : null}
-          </SafeAreaView>
-
-          {state.step === 'camera' ? (
-            <View style={styles.bottom} pointerEvents="box-none">
-              <View style={styles.side}>
-                {batch && tray.length > 0 ? (
-                  <TrayButton photos={tray} onPress={() => setTrayOpen(true)} />
-                ) : batch ? (
+        {/* The controls position against this inner view, inside the padding. */}
+        <SafeAreaView edges={['bottom']} style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <View style={styles.fill} pointerEvents="box-none">
+            <SafeAreaView edges={['top']} style={styles.top} pointerEvents="box-none">
+              <View style={styles.topRow} pointerEvents="box-none">
+                {state.step === 'camera' ? (
+                  <View style={styles.mode}>
+                    <Segmented<Mode>
+                      label="Scan mode"
+                      options={MODES}
+                      value={mode}
+                      onChange={setMode}
+                    />
+                  </View>
+                ) : (
+                  <View />
+                )}
+                <View style={styles.toggles}>
                   <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Choose photos from your library"
-                    disabled={picking}
-                    onPress={addFromLibrary}
+                    accessibilityRole="switch"
+                    accessibilityLabel="Auto-capture"
+                    accessibilityHint="Takes the photo once a card sits still in the frame"
+                    accessibilityState={{ checked: auto }}
+                    onPress={() => setAuto((a) => !a)}
+                    style={[
+                      styles.autoPill,
+                      {
+                        backgroundColor: auto ? colors.accent : colors.surface,
+                        borderColor: auto ? colors.accent : colors.outline,
+                      },
+                    ]}>
+                    {/* A word, as iOS's own camera labels its auto modes: no symbol says "auto". */}
+                    <ThemedText
+                      variant="label"
+                      numberOfLines={1}
+                      style={{ color: auto ? colors.onAccent : colors.text }}>
+                      Auto
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="switch"
+                    accessibilityLabel="Torch"
+                    accessibilityState={{ checked: torch }}
+                    onPress={() => setTorch((t) => !t)}
                     style={[
                       styles.round,
-                      { backgroundColor: colors.surface, borderColor: colors.outline },
+                      {
+                        backgroundColor: torch ? colors.accent : colors.surface,
+                        borderColor: torch ? colors.accent : colors.outline,
+                      },
                     ]}>
-                    {picking ? (
-                      <ActivityIndicator color={colors.accent} />
-                    ) : (
-                      <Icon name="photo.on.rectangle" size={20} color="text" />
-                    )}
+                    <Icon
+                      name={torch ? 'flashlight.on.fill' : 'flashlight.off.fill'}
+                      size={18}
+                      color={torch ? 'onAccent' : 'text'}
+                    />
                   </Pressable>
-                ) : tally > 0 ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${tally} added this session. Reset the count`}
-                    onLongPress={() => setTally(0)}
-                    style={[
-                      styles.pill,
-                      { backgroundColor: colors.surface, borderColor: colors.holo },
-                    ]}>
-                    <ThemedText variant="figureSmall">+{tally} added</ThemedText>
-                  </Pressable>
-                ) : null}
+                </View>
               </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={batch ? 'Take a photo for the batch' : 'Take the photo'}
-                disabled={!canShoot}
-                onPress={shoot}
-                style={({ pressed }) => [
-                  styles.shutter,
-                  {
-                    borderColor: colors.text,
-                    opacity: !canShoot && !capturing ? 0.4 : pressed ? 0.7 : 1,
-                  },
-                ]}>
-                <View style={[styles.shutterInner, { backgroundColor: colors.accent }]} />
-              </Pressable>
-              <View style={[styles.side, styles.sideEnd]}>
-                {batch && tray.length > 0 ? (
-                  <Button
-                    title={`Scan ${tray.length}`}
-                    busy={startBatch.isPending}
-                    disabled={!online}
-                    onPress={sendBatch}
-                  />
-                ) : (
-                  <ReviewEntry jobs={jobs.data} />
-                )}
-              </View>
-            </View>
-          ) : null}
-
-          {busy ? (
-            <View style={styles.centre} pointerEvents="box-none">
-              <ThemedView
-                background="surface"
-                style={[styles.status, { borderColor: colors.border }]}>
-                <ActivityIndicator color={colors.accent} />
-                <ThemedText variant="label" accessibilityLiveRegion="polite">
-                  {state.step === 'uploading'
-                    ? 'Sending the photo…'
-                    : state.status === 'retrying'
-                      ? 'The scanner is busy; trying again shortly…'
-                      : 'Reading the card…'}
+              {state.step === 'camera' && guide ? (
+                <ThemedText
+                  variant="label"
+                  style={[styles.hint, { top: guide.y - 34 - spacing.sm }]}
+                  accessibilityLiveRegion="polite">
+                  {hintFor(mode, online, trayFull, auto ? autoCapture.status : null)}
                 </ThemedText>
-                <Button title="Cancel" variant="secondary" onPress={() => flow.reset()} />
-              </ThemedView>
-            </View>
-          ) : null}
+              ) : null}
+            </SafeAreaView>
 
-          {state.step === 'results' || state.step === 'failed' ? (
-            <ThemedView
-              background="background"
-              style={[styles.sheet, { borderColor: colors.border }]}>
-              <View style={styles.sheetHeader}>
+            {state.step === 'camera' ? (
+              <View style={styles.bottom} pointerEvents="box-none">
+                <View style={styles.side}>
+                  {batch && tray.length > 0 ? (
+                    <TrayButton photos={tray} onPress={() => setTrayOpen(true)} />
+                  ) : batch ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Choose photos from your library"
+                      disabled={picking}
+                      onPress={addFromLibrary}
+                      style={[
+                        styles.round,
+                        { backgroundColor: colors.surface, borderColor: colors.outline },
+                      ]}>
+                      {picking ? (
+                        <ActivityIndicator color={colors.accent} />
+                      ) : (
+                        <Icon name="photo.on.rectangle" size={20} color="text" />
+                      )}
+                    </Pressable>
+                  ) : tally > 0 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${tally} added this session. Reset the count`}
+                      onLongPress={() => setTally(0)}
+                      style={[
+                        styles.pill,
+                        { backgroundColor: colors.surface, borderColor: colors.holo },
+                      ]}>
+                      <ThemedText variant="figureSmall">+{tally} added</ThemedText>
+                    </Pressable>
+                  ) : null}
+                </View>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Close and scan another card"
-                  hitSlop={spacing.sm}
-                  onPress={() => {
-                    setSelected(null);
-                    flow.reset();
-                  }}
-                  style={[styles.close, { backgroundColor: colors.surfaceRaised }]}>
-                  <Icon name="xmark" size={14} color="textSecondary" weight="bold" />
+                  accessibilityLabel={batch ? 'Take a photo for the batch' : 'Take the photo'}
+                  disabled={!canShoot}
+                  onPress={shoot}
+                  style={({ pressed }) => [
+                    styles.shutter,
+                    {
+                      borderColor: colors.text,
+                      opacity: !canShoot && !capturing ? 0.4 : pressed ? 0.7 : 1,
+                    },
+                  ]}>
+                  <View style={[styles.shutterInner, { backgroundColor: colors.accent }]} />
                 </Pressable>
-              </View>
-              <ScrollView contentContainerStyle={styles.sheetContent} bounces={false}>
-                {state.step === 'results' ? (
-                  selected ? (
-                    <ScanConfirm
-                      match={selected}
-                      busy={add.isPending}
+                <View style={[styles.side, styles.sideEnd]}>
+                  {batch && tray.length > 0 ? (
+                    <Button
+                      title={`Scan ${tray.length}`}
+                      busy={startBatch.isPending}
                       disabled={!online}
-                      onAdd={(choice) => confirm(selected, choice)}
-                      onBack={() => setSelected(null)}
+                      onPress={sendBatch}
                     />
                   ) : (
-                    <>
-                      <ScanCandidates
-                        candidates={state.candidates}
-                        recognized={state.recognized}
-                        onPick={setSelected}
+                    <ReviewEntry jobs={jobs.data} />
+                  )}
+                </View>
+              </View>
+            ) : null}
+
+            {busy ? (
+              <View style={styles.centre} pointerEvents="box-none">
+                <ThemedView
+                  background="surface"
+                  style={[styles.status, { borderColor: colors.border }]}>
+                  <ActivityIndicator color={colors.accent} />
+                  <ThemedText variant="label" accessibilityLiveRegion="polite">
+                    {state.step === 'uploading'
+                      ? 'Sending the photo…'
+                      : state.status === 'retrying'
+                        ? 'The scanner is busy; trying again shortly…'
+                        : 'Reading the card…'}
+                  </ThemedText>
+                  <Button title="Cancel" variant="secondary" onPress={() => flow.reset()} />
+                </ThemedView>
+              </View>
+            ) : null}
+
+            {state.step === 'results' || state.step === 'failed' ? (
+              <ThemedView
+                background="background"
+                style={[styles.sheet, { borderColor: colors.border }]}>
+                <View style={styles.sheetHeader}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Close and scan another card"
+                    hitSlop={spacing.sm}
+                    onPress={() => {
+                      setSelected(null);
+                      flow.reset();
+                    }}
+                    style={[styles.close, { backgroundColor: colors.surfaceRaised }]}>
+                    <Icon name="xmark" size={14} color="textSecondary" weight="bold" />
+                  </Pressable>
+                </View>
+                <ScrollView contentContainerStyle={styles.sheetContent} bounces={false}>
+                  {state.step === 'results' ? (
+                    selected ? (
+                      <ScanConfirm
+                        match={selected}
+                        busy={add.isPending}
+                        disabled={!online}
+                        onAdd={(choice) => confirm(selected, choice)}
+                        onBack={() => setSelected(null)}
                       />
-                      <View style={styles.actions}>
-                        {term ? (
+                    ) : (
+                      <>
+                        <ScanCandidates
+                          candidates={state.candidates}
+                          recognized={state.recognized}
+                          onPick={setSelected}
+                        />
+                        <View style={styles.actions}>
+                          {term ? (
+                            <Button
+                              title="None of these: search"
+                              variant="secondary"
+                              style={styles.action}
+                              onPress={() => searchInstead(term)}
+                            />
+                          ) : null}
                           <Button
-                            title="None of these: search"
+                            title="Retake"
                             variant="secondary"
                             style={styles.action}
-                            onPress={() => searchInstead(term)}
+                            onPress={() => flow.reset()}
                           />
-                        ) : null}
+                        </View>
+                      </>
+                    )
+                  ) : (
+                    <>
+                      <ThemedText variant="heading">
+                        {state.jobId === null ? 'Couldn’t scan' : 'No match'}
+                      </ThemedText>
+                      <ThemedText color="textSecondary">{state.message}</ThemedText>
+                      {state.canRetry ? (
+                        <Button title="Try this photo again" onPress={flow.retry} />
+                      ) : null}
+                      {term ? (
                         <Button
-                          title="Retake"
+                          title={`Search for “${term}”`}
                           variant="secondary"
-                          style={styles.action}
-                          onPress={() => flow.reset()}
+                          onPress={() => searchInstead(term)}
                         />
-                      </View>
+                      ) : null}
+                      <Button title="Retake" variant="secondary" onPress={() => flow.reset()} />
                     </>
-                  )
-                ) : (
-                  <>
-                    <ThemedText variant="heading">
-                      {state.jobId === null ? 'Couldn’t scan' : 'No match'}
-                    </ThemedText>
-                    <ThemedText color="textSecondary">{state.message}</ThemedText>
-                    {state.canRetry ? (
-                      <Button title="Try this photo again" onPress={flow.retry} />
-                    ) : null}
-                    {term ? (
-                      <Button
-                        title={`Search for “${term}”`}
-                        variant="secondary"
-                        onPress={() => searchInstead(term)}
-                      />
-                    ) : null}
-                    <Button title="Retake" variant="secondary" onPress={() => flow.reset()} />
-                  </>
-                )}
-              </ScrollView>
-            </ThemedView>
-          ) : null}
-        </View>
-      </SafeAreaView>
+                  )}
+                </ScrollView>
+              </ThemedView>
+            ) : null}
+          </View>
+        </SafeAreaView>
+      </View>
       <TraySheet
         visible={trayOpen}
         photos={tray}
@@ -583,6 +595,9 @@ function deleteQuietly(uri: string) {
     // Best effort: iOS clears the cache directory itself.
   }
 }
+
+/** The shutter's size; the guide keeps clear of the row it sits in. */
+const SHUTTER = 76;
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
@@ -634,9 +649,9 @@ const styles = StyleSheet.create({
   side: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   sideEnd: { justifyContent: 'flex-end' },
   shutter: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: SHUTTER,
+    height: SHUTTER,
+    borderRadius: SHUTTER / 2,
     borderWidth: 4,
     alignItems: 'center',
     justifyContent: 'center',

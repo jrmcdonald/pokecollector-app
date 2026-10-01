@@ -9,6 +9,29 @@ describe('guideRect', () => {
     expect(g.y + g.height / 2).toBeCloseTo(350);
     expect(g.width).toBeLessThanOrEqual(390 * 0.78);
   });
+
+  // A full-screen camera on a 393 × 852 phone, the shutter row's top at 669.
+  const screen = { width: 393, height: 852 };
+
+  it('is unchanged when its lowest edge leaves room', () => {
+    expect(guideRect(screen, 657)).toEqual(guideRect(screen));
+  });
+
+  it('shrinks to keep clear of the controls, still centred', () => {
+    // A 375 × 667 phone: centred at full size, it would reach the shutter.
+    const small = { width: 375, height: 667 };
+    const g = guideRect(small, 506);
+    expect(g.y + g.height).toBeCloseTo(506);
+    expect(g.y + g.height / 2).toBeCloseTo(667 / 2);
+    expect(g.width / g.height).toBeCloseTo(CARD_RATIO);
+    expect(g.height).toBeLessThan(guideRect(small).height);
+  });
+
+  it('never goes negative when the controls fill the view', () => {
+    const g = guideRect(screen, 100);
+    expect(g.width).toBe(0);
+    expect(g.height).toBe(0);
+  });
 });
 
 describe('cropForGuide', () => {

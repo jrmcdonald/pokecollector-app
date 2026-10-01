@@ -18,20 +18,22 @@ Freak or Creatures.
 ## What it needs
 
 - A PokeCollector server you run yourself, reachable over **https**.
-- Optionally, [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/)
-  in front of it with a service token for the app. The app sends the token's
-  headers on every request; a server without Access ignores them.
+- Whatever you have in front of it, if anything: nothing (a server on your
+  network, or behind a VPN such as Tailscale),
+  [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/)
+  with a service token for the app, or another reverse proxy that wants
+  headers of its own. The app sends them on every request.
 - An iPhone, AltStore (or similar) and a free Apple ID.
 
 Nothing about your server is built into the app or committed here. On first
 launch it asks for:
 
-| Field                              | Example                              | Notes                                                                                         |
-| ---------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Primary address                    | `https://pokecollector.home.example` | Tried first. Typically a LAN-only name, used at home                                          |
-| Fallback address                   | `https://pokecollector.example.com`  | Optional. Used whenever the primary does not answer, e.g. a public hostname behind Cloudflare |
-| Service token client ID and secret |                                      | From Cloudflare Zero Trust → Access → Service credentials                                     |
-| Username and password              |                                      | Your PokeCollector account                                                                    |
+| Field                  | Example                              | Notes                                                                                         |
+| ---------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Primary address        | `https://pokecollector.home.example` | Tried first. Typically a LAN-only name, used at home                                          |
+| Fallback address       | `https://pokecollector.example.com`  | Optional. Used whenever the primary does not answer, e.g. a public hostname behind Cloudflare |
+| In front of the server | None, Cloudflare or Headers          | A service token's client ID and secret, or up to five custom headers, sent to both addresses  |
+| Username and password  |                                      | Your PokeCollector account                                                                    |
 
 All of it stays in the phone's Keychain. With two addresses, the app checks
 which one answers (the primary gets three seconds) and re-checks when the

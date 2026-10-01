@@ -3,8 +3,7 @@ import type { FetchLike, ResponseLike, ServerCredentials } from '../client';
 export const CREDENTIALS: ServerCredentials = {
   primaryUrl: 'https://pc.example.com',
   fallbackUrl: null,
-  accessClientId: 'id.access',
-  accessClientSecret: 'secret',
+  proxy: { kind: 'cloudflare', clientId: 'id.access', clientSecret: 'secret' },
   username: 'ash',
   password: 'pikachu',
 };

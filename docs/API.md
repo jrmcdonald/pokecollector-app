@@ -12,13 +12,15 @@ Pinned upstream version: **1.51.0** (match `ha-addons/pokecollector/Dockerfile`)
 
 | Header                    | Value                   | Why                                                           |
 | ------------------------- | ----------------------- | ------------------------------------------------------------- |
-| `CF-Access-Client-Id`     | service token client ID | Gets through Cloudflare Access                                |
+| `CF-Access-Client-Id`     | service token client ID | Gets through Cloudflare Access, when that is what is in front |
 | `CF-Access-Client-Secret` | service token secret    | 〃                                                            |
+| up to five custom headers | as entered              | Gets through another proxy, when that is what is in front     |
 | `Authorization`           | `Bearer <JWT>`          | PokeCollector's session, except on login and `/api/auth/mode` |
 
-Requests are sent with `redirect: 'manual'` and `credentials: 'omit'` via `expo/fetch`. No cookies: Access sets `CF_Authorization` after a service-token request, and a stored cookie would keep the app in after the token is revoked. Both Access headers are omitted when no service token is configured. Access rejects a
-bad service token with a redirect or an HTML page, never JSON; the client
-treats any non-JSON response other than a 5xx or 429 as an `AccessError`.
+Requests are sent with `redirect: 'manual'` and `credentials: 'omit'` via `expo/fetch`. No cookies: Access sets `CF_Authorization` after a service-token request, and a stored cookie would keep the app in after the token is revoked. With nothing in front (`proxy.kind` `none`), no proxy headers are sent. A
+proxy rejects its own credentials with a redirect or an HTML page, never
+JSON; the client treats any non-JSON response other than a 5xx or 429 as a
+`ProxyError`, worded for the kind of proxy configured (`src/api/proxy.ts`).
 
 ## Which address
 

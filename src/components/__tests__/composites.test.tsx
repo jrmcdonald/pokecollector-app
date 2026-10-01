@@ -22,7 +22,7 @@ jest.mock('@/session/session', () => ({
       status: 'signedIn',
       cacheId: 'acct',
       accounts: [],
-      client: { activeBaseUrl: 'https://pc.example.com', accessHeaders: {}, sessionToken: 't' },
+      client: { activeBaseUrl: 'https://pc.example.com', proxyHeaders: {}, sessionToken: 't' },
     },
   }),
 }));

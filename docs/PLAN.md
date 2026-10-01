@@ -315,17 +315,14 @@ bundle IDs: each new one uses one of the 10 App IDs a week.
       tell the user to change it in the web UI first.
 - [x] Settings: view the server and user, re-test the connection, replace
       credentials, clear the cache, sign out (wipes the Keychain entries).
-- [ ] **Connection settings that are not tied to Cloudflare.** Onboarding,
-      Settings and the error messages assume the server sits behind a
-      Cloudflare Tunnel with Access: they ask for a service token's client ID
-      and secret, and explain a rejected request as Access turning it away.
-      Make the proxy part generic: no extra authentication (a server on the
-      LAN, or behind a VPN such as Tailscale), a Cloudflare Access service
-      token, or custom request headers for any other reverse proxy, each
-      stored in the Keychain like the rest. The client already leaves the
-      Access headers out when no token is set; the work is in the forms, the
-      stored format (with a migration, as for multiple accounts) and the
-      wording of `AccessError`.
+- [x] **Connection settings that are not tied to Cloudflare.** Onboarding
+      and Settings ask what is in front of the server: nothing (a server on
+      the LAN, or behind a VPN such as Tailscale), a Cloudflare Access
+      service token, or up to five custom headers for any other reverse
+      proxy. All of it stays in the Keychain; the stored format is v5, and
+      v4 and v3 migrate into it. `AccessError` is now `ProxyError`, worded
+      for the kind of proxy. See `DECISIONS.md`, "Any proxy, not only
+      Cloudflare".
 
 ### 6.2 API client (`src/api/client.ts`)
 
@@ -471,16 +468,15 @@ account's collection.
       for half a second; a card left in the guide is taken once. Needed
       `react-native-vision-camera` in place of `expo-camera`, so a CI
       rebuild. See `DECISIONS.md`, "Auto-capture and library photos".
-- [ ] **Review the Scan screen's bottom edge.** The camera stops at the top
-      of the tab bar, so the preview ends in a hard straight line above the
-      floating bar and the band behind it is plain background. Look at
-      running the preview full screen, behind the tab bar and the home
-      indicator, while the shutter, tray and hint stay above the bar. The
-      crop must follow: `guideRect` and `cropForGuide` are worked out from
-      the camera view's size, so a taller view moves the guide, and a guide
-      measured in a different view from the preview would crop the wrong
-      part of the photo. Check it at the largest text size too, where the
-      tab bar is taller. JavaScript only.
+- [x] **The Scan screen's bottom edge.** The camera and its guide now run
+      full screen, behind the tab bar and the home indicator, and only the
+      controls stay in the bottom safe area. The guide stays centred in the
+      whole view, so the crop and auto-capture's mapping onto the camera
+      frame are unchanged, and shrinks only where a centred guide would reach
+      the shutter row (`guideRect`'s `maxBottom`), as on a short phone. One
+      view and guide (`CameraFrame`) feed the overlay, the crop and the
+      detector, so they cannot disagree. To check on the phone, including at
+      the largest text size. JavaScript only.
 
 **Done when:** a sleeved or unsleeved card on a table gives the right card in
 the top 3 most of the time, and adding it takes 2 taps or fewer after the scan.

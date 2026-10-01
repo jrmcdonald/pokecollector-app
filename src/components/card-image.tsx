@@ -43,7 +43,7 @@ export function CardImage({ card, size, style, frame = 'plain', photoItemId }: P
   const { session } = useSession();
   const proxy =
     session.status === 'signedIn'
-      ? { baseUrl: session.client.activeBaseUrl, headers: session.client.accessHeaders }
+      ? { baseUrl: session.client.activeBaseUrl, headers: session.client.proxyHeaders }
       : { baseUrl: '', headers: {} };
   const source =
     cardImageSource(card, size, proxy) ??

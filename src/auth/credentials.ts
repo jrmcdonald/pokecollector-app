@@ -9,12 +9,20 @@
 import * as SecureStore from 'expo-secure-store';
 
 import type { ServerCredentials } from '@/api/client';
+import {
+  headerProblem,
+  MAX_PROXY_HEADERS,
+  NO_PROXY,
+  type ProxyAuth,
+  type ProxyHeader,
+} from '@/api/proxy';
 
 import { parseState, parseV3, type StoredState } from './accounts';
 
-/** Several accounts on one server. */
-const KEY = 'pokecollector.credentials.v4';
-/** One account: read once, to migrate, then deleted. */
+/** Several accounts on one server, behind any kind of proxy. */
+const KEY = 'pokecollector.credentials.v5';
+/** Earlier formats, read once to migrate, then deleted. v4 assumed Cloudflare. */
+const V4_KEY = 'pokecollector.credentials.v4';
 const V3_KEY = 'pokecollector.credentials.v3';
 
 const OPTIONS: SecureStore.SecureStoreOptions = {
@@ -32,11 +40,14 @@ const OPTIONS: SecureStore.SecureStoreOptions = {
 export async function loadState(): Promise<StoredState | null> {
   const current = parseState(await SecureStore.getItemAsync(KEY, OPTIONS));
   if (current) return current;
-  const migrated = parseV3(await SecureStore.getItemAsync(V3_KEY, OPTIONS));
+  const migrated =
+    parseState(await SecureStore.getItemAsync(V4_KEY, OPTIONS)) ??
+    parseV3(await SecureStore.getItemAsync(V3_KEY, OPTIONS));
   if (!migrated) return null;
   // Write the new format before deleting the old, so a crash in between
   // loses nothing.
   await saveState(migrated);
+  await SecureStore.deleteItemAsync(V4_KEY, OPTIONS);
   await SecureStore.deleteItemAsync(V3_KEY, OPTIONS);
   return migrated;
 }
@@ -47,6 +58,7 @@ export async function saveState(state: StoredState): Promise<void> {
 
 export async function clearCredentials(): Promise<void> {
   await SecureStore.deleteItemAsync(KEY, OPTIONS);
+  await SecureStore.deleteItemAsync(V4_KEY, OPTIONS);
   await SecureStore.deleteItemAsync(V3_KEY, OPTIONS);
 }
 
@@ -60,11 +72,48 @@ export function newCacheId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** What the connection form holds: every field as typed, the fallback possibly blank. */
-export type CredentialsInput = Omit<ServerCredentials, 'fallbackUrl'> & { fallbackUrl: string };
+/**
+ * What the connection form holds: every field as typed, the fallback possibly
+ * blank, and the fields for every kind of proxy, so switching kinds and back
+ * keeps what was typed. Only the chosen kind is saved.
+ */
+export interface CredentialsInput {
+  primaryUrl: string;
+  fallbackUrl: string;
+  proxyKind: ProxyAuth['kind'];
+  clientId: string;
+  clientSecret: string;
+  headers: ProxyHeader[];
+  username: string;
+  password: string;
+}
+
+export const EMPTY_INPUT: CredentialsInput = {
+  primaryUrl: '',
+  fallbackUrl: '',
+  proxyKind: 'none',
+  clientId: '',
+  clientSecret: '',
+  headers: [{ name: '', value: '' }],
+  username: '',
+  password: '',
+};
 
 export function toInput(credentials: ServerCredentials): CredentialsInput {
-  return { ...credentials, fallbackUrl: credentials.fallbackUrl ?? '' };
+  const { proxy } = credentials;
+  return {
+    primaryUrl: credentials.primaryUrl,
+    fallbackUrl: credentials.fallbackUrl ?? '',
+    proxyKind: proxy.kind,
+    clientId: proxy.kind === 'cloudflare' ? proxy.clientId : '',
+    clientSecret: proxy.kind === 'cloudflare' ? proxy.clientSecret : '',
+    headers:
+      proxy.kind === 'headers' && proxy.headers.length
+        ? proxy.headers.map((h) => ({ ...h }))
+        : EMPTY_INPUT.headers,
+    username: credentials.username,
+    password: credentials.password,
+  };
 }
 
 /**
@@ -79,17 +128,10 @@ export function normaliseCredentials(
   const fallback = input.fallbackUrl.trim() ? normaliseUrl(input.fallbackUrl, 'fallback') : null;
   if (fallback && !fallback.ok) return fallback;
 
-  const accessClientId = input.accessClientId.trim();
-  const accessClientSecret = input.accessClientSecret.trim();
+  const proxy = normaliseProxy(input);
+  if (!proxy.ok) return proxy;
+
   const username = input.username.trim();
-  // Optional, for a server without Cloudflare Access in front; but half a
-  // token is always a mistake.
-  if (!accessClientId !== !accessClientSecret) {
-    return {
-      ok: false,
-      error: 'Enter both parts of the Cloudflare service token, or neither.',
-    };
-  }
   if (!username || !input.password) {
     return { ok: false, error: 'A PokeCollector username and password are required.' };
   }
@@ -99,13 +141,50 @@ export function normaliseCredentials(
       primaryUrl: primary.url,
       // The same address twice is one address.
       fallbackUrl: fallback && fallback.url !== primary.url ? fallback.url : null,
-      accessClientId,
-      accessClientSecret,
+      proxy: proxy.value,
       username,
       // Passwords may legitimately start or end with a space.
       password: input.password,
     },
   };
+}
+
+function normaliseProxy(
+  input: CredentialsInput,
+): { ok: true; value: ProxyAuth } | { ok: false; error: string } {
+  switch (input.proxyKind) {
+    case 'none':
+      return { ok: true, value: NO_PROXY };
+    case 'cloudflare': {
+      const clientId = input.clientId.trim();
+      const clientSecret = input.clientSecret.trim();
+      if (!clientId || !clientSecret) {
+        return { ok: false, error: 'Enter both parts of the Cloudflare service token.' };
+      }
+      return { ok: true, value: { kind: 'cloudflare', clientId, clientSecret } };
+    }
+    case 'headers': {
+      // A row left completely blank is one not used, not a mistake.
+      const headers = input.headers
+        .map((h) => ({ name: h.name.trim(), value: h.value.trim() }))
+        .filter((h) => h.name || h.value);
+      if (!headers.length) {
+        return { ok: false, error: 'Add at least one header for the proxy, or choose None.' };
+      }
+      if (headers.length > MAX_PROXY_HEADERS) {
+        return { ok: false, error: `Up to ${MAX_PROXY_HEADERS} proxy headers can be sent.` };
+      }
+      const seen = new Set<string>();
+      for (const header of headers) {
+        const problem = headerProblem(header);
+        if (problem) return { ok: false, error: problem };
+        const key = header.name.toLowerCase();
+        if (seen.has(key)) return { ok: false, error: `${header.name} is there twice.` };
+        seen.add(key);
+      }
+      return { ok: true, value: { kind: 'headers', headers } };
+    }
+  }
 }
 
 function normaliseUrl(

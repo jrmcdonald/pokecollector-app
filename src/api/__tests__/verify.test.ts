@@ -27,13 +27,13 @@ const unreachableAt =
   };
 
 describe('verifyConnection', () => {
-  it('passes when Access and the account both work', async () => {
+  it('passes when the proxy and the account both work', async () => {
     expect(await verify(healthy)).toEqual({ ok: true, user: ME, token: 't', notes: [] });
   });
 
-  it('blames Access when the anonymous check is redirected', async () => {
+  it('blames the proxy when the anonymous check is redirected', async () => {
     const result = await verify(() => ({ status: 302 }));
-    expect(result).toMatchObject({ ok: false, route: 'primary', step: 'access' });
+    expect(result).toMatchObject({ ok: false, route: 'primary', step: 'proxy' });
   });
 
   it('blames the account when the password is wrong', async () => {
@@ -97,7 +97,7 @@ describe('verifyConnection', () => {
         (call) => (call.url.startsWith(PUBLIC) ? { status: 302 } : healthy(call)),
         both,
       );
-      expect(result).toMatchObject({ ok: false, route: 'fallback', step: 'access' });
+      expect(result).toMatchObject({ ok: false, route: 'fallback', step: 'proxy' });
     });
 
     it('fails when neither answers', async () => {

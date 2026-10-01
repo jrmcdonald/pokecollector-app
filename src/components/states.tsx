@@ -2,7 +2,7 @@
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { AccessError, ApiError, AuthError, NetworkError } from '@/api/errors';
+import { ProxyError, ApiError, AuthError, NetworkError } from '@/api/errors';
 import { CARD_ASPECT } from '@/components/card-image';
 import { radius, spacing, useColors } from '@/theme';
 
@@ -38,7 +38,7 @@ export function EmptyState({
  * anything else can be retried.
  */
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry(): void }) {
-  const needsSettings = error instanceof AccessError || error instanceof AuthError;
+  const needsSettings = error instanceof ProxyError || error instanceof AuthError;
   const title =
     error instanceof NetworkError
       ? 'Offline or unreachable'

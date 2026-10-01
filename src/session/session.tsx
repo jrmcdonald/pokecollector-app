@@ -43,7 +43,7 @@ import { ClientPool } from './client-pool';
 
 // expo/fetch rather than React Native's global fetch: the global one is built
 // on XMLHttpRequest and ignores `redirect: 'manual'`, which is how the client
-// tells an Access login redirect apart from a real response.
+// tells a proxy's login redirect apart from a real response.
 const nativeFetch: FetchLike = (url, init) => expoFetch(url, init);
 
 export function createClient(credentials: ServerCredentials, token?: string): PokeCollectorClient {

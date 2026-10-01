@@ -12,7 +12,7 @@ import { useActiveRoute, useSession } from '@/session/session';
 import { radius, spacing, useColors } from '@/theme';
 
 /**
- * The server's addresses and service token, and the current account's login:
+ * The server's addresses and proxy, and the current account's login:
  * set up once and rarely changed, so kept off the main Settings screen.
  */
 export default function Connection() {
@@ -66,7 +66,7 @@ export default function Connection() {
           ) : null}
           <ThemedText color="textSecondary">
             {accounts.length > 1
-              ? 'The addresses and service token apply to every account; the username and password are the current account’s. Changes are tested before they are saved.'
+              ? 'The addresses and what is in front of the server apply to every account; the username and password are the current account’s. Changes are tested before they are saved.'
               : 'Changes are tested before they are saved.'}
           </ThemedText>
           <ConnectionForm

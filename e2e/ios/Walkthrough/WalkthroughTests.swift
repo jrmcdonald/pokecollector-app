@@ -71,7 +71,10 @@ final class WalkthroughTests: XCTestCase {
     wait(for: field, "Search")
     capture("search")
     type("pika", into: field)
-    wait(for: button(startingWith: "Pikachu"), "Search results")
+    // The count, not a Pikachu: typed slowly, the search can go out for "pi"
+    // first, and those results have Pikachus too, among Pidgey and Caterpie.
+    // Only "pika" finds exactly the fake server's four.
+    wait(for: element(startingWith: "4 cards"), "Search results")
     capture("search-results")
 
     // No camera on the simulator, and the permission is never granted, so

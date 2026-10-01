@@ -9,6 +9,7 @@ import {
   ServerError,
   ValidationError,
 } from '../errors';
+import type { ProxyAuth } from '../proxy';
 import { UserSchema } from '../schemas';
 import { CREDENTIALS, fakeFetch, loginOk, type Call } from './fake-server';
 
@@ -182,11 +183,14 @@ describe('PokeCollectorClient', () => {
       [{ kind: 'cloudflare', clientId: 'i', clientSecret: 's' }, /Cloudflare Access/],
       [{ kind: 'headers', headers: [{ name: 'X-Api-Key', value: 'k' }] }, /Check its headers/],
       [{ kind: 'none' }, /If that proxy needs credentials/],
-    ] as const)('says who turned the request away for a %j proxy', async (proxy, wording) => {
-      const { fetch } = fakeFetch(() => ({ status: 302, headers: { location: '/login' } }));
-      const client = new PokeCollectorClient({ ...CREDENTIALS, proxy }, fetch);
-      await expect(client.requestAnonymous('/api/auth/mode')).rejects.toThrow(wording);
-    });
+    ] as [ProxyAuth, RegExp][])(
+      'says who turned the request away for a %j proxy',
+      async (proxy, wording) => {
+        const { fetch } = fakeFetch(() => ({ status: 302, headers: { location: '/login' } }));
+        const client = new PokeCollectorClient({ ...CREDENTIALS, proxy }, fetch);
+        await expect(client.requestAnonymous('/api/auth/mode')).rejects.toThrow(wording);
+      },
+    );
   });
 
   describe('Cloudflare Access', () => {

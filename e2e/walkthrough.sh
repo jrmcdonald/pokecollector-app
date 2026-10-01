@@ -65,8 +65,19 @@ status=$?
 if [ "$status" -ne 0 ] &&
   grep -qE 'Timed out (attempting to launch app|while requesting screenshot)' "$OUT/$name.log"; then
   echo "::warning::The simulator timed out; the walkthrough runs once more"
+  grep -E 'error:|Test Case .* failed' "$OUT/$name.log" || true
   mv "$OUT/$name.log" "$OUT/$name-attempt1.log"
+  # A retry is only worth it against a server that still answers. One that
+  # does not is the failure to report, not the simulator.
+  if ! curl -fsS --max-time 10 --cacert "$CA_CERT" "$SERVER_URL/api/auth/mode" > /dev/null; then
+    echo "::error::The fake server no longer answers; not retrying"
+    tail -n 40 "$OUT/server.log"
+    exit 1
+  fi
   prepare
+  # A simulator erased and booted twice has been slow to let the app out to
+  # the network; give it a moment before the walkthrough starts timing.
+  sleep 15
   server_lines_before=$(wc -l < "$OUT/server.log")
   walk
   status=$?
@@ -83,6 +94,10 @@ if [ "$status" -ne 0 ]; then
   echo "::endgroup::"
   echo "::group::Requests to the fake server in this run"
   tail -n "+$((server_lines_before + 1))" "$OUT/server.log" | tail -n 80
+  echo "::endgroup::"
+  echo "::group::Is the fake server still answering?"
+  curl -sS --max-time 10 --cacert "$CA_CERT" "$SERVER_URL/api/auth/mode" || true
+  echo
   echo "::endgroup::"
 fi
 exit $status

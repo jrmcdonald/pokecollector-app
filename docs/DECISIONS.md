@@ -547,6 +547,11 @@ walkthrough at the default text size (about 11) and at the largest (about 9).
   to the compiler, so the wrapper ran plain clang. The workflow now
   sets it in the environment, and the build step warns when ccache answers
   no calls.
+  The workflow also runs on pushes to `main`: caches belong to the branch
+  that saved them, and a pull request can restore only its own and `main`'s,
+  so without a run on `main` every new pull request started cold. Measured on
+  PR #10: 18.6 min to compile before the fix, 5.3 with an empty cache, 2.1
+  with a warm one (645 of 645 calls hit).
 - **Each walkthrough runner boots its simulator straight after checkout.** A runner's
   first boot does one-off work that once stalled the app when left to the
   walkthrough; setting up the runner now overlaps it. `walkthrough.sh` still

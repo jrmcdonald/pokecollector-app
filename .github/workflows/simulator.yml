@@ -18,10 +18,25 @@
 # pull request, or run this workflow by hand with "approve" ticked. The run
 # commits them to the branch. See e2e/README.md.
 #
+# It also runs on every push to main that touches the app. That run is the
+# one that matters for speed: GitHub caches belong to the branch that saved
+# them, and a pull request can restore only its own and main's. Without a
+# cache saved on main, every new pull request would compile from cold.
+#
 # Free on a public repository, like every standard runner.
 name: Simulator
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'e2e/**'
+      - 'app.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/simulator.yml'
   pull_request:
     types: [opened, synchronize, reopened, labeled]
     paths:

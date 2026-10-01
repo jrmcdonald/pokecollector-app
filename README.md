@@ -132,24 +132,20 @@ default text size and the largest one.
 The app isn't on the App Store. You build it in GitHub Actions and sideload
 it.
 
-1. **Fork this repository.** To use your own bundle ID prefix, set an Actions
-   variable `BUNDLE_ID_PREFIX` (such as `com.example`) on the fork. Otherwise
-   it uses this repository's.
-2. **Run the iOS build:** Actions → **iOS build** → Run workflow, with variant
+1. **Run the iOS build:** Actions → **iOS build** → Run workflow, with variant
    `production`. It takes a few minutes on a macOS runner, which is free for
    public repositories.
-3. **Download the `PokeCollector-production` artifact** from the run and
+2. **Download the `PokeCollector-production` artifact** from the run and
    unzip it to get the `.ipa`.
-4. **Install it with AltStore.** Set up AltServer and AltStore first (see
+3. **Install it with AltStore.** Set up AltServer and AltStore first (see
    [AltStore's guide](https://faq.altstore.io/)). On Windows, install iTunes
    and iCloud from Apple's website, not the Microsoft Store. Then, with the
    phone on the same network as AltServer, open the `.ipa` in AltStore.
-5. **Keep it refreshed.** Apps signed with a free Apple ID expire after 7
+4. **Keep it refreshed.** Apps signed with a free Apple ID expire after 7
    days. Leave AltServer running and AltStore renews them in the background.
 
 A free Apple ID can have three sideloaded apps at once, AltStore included, so
-there's room for the app and its development build. It can also register only
-10 new App IDs a week, so pick a bundle ID prefix once and keep it.
+there's room for the app and its development build.
 
 ## First launch
 
@@ -203,7 +199,7 @@ The app is [Expo](https://expo.dev) SDK 57 (React Native, TypeScript),
 using Expo Router, TanStack Query, zod and FlashList. All server access goes
 through `src/api`, typed from PokeCollector's OpenAPI spec in `openapi/`.
 
-**The dev loop.** Build the `development` variant (step 2 above) and install
+**The dev loop.** Build the `development` variant (step 1 above) and install
 **PokeCollector Dev** alongside the normal app. Then, on your computer:
 
 ```bash

@@ -541,6 +541,12 @@ walkthrough at the default text size (about 11) and at the largest (about 9).
   restored before the build and saved even when a later step fails, under a
   key per run, restoring the newest. Swift is not cached by ccache, so the
   Expo modules still compile each time.
+  Until 2026-09-30 it cached nothing (`--show-stats` read 0 calls), most
+  likely because React Native's wrapper runs `$CCACHE_BINARY clang` and the
+  pods set `CCACHE_BINARY` only as a build setting, which Xcode does not pass
+  to the compiler, so the wrapper ran plain clang. The workflow now
+  sets it in the environment, and the build step warns when ccache answers
+  no calls.
 - **Each walkthrough runner boots its simulator straight after checkout.** A runner's
   first boot does one-off work that once stalled the app when left to the
   walkthrough; setting up the runner now overlaps it. `walkthrough.sh` still

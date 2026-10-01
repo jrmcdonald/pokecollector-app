@@ -19,7 +19,7 @@ import {
   stepAuto,
   type AutoStatus,
 } from '@/utils/card-detect';
-import { guideRect, type Size } from '@/utils/crop';
+import type { CameraFrame } from '@/utils/crop';
 
 /** Checked about ten times a second; more would only cost battery. */
 const INTERVAL_MS = 90;
@@ -27,14 +27,15 @@ const INTERVAL_MS = 90;
 export function useAutoCapture({
   on,
   ready,
-  view,
+  frame: layout,
   onCapture,
 }: {
   /** The switch. */
   on: boolean;
   /** The camera is idle and a photo could be taken now. */
   ready: boolean;
-  view: Size | null;
+  /** The camera view and its guide, once laid out. */
+  frame: CameraFrame | null;
   onCapture(): void;
 }): { output: CameraFrameOutput; status: AutoStatus } {
   const enabled = on && ready;
@@ -69,7 +70,9 @@ export function useAutoCapture({
     if (step.fire) capture.current();
   }, []);
 
-  const guide = useMemo(() => (view ? guideRect(view) : null), [view]);
+  // The camera's frames below are a different thing: pixels, not layout.
+  const view = layout?.view;
+  const guide = layout?.guide;
   const onFrame = useMemo(
     () =>
       guide && view

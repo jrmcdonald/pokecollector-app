@@ -11,22 +11,22 @@
 import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
-import { cropForGuide, downscaleTo, guideRect, type Size } from './crop';
+import { cropForGuide, downscaleTo, type CameraFrame, type Size } from './crop';
 
 /**
  * @param uri A local photo, in any orientation: the manipulator applies its
  *   EXIF orientation as it loads it, so sizes below are as the photo is seen.
- * @param view The camera view the photo was taken in, or null for a photo
- *   from the library.
+ * @param frame The camera view the photo was taken in and its guide, or null
+ *   for a photo from the library.
  */
-export async function prepareScanPhoto(uri: string, view: Size | null): Promise<File> {
+export async function prepareScanPhoto(uri: string, frame: CameraFrame | null): Promise<File> {
   const source = await ImageManipulator.manipulate(uri).renderAsync();
   let image = source;
   try {
     let context = ImageManipulator.manipulate(source);
     let size: Size = { width: source.width, height: source.height };
-    if (view) {
-      const crop = cropForGuide(size, view, guideRect(view));
+    if (frame) {
+      const crop = cropForGuide(size, frame.view, frame.guide);
       context = context.crop({
         originX: crop.x,
         originY: crop.y,

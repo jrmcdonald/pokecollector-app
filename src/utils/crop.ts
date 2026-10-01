@@ -16,12 +16,27 @@ export interface Rect extends Size {
   y: number;
 }
 
+/** A camera view and the guide drawn on it: what a photo's crop is worked out from. */
+export interface CameraFrame {
+  view: Size;
+  guide: Rect;
+}
+
 /** A card's printed proportions, 63 × 88 mm. */
 export const CARD_RATIO = 63 / 88;
 
-/** The card-shaped guide, centred, as large as fits with room around it. */
-export function guideRect(view: Size): Rect {
-  const width = Math.min(view.width * 0.78, view.height * 0.62 * CARD_RATIO);
+/**
+ * The card-shaped guide, centred, as large as fits with room around it.
+ *
+ * `maxBottom` is the lowest the guide may reach, for a view that runs behind
+ * controls (the camera runs behind the shutter and the tab bar). The guide
+ * stays centred in the whole view and shrinks to keep clear: centred, it
+ * maps onto the photo and the camera frame the same way whichever way the
+ * sensor is turned (see `guideInFrame`).
+ */
+export function guideRect(view: Size, maxBottom = view.height): Rect {
+  const clear = Math.max(0, 2 * Math.min(maxBottom, view.height) - view.height);
+  const width = Math.min(view.width * 0.78, view.height * 0.62 * CARD_RATIO, clear * CARD_RATIO);
   const height = width / CARD_RATIO;
   return {
     x: (view.width - width) / 2,

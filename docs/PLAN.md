@@ -471,16 +471,15 @@ account's collection.
       for half a second; a card left in the guide is taken once. Needed
       `react-native-vision-camera` in place of `expo-camera`, so a CI
       rebuild. See `DECISIONS.md`, "Auto-capture and library photos".
-- [ ] **Review the Scan screen's bottom edge.** The camera stops at the top
-      of the tab bar, so the preview ends in a hard straight line above the
-      floating bar and the band behind it is plain background. Look at
-      running the preview full screen, behind the tab bar and the home
-      indicator, while the shutter, tray and hint stay above the bar. The
-      crop must follow: `guideRect` and `cropForGuide` are worked out from
-      the camera view's size, so a taller view moves the guide, and a guide
-      measured in a different view from the preview would crop the wrong
-      part of the photo. Check it at the largest text size too, where the
-      tab bar is taller. JavaScript only.
+- [x] **The Scan screen's bottom edge.** The camera and its guide now run
+      full screen, behind the tab bar and the home indicator, and only the
+      controls stay in the bottom safe area. The guide stays centred in the
+      whole view, so the crop and auto-capture's mapping onto the camera
+      frame are unchanged, and shrinks only where a centred guide would reach
+      the shutter row (`guideRect`'s `maxBottom`), as on a short phone. One
+      view and guide (`CameraFrame`) feed the overlay, the crop and the
+      detector, so they cannot disagree. To check on the phone, including at
+      the largest text size. JavaScript only.
 
 **Done when:** a sleeved or unsleeved card on a table gives the right card in
 the top 3 most of the time, and adding it takes 2 taps or fewer after the scan.

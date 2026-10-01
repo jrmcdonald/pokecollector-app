@@ -11,7 +11,7 @@ import { ApiError } from '@/api/errors';
 import { MISSING_KEY, ScanCancelled, ScanTimedOut, waitForScan } from '@/api/scan';
 import { candidatesOf, type Recognized, type ScanItem, type ScanMatch } from '@/api/schemas';
 import { useSession } from '@/session/session';
-import type { Size } from '@/utils/crop';
+import type { CameraFrame } from '@/utils/crop';
 import { prepareScanPhoto } from '@/utils/scan-photo';
 
 export type ScanState =
@@ -103,16 +103,16 @@ export function useScanFlow() {
   );
 
   /**
-   * Scans one photo: from the camera, with the view it was taken in so it is
-   * cropped to the guide, or from the library, with no view.
+   * Scans one photo: from the camera, with the view and guide it was taken
+   * with so it is cropped to the guide, or from the library, with neither.
    */
   const capture = useCallback(
-    async (uri: string, view: Size | null) => {
+    async (uri: string, frame: CameraFrame | null) => {
       const run = runRef.current;
       setState({ step: 'uploading' });
       let jobId: number;
       try {
-        const file = await prepareScanPhoto(uri, view);
+        const file = await prepareScanPhoto(uri, frame);
         try {
           jobId = (await createScanJob(getClient(), [file])).id;
         } finally {

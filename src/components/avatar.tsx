@@ -30,7 +30,7 @@ export function Avatar({
   const [failed, setFailed] = useState<number | null>(null);
   const proxy =
     session.status === 'signedIn'
-      ? { baseUrl: session.client.activeBaseUrl, headers: session.client.accessHeaders }
+      ? { baseUrl: session.client.activeBaseUrl, headers: session.client.proxyHeaders }
       : { baseUrl: '', headers: {} };
   const source = failed === avatarId ? null : avatarImageSource(avatarId, proxy);
   const circle = { width: size, height: size, borderRadius: size / 2 };

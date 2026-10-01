@@ -3,17 +3,17 @@
  * changes made to it. Pure functions, so every rule here is unit-tested;
  * `credentials.ts` does the Keychain reads and writes.
  *
- * The server (addresses and service token) is shared. Each account has its
+ * The server (addresses and whatever its proxy wants) is shared. Each account has its
  * own login and an opaque id that doubles as the root of its query keys, so
  * each account's cached data stays apart and switching back shows it at once.
  */
 import type { ServerCredentials } from '@/api/client';
+import { parseProxy, proxyFromToken, type ProxyAuth } from '@/api/proxy';
 
 export interface ServerConfig {
   primaryUrl: string;
   fallbackUrl: string | null;
-  accessClientId: string;
-  accessClientSecret: string;
+  proxy: ProxyAuth;
 }
 
 export interface Account {
@@ -31,8 +31,8 @@ export interface StoredState {
 }
 
 export function serverOf(credentials: ServerCredentials): ServerConfig {
-  const { primaryUrl, fallbackUrl, accessClientId, accessClientSecret } = credentials;
-  return { primaryUrl, fallbackUrl, accessClientId, accessClientSecret };
+  const { primaryUrl, fallbackUrl, proxy } = credentials;
+  return { primaryUrl, fallbackUrl, proxy };
 }
 
 export function credentialsFor(server: ServerConfig, account: Account): ServerCredentials {
@@ -52,7 +52,7 @@ export function activeAccount(state: StoredState): Account {
  *
  * - A different server (primary address) starts again with this one account:
  *   the other accounts belonged to the old server.
- * - The same server updates the addresses and token, and the active account's
+ * - The same server updates the addresses and proxy, and the active account's
  *   login. A different username there switches to that account if it is
  *   already saved, and otherwise replaces the active account with a new one.
  */
@@ -137,15 +137,21 @@ function isString(v: unknown): v is string {
   return typeof v === 'string';
 }
 
-function isServer(v: unknown): v is ServerConfig {
-  if (!v || typeof v !== 'object') return false;
+/**
+ * A stored server: v5 keeps a `proxy`; v4 and v3 kept a Cloudflare service
+ * token as two strings, both blank for a server without Access.
+ */
+function parseServer(v: unknown): ServerConfig | null {
+  if (!v || typeof v !== 'object') return null;
   const s = v as Record<string, unknown>;
-  return (
-    isString(s.primaryUrl) &&
-    (s.fallbackUrl === null || isString(s.fallbackUrl)) &&
-    isString(s.accessClientId) &&
-    isString(s.accessClientSecret)
-  );
+  if (!isString(s.primaryUrl) || !(s.fallbackUrl === null || isString(s.fallbackUrl))) return null;
+  const proxy =
+    'proxy' in s
+      ? parseProxy(s.proxy)
+      : isString(s.accessClientId) && isString(s.accessClientSecret)
+        ? proxyFromToken(s.accessClientId, s.accessClientSecret)
+        : null;
+  return proxy ? { primaryUrl: s.primaryUrl, fallbackUrl: s.fallbackUrl, proxy } : null;
 }
 
 function isAccount(v: unknown): v is Account {
@@ -154,20 +160,24 @@ function isAccount(v: unknown): v is Account {
   return isString(a.id) && isString(a.username) && isString(a.password);
 }
 
-/** Reads the stored JSON, or null if it is missing or unusable. */
+/**
+ * Reads the stored JSON, or null if it is missing or unusable. Reads the v4
+ * format too, whose server kept a service token rather than a proxy.
+ */
 export function parseState(raw: string | null): StoredState | null {
   if (!raw) return null;
   try {
     const value = JSON.parse(raw) as Record<string, unknown>;
     const accounts = value.accounts;
+    const server = parseServer(value.server);
     if (
-      isServer(value.server) &&
+      server &&
       Array.isArray(accounts) &&
       accounts.length > 0 &&
       accounts.every(isAccount) &&
       isString(value.activeId)
     ) {
-      const state = { server: value.server, accounts, activeId: value.activeId };
+      const state = { server, accounts, activeId: value.activeId };
       return { ...state, activeId: activeAccount(state).id };
     }
   } catch {
@@ -185,21 +195,11 @@ export function parseV3(raw: string | null): StoredState | null {
   try {
     const value = JSON.parse(raw) as { credentials?: Record<string, unknown>; cacheId?: unknown };
     const c = value.credentials;
-    if (
-      c &&
-      isString(value.cacheId) &&
-      isServer(c) &&
-      isString(c.username) &&
-      isString(c.password)
-    ) {
+    const server = parseServer(c);
+    if (c && server && isString(value.cacheId) && isString(c.username) && isString(c.password)) {
       const account = { id: value.cacheId, username: c.username, password: c.password };
       return {
-        server: {
-          primaryUrl: c.primaryUrl,
-          fallbackUrl: c.fallbackUrl,
-          accessClientId: c.accessClientId,
-          accessClientSecret: c.accessClientSecret,
-        },
+        server,
         accounts: [account],
         activeId: account.id,
       };

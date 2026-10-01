@@ -59,7 +59,7 @@ jest.mock('@/session/session', () => ({
       cacheId: 'acct',
       accounts: [],
       credentials: { username: 'ash' },
-      client: { activeBaseUrl: 'https://pc.example.com', accessHeaders: {}, sessionToken: 't' },
+      client: { activeBaseUrl: 'https://pc.example.com', proxyHeaders: {}, sessionToken: 't' },
     },
     getClient: () => ({ request: mockRequest }),
   }),

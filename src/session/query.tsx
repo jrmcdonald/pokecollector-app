@@ -12,7 +12,7 @@ import { QueryClient, onlineManager } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import type { ReactNode } from 'react';
 
-import { AccessError, AuthError, RateLimitError } from '@/api/errors';
+import { ProxyError, AuthError, RateLimitError } from '@/api/errors';
 
 onlineManager.setEventListener((setOnline) =>
   NetInfo.addEventListener((state) => setOnline(state.isConnected !== false)),
@@ -28,7 +28,7 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       retry: (failureCount, error) => {
         // Retrying these cannot help: they need the user, or time.
-        if (error instanceof AccessError || error instanceof AuthError) return false;
+        if (error instanceof ProxyError || error instanceof AuthError) return false;
         if (error instanceof RateLimitError) return failureCount < 1;
         return failureCount < 2;
       },

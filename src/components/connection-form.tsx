@@ -1,31 +1,46 @@
 /**
- * The server, service token and account, with a connection test that must
- * pass before anything is saved. Used by onboarding and by Settings.
+ * The server, whatever its proxy wants, and the account, with a connection
+ * test that must pass before anything is saved. Used by onboarding and by
+ * Settings.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import type { ServerCredentials } from '@/api/client';
+import { MAX_PROXY_HEADERS, proxyName, type ProxyAuth } from '@/api/proxy';
 import type { User } from '@/api/schemas';
 import { verifyConnection } from '@/api/verify';
-import { normaliseCredentials, toInput, type CredentialsInput } from '@/auth/credentials';
+import {
+  EMPTY_INPUT,
+  normaliseCredentials,
+  toInput,
+  type CredentialsInput,
+} from '@/auth/credentials';
 import { createClient } from '@/session/session';
 import { spacing } from '@/theme';
 
 import { Button } from './button';
 import { SecretField } from './secret-field';
+import { Segmented } from './segmented';
 import { TextField } from './text-field';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-const EMPTY: CredentialsInput = {
-  primaryUrl: '',
-  fallbackUrl: '',
-  accessClientId: '',
-  accessClientSecret: '',
-  username: '',
-  password: '',
+const PROXY_KINDS = [
+  { value: 'none', label: 'None' },
+  { value: 'cloudflare', label: 'Cloudflare' },
+  { value: 'headers', label: 'Headers' },
+] as const;
+
+const PROXY_HINTS: Record<ProxyAuth['kind'], string> = {
+  none: 'Nothing in front of the server asks for credentials: it is on your network, behind a VPN such as Tailscale, or behind a proxy that lets the app through.',
+  cloudflare:
+    'Cloudflare Access with a service token, from Zero Trust → Access → Service credentials. Sent to both addresses.',
+  headers:
+    'A reverse proxy that wants headers of its own, such as an API key. Sent to both addresses, on every request.',
 };
+
+type TextKey = 'primaryUrl' | 'fallbackUrl' | 'clientId' | 'clientSecret' | 'username' | 'password';
 
 type Props = {
   initial?: ServerCredentials;
@@ -34,12 +49,41 @@ type Props = {
 };
 
 export function ConnectionForm({ initial, submitTitle, onVerified }: Props) {
-  const [values, setValues] = useState<CredentialsInput>(initial ? toInput(initial) : EMPTY);
+  const [values, setValues] = useState<CredentialsInput>(() =>
+    initial ? toInput(initial) : EMPTY_INPUT,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
+  // Header rows keep their own keys, so removing one does not hand its
+  // neighbour's saved value to the wrong row.
+  const nextKey = useRef(values.headers.length);
+  const [rowKeys, setRowKeys] = useState(() => values.headers.map((_, i) => String(i)));
 
-  const set = (key: keyof CredentialsInput) => (text: string) =>
+  const set = (key: TextKey) => (text: string) =>
     setValues((current) => ({ ...current, [key]: text }));
+
+  function setHeader(index: number, field: 'name' | 'value', text: string) {
+    setValues((current) => ({
+      ...current,
+      headers: current.headers.map((h, i) => (i === index ? { ...h, [field]: text } : h)),
+    }));
+  }
+
+  function addHeader() {
+    setValues((current) => ({
+      ...current,
+      headers: [...current.headers, { name: '', value: '' }],
+    }));
+    setRowKeys((keys) => [...keys, String(nextKey.current++)]);
+  }
+
+  function removeHeader(index: number) {
+    setValues((current) => ({
+      ...current,
+      headers: current.headers.filter((_, i) => i !== index),
+    }));
+    setRowKeys((keys) => keys.filter((_, i) => i !== index));
+  }
 
   async function submit() {
     setError(null);
@@ -55,8 +99,8 @@ export function ConnectionForm({ initial, submitTitle, onVerified }: Props) {
         const where = result.route ? ` (${result.route} address)` : '';
         setError({
           title:
-            result.step === 'access'
-              ? `Could not get through Cloudflare${where}`
+            result.step === 'proxy'
+              ? `Could not get through ${proxyName(normalised.value.proxy)}${where}`
               : result.step === 'account'
                 ? `Could not sign in${where}`
                 : 'Could not reach the server',
@@ -91,26 +135,74 @@ export function ConnectionForm({ initial, submitTitle, onVerified }: Props) {
       />
       <TextField
         label="Fallback address (optional)"
-        hint="Used whenever the primary does not answer, such as the public Cloudflare hostname."
+        hint="Used whenever the primary does not answer, such as a public hostname."
         placeholder="https://pokecollector.example.com"
         keyboardType="url"
         textContentType="URL"
         value={values.fallbackUrl}
         onChangeText={set('fallbackUrl')}
       />
-      <TextField
-        label="Service token client ID"
-        textContentType="none"
-        autoComplete="off"
-        hint="From Cloudflare Zero Trust → Access → Service credentials. Leave both blank if the server has no Access in front. Sent to both addresses; a proxy without Access ignores it."
-        value={values.accessClientId}
-        onChangeText={set('accessClientId')}
-      />
-      <SecretField
-        label="Service token client secret"
-        value={values.accessClientSecret}
-        onChangeText={set('accessClientSecret')}
-      />
+
+      <View style={styles.group}>
+        <ThemedText variant="label">In front of the server</ThemedText>
+        <Segmented<ProxyAuth['kind']>
+          label="In front of the server"
+          options={PROXY_KINDS}
+          value={values.proxyKind}
+          onChange={(proxyKind) => setValues((current) => ({ ...current, proxyKind }))}
+        />
+        <ThemedText variant="caption" color="textSecondary">
+          {PROXY_HINTS[values.proxyKind]}
+        </ThemedText>
+      </View>
+      {values.proxyKind === 'cloudflare' ? (
+        <>
+          <TextField
+            label="Service token client ID"
+            textContentType="none"
+            autoComplete="off"
+            value={values.clientId}
+            onChangeText={set('clientId')}
+          />
+          <SecretField
+            label="Service token client secret"
+            value={values.clientSecret}
+            onChangeText={set('clientSecret')}
+          />
+        </>
+      ) : null}
+      {values.proxyKind === 'headers' ? (
+        <>
+          {values.headers.map((header, index) => (
+            <View key={rowKeys[index] ?? index} style={styles.group}>
+              <TextField
+                label={`Header ${index + 1} name`}
+                placeholder="X-Api-Key"
+                textContentType="none"
+                autoComplete="off"
+                value={header.name}
+                onChangeText={(text) => setHeader(index, 'name', text)}
+              />
+              <SecretField
+                label={`Header ${index + 1} value`}
+                value={header.value}
+                onChangeText={(text) => setHeader(index, 'value', text)}
+              />
+              {values.headers.length > 1 ? (
+                <Button
+                  title={`Remove header ${index + 1}`}
+                  variant="secondary"
+                  onPress={() => removeHeader(index)}
+                />
+              ) : null}
+            </View>
+          ))}
+          {values.headers.length < MAX_PROXY_HEADERS ? (
+            <Button title="Add a header" variant="secondary" onPress={addHeader} />
+          ) : null}
+        </>
+      ) : null}
+
       <TextField
         label="PokeCollector username"
         textContentType="username"
@@ -141,5 +233,6 @@ export function ConnectionForm({ initial, submitTitle, onVerified }: Props) {
 
 const styles = StyleSheet.create({
   form: { gap: spacing.md },
+  group: { gap: spacing.sm },
   error: { padding: spacing.md, borderRadius: 12, gap: spacing.xs },
 });

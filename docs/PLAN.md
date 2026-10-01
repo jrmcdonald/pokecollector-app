@@ -315,17 +315,14 @@ bundle IDs: each new one uses one of the 10 App IDs a week.
       tell the user to change it in the web UI first.
 - [x] Settings: view the server and user, re-test the connection, replace
       credentials, clear the cache, sign out (wipes the Keychain entries).
-- [ ] **Connection settings that are not tied to Cloudflare.** Onboarding,
-      Settings and the error messages assume the server sits behind a
-      Cloudflare Tunnel with Access: they ask for a service token's client ID
-      and secret, and explain a rejected request as Access turning it away.
-      Make the proxy part generic: no extra authentication (a server on the
-      LAN, or behind a VPN such as Tailscale), a Cloudflare Access service
-      token, or custom request headers for any other reverse proxy, each
-      stored in the Keychain like the rest. The client already leaves the
-      Access headers out when no token is set; the work is in the forms, the
-      stored format (with a migration, as for multiple accounts) and the
-      wording of `AccessError`.
+- [x] **Connection settings that are not tied to Cloudflare.** Onboarding
+      and Settings ask what is in front of the server: nothing (a server on
+      the LAN, or behind a VPN such as Tailscale), a Cloudflare Access
+      service token, or up to five custom headers for any other reverse
+      proxy. All of it stays in the Keychain; the stored format is v5, and
+      v4 and v3 migrate into it. `AccessError` is now `ProxyError`, worded
+      for the kind of proxy. See `DECISIONS.md`, "Any proxy, not only
+      Cloudflare".
 
 ### 6.2 API client (`src/api/client.ts`)
 

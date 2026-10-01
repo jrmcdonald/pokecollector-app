@@ -604,3 +604,32 @@ they cost one iOS build and one AltStore reinstall.
   sends the chosen photos straight off as a batch, since there is no tray to
   collect them in. That button is on the simulator's Scan screenshot, which
   needs approving again.
+
+## 2026-10-01 — Any proxy, not only Cloudflare
+
+`PLAN.md` §6.1. The app assumed Cloudflare Access in front of the server.
+
+- **Three kinds, chosen, not inferred.** A segmented control under the
+  addresses: None, Cloudflare (a service token's client ID and secret) or
+  Headers (up to five name and value pairs). Before, a blank token meant
+  none; a choice is clearer, and lets the form say what each kind is for.
+  The form keeps what was typed for every kind, so switching and back loses
+  nothing, but only the chosen kind is saved.
+- **One proxy per server, sent to both addresses.** As before: the addresses
+  are two paths to one server, and a proxy that wants nothing ignores
+  headers it was not expecting. A server with a different proxy per address
+  would need a proxy per route; not done until someone has one.
+- **Custom headers are checked, not trusted.** A valid field name, a value
+  on one line, no duplicates, and none the app sets itself or fetch forbids
+  (`Authorization`, `Accept`, `Content-Type`, `Cookie`, `Host` and so on).
+  Values are shown as masked secrets, like the service token's.
+- **Stored format v5.** The server keeps a `proxy` instead of two token
+  strings. v4 and v3 items are read once, turned into v5 (a token becomes
+  `cloudflare`, a blank one `none`), written, and then deleted, so a crash
+  part way loses nothing.
+- **`ProxyError`, worded for the proxy.** Renamed from `AccessError`; still
+  any non-JSON answer other than a 5xx or 429. Its message names Cloudflare
+  Access, "the proxy … check its headers", or, with nothing configured, a
+  login page in front that may need credentials adding. The connection test
+  heads its failure "Could not get through Cloudflare Access" or "… the
+  proxy". The onboarding and Settings screenshots change and need approving.

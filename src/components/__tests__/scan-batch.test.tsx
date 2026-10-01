@@ -27,7 +27,7 @@ jest.mock('@/session/session', () => ({
       cacheId: 'acct',
       accounts: [],
       credentials: { username: 'ash' },
-      client: { activeBaseUrl: 'https://pc.example.com', accessHeaders: {}, sessionToken: 't' },
+      client: { activeBaseUrl: 'https://pc.example.com', proxyHeaders: {}, sessionToken: 't' },
     },
     // Requests fail at once: these tests are about the controls, and a request
     // left pending would keep Jest from exiting.

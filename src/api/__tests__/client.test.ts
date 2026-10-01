@@ -1,6 +1,6 @@
 import { buildUrl, PokeCollectorClient, PRIMARY_PROBE_TIMEOUT_MS } from '../client';
 import {
-  AccessError,
+  ProxyError,
   AuthError,
   NetworkError,
   NotFoundError,
@@ -48,15 +48,12 @@ describe('PokeCollectorClient', () => {
     expect(calls.every((c) => c.credentials === 'omit')).toBe(true);
   });
 
-  it('sends no Access headers when no service token is configured', async () => {
+  it('sends no proxy headers for a server with nothing in front', async () => {
     const { fetch, calls } = fakeFetch(() => ({ status: 200, body: { multi_user: true } }));
-    const client = new PokeCollectorClient(
-      { ...CREDENTIALS, accessClientId: '', accessClientSecret: '' },
-      fetch,
-    );
+    const client = new PokeCollectorClient({ ...CREDENTIALS, proxy: { kind: 'none' } }, fetch);
     await client.requestAnonymous('/api/auth/mode');
     expect(Object.keys(calls[0]?.headers ?? {})).not.toContain('CF-Access-Client-Id');
-    expect(client.accessHeaders).toEqual({});
+    expect(client.proxyHeaders).toEqual({});
   });
 
   it('uses a token it is given instead of logging in', async () => {
@@ -165,6 +162,33 @@ describe('PokeCollectorClient', () => {
     await expect(client.request('/api/auth/me')).rejects.toThrow(/may have been deactivated/);
   });
 
+  describe('other proxies', () => {
+    it('sends custom proxy headers to every request, and no Access headers', async () => {
+      const { fetch, calls } = fakeFetch(() => ({ status: 200, body: { multi_user: true } }));
+      const client = new PokeCollectorClient(
+        {
+          ...CREDENTIALS,
+          proxy: { kind: 'headers', headers: [{ name: 'X-Api-Key', value: 'k1' }] },
+        },
+        fetch,
+      );
+      await client.requestAnonymous('/api/auth/mode');
+      expect(calls[0]?.headers['X-Api-Key']).toBe('k1');
+      expect(Object.keys(calls[0]?.headers ?? {})).not.toContain('CF-Access-Client-Id');
+      expect(client.proxyHeaders).toEqual({ 'X-Api-Key': 'k1' });
+    });
+
+    it.each([
+      [{ kind: 'cloudflare', clientId: 'i', clientSecret: 's' }, /Cloudflare Access/],
+      [{ kind: 'headers', headers: [{ name: 'X-Api-Key', value: 'k' }] }, /Check its headers/],
+      [{ kind: 'none' }, /If that proxy needs credentials/],
+    ] as const)('says who turned the request away for a %j proxy', async (proxy, wording) => {
+      const { fetch } = fakeFetch(() => ({ status: 302, headers: { location: '/login' } }));
+      const client = new PokeCollectorClient({ ...CREDENTIALS, proxy }, fetch);
+      await expect(client.requestAnonymous('/api/auth/mode')).rejects.toThrow(wording);
+    });
+  });
+
   describe('Cloudflare Access', () => {
     it('treats a redirect as an Access rejection', async () => {
       const { fetch } = fakeFetch(() => ({
@@ -172,7 +196,7 @@ describe('PokeCollectorClient', () => {
         headers: { location: 'https://team.cloudflareaccess.com/cdn-cgi/access/login' },
       }));
       const client = new PokeCollectorClient(CREDENTIALS, fetch);
-      await expect(client.requestAnonymous('/api/auth/mode')).rejects.toBeInstanceOf(AccessError);
+      await expect(client.requestAnonymous('/api/auth/mode')).rejects.toBeInstanceOf(ProxyError);
     });
 
     it('treats an HTML 200 (a followed redirect) as an Access rejection', async () => {
@@ -183,7 +207,7 @@ describe('PokeCollectorClient', () => {
         redirected: true,
       }));
       const client = new PokeCollectorClient(CREDENTIALS, fetch);
-      await expect(client.requestAnonymous('/api/auth/mode')).rejects.toBeInstanceOf(AccessError);
+      await expect(client.requestAnonymous('/api/auth/mode')).rejects.toBeInstanceOf(ProxyError);
     });
 
     it('treats an HTML 403 as an Access rejection, not a PokeCollector one', async () => {
@@ -193,7 +217,7 @@ describe('PokeCollectorClient', () => {
         contentType: 'text/html',
       }));
       const client = new PokeCollectorClient(CREDENTIALS, fetch);
-      await expect(client.requestAnonymous('/api/auth/mode')).rejects.toBeInstanceOf(AccessError);
+      await expect(client.requestAnonymous('/api/auth/mode')).rejects.toBeInstanceOf(ProxyError);
     });
 
     it('reports a Cloudflare error page as a server problem', async () => {
@@ -374,7 +398,7 @@ describe('primary and fallback addresses', () => {
       throw new TypeError('Network request failed');
     });
     const client = new PokeCollectorClient(BOTH, fetch);
-    await expect(client.request('/api/auth/me')).rejects.toBeInstanceOf(AccessError);
+    await expect(client.request('/api/auth/me')).rejects.toBeInstanceOf(ProxyError);
   });
 
   it('reports both unreachable as a NetworkError', async () => {

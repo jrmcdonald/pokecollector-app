@@ -1,8 +1,10 @@
 /**
  * The one place the app talks to PokeCollector.
  *
- * Two credentials ride on every request. The Cloudflare service token gets it
- * through Access; the PokeCollector JWT says whose collection it is. Upstream
+ * Two credentials ride on every request. Whatever the proxy in front of the
+ * server wants (`proxy.ts`: nothing, a Cloudflare Access service token, or
+ * headers of its own) gets it through; the PokeCollector JWT says whose
+ * collection it is. Upstream
  * has no API tokens, so the JWT comes from POST /api/auth/login with the
  * username and password kept in the Keychain, and lasts seven days.
  *
@@ -13,13 +15,13 @@
  *
  * A server can have two addresses: a primary, tried first (typically the one
  * that only works on the home network), and a fallback (typically the public
- * one behind Cloudflare). Both reach the same backend, so one JWT serves both.
+ * public one, behind a proxy). Both reach the same backend, so one JWT serves both.
  * See `resolveBaseUrl` for how the client picks between them.
  */
 import type { z } from 'zod';
 
 import {
-  AccessError,
+  ProxyError,
   ApiError,
   AuthError,
   ConflictError,
@@ -30,6 +32,7 @@ import {
   ServerError,
   ValidationError,
 } from './errors';
+import { proxyHeaders, proxyRejection, type ProxyAuth } from './proxy';
 import { AuthModeSchema, TokenResponseSchema } from './schemas';
 
 export interface ServerCredentials {
@@ -37,8 +40,8 @@ export interface ServerCredentials {
   primaryUrl: string;
   /** Origin only, or null. Used when the primary does not answer. */
   fallbackUrl: string | null;
-  accessClientId: string;
-  accessClientSecret: string;
+  /** What the proxy in front of the server wants, sent to both addresses. */
+  proxy: ProxyAuth;
   username: string;
   password: string;
 }
@@ -153,18 +156,14 @@ export class PokeCollectorClient {
   }
 
   /**
-   * The Access headers alone, for image requests that go through the proxy.
-   * Empty when no service token is configured, for a server without Access.
+   * The proxy's headers alone, for image requests that go through it. Empty
+   * for a server with nothing in front that wants any.
    */
-  get accessHeaders(): Record<string, string> {
-    if (!this.credentials.accessClientId && !this.credentials.accessClientSecret) return {};
-    return {
-      'CF-Access-Client-Id': this.credentials.accessClientId,
-      'CF-Access-Client-Secret': this.credentials.accessClientSecret,
-    };
+  get proxyHeaders(): Record<string, string> {
+    return proxyHeaders(this.credentials.proxy);
   }
 
-  /** A request that needs no PokeCollector login, only Access. */
+  /** A request that needs no PokeCollector login, only the proxy's. */
   async requestAnonymous<T>(path: string, options: RequestOptions<T> = {}): Promise<T> {
     return this.onRoute(options, (base) => this.send(base, path, options, null));
   }
@@ -352,8 +351,8 @@ export class PokeCollectorClient {
   ): Promise<T> {
     const method = options.method ?? 'GET';
     const headers: Record<string, string> = {
-      // Sent to both routes. A LAN reverse proxy without Access ignores them.
-      ...this.accessHeaders,
+      // Sent to both routes; a proxy that does not want them ignores them.
+      ...this.proxyHeaders,
       Accept: 'application/json',
     };
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -378,7 +377,8 @@ export class PokeCollectorClient {
         method,
         headers,
         body,
-        // Access answers a bad service token with a redirect to its login page.
+        // A proxy refusing a request (Access with a bad service token, say)
+        // tends to redirect to its own login page.
         // Followed, that is a 200 of HTML; not followed, it is unmistakable.
         redirect: 'manual',
         // No cookies. Access sets CF_Authorization after a service-token
@@ -397,7 +397,13 @@ export class PokeCollectorClient {
       clearTimeout(timeout);
     }
 
-    return interpret(response, text, options.schema, `${method} ${path}`);
+    return interpret(
+      response,
+      text,
+      options.schema,
+      `${method} ${path}`,
+      proxyRejection(this.credentials.proxy),
+    );
   }
 }
 
@@ -406,13 +412,15 @@ function interpret<T>(
   text: string,
   schema: z.ZodType<T> | undefined,
   what: string,
+  /** What to say when the proxy, not PokeCollector, answered. */
+  rejection: string,
 ): T {
   const { status } = response;
   const contentType = response.headers.get('content-type') ?? '';
   const isJson = contentType.includes('application/json');
 
   // These mean the same thing whoever sent them, so they come before the
-  // question of whether Cloudflare or PokeCollector answered.
+  // question of whether the proxy or PokeCollector answered.
   if (status === 429) {
     const retryAfter = Number(response.headers.get('retry-after'));
     throw new RateLimitError(
@@ -422,8 +430,8 @@ function interpret<T>(
     );
   }
   if (status >= 500 && !isJson) {
-    // Cloudflare's own pages: 502/504/524 for a slow or failing origin, 530
-    // when the tunnel is down.
+    // A proxy's own pages, such as Cloudflare's 502/504/524 for a slow or
+    // failing origin and 530 when the tunnel is down.
     throw new ServerError(
       `${what} failed with HTTP ${status} before reaching PokeCollector. ` +
         'The server or its tunnel may be down.',
@@ -431,14 +439,11 @@ function interpret<T>(
     );
   }
 
-  // Anything else that is not JSON came from Cloudflare Access: a redirect to
-  // its login, or its HTML block page. Upstream answers every /api route,
-  // errors included, with JSON.
+  // Anything else that is not JSON came from the proxy: a redirect to its
+  // login, or an HTML block page. Upstream answers every /api route, errors
+  // included, with JSON.
   if (response.redirected || (status >= 300 && status < 400) || (!isJson && status !== 204)) {
-    throw new AccessError(
-      'Cloudflare Access turned the request away. The service token is wrong, revoked or expired.',
-      status,
-    );
+    throw new ProxyError(rejection, status);
   }
 
   const body: unknown = text ? safeParse(text) : undefined;

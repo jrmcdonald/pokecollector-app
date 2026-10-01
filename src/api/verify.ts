@@ -2,8 +2,8 @@
  * The connection test onboarding and Settings run before saving anything.
  *
  * Each configured address is tested on its own, in two steps so a failure
- * says which half is wrong: Access (the service token) or PokeCollector (the
- * account). An address that does not answer at all is allowed, as long as the
+ * says which half is wrong: the proxy in front (its token or headers) or
+ * PokeCollector (the account). An address that does not answer at all is allowed, as long as the
  * other one passes: set up away from home, the home address is unreachable
  * by design, and it is still the right thing to save.
  */
@@ -15,7 +15,7 @@ import type { User } from './schemas';
 /** Long enough for a slow tunnel, short enough that an unreachable address doesn't stall setup. */
 const VERIFY_TIMEOUT_MS = 8_000;
 
-type Step = 'unreachable' | 'access' | 'account';
+type Step = 'unreachable' | 'proxy' | 'account';
 
 type AddressResult =
   { ok: true; user: User; token: string | null } | { ok: false; step: Step; message: string };
@@ -87,7 +87,7 @@ async function verifyAddress(client: PokeCollectorClient): Promise<AddressResult
   } catch (error) {
     return {
       ok: false,
-      step: error instanceof NetworkError ? 'unreachable' : 'access',
+      step: error instanceof NetworkError ? 'unreachable' : 'proxy',
       message: describe(error),
     };
   }

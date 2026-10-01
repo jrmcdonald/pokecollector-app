@@ -40,7 +40,7 @@ export function ScanPhoto({
     : remote && item.has_image && session.status === 'signedIn'
       ? scanPhotoSource(jobId, item.id, {
           baseUrl: session.client.activeBaseUrl,
-          headers: session.client.accessHeaders,
+          headers: session.client.proxyHeaders,
           token: session.client.sessionToken,
           scope: session.cacheId,
         })

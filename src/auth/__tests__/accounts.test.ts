@@ -15,8 +15,7 @@ import {
 const creds: ServerCredentials = {
   primaryUrl: 'https://home.example.com',
   fallbackUrl: 'https://pc.example.com',
-  accessClientId: 'id.access',
-  accessClientSecret: 'secret',
+  proxy: { kind: 'cloudflare', clientId: 'id.access', clientSecret: 'secret' },
   username: 'ash',
   password: 'pikachu',
 };
@@ -132,17 +131,41 @@ describe('parsing', () => {
   });
 
   it('migrates the single-account format, keeping its cache id', () => {
-    const v3 = JSON.stringify({ credentials: creds, cacheId: 'old-cache' });
+    // v3 kept the service token as two strings.
+    const { proxy: _proxy, ...rest } = creds;
+    const old = { ...rest, accessClientId: 'id.access', accessClientSecret: 'secret' };
+    const v3 = JSON.stringify({ credentials: old, cacheId: 'old-cache' });
     expect(parseV3(v3)).toEqual({
-      server: {
-        primaryUrl: creds.primaryUrl,
-        fallbackUrl: creds.fallbackUrl,
-        accessClientId: creds.accessClientId,
-        accessClientSecret: creds.accessClientSecret,
-      },
+      server: { primaryUrl: creds.primaryUrl, fallbackUrl: creds.fallbackUrl, proxy: creds.proxy },
       accounts: [{ id: 'old-cache', username: 'ash', password: 'pikachu' }],
       activeId: 'old-cache',
     });
-    expect(parseV3(JSON.stringify({ credentials: creds }))).toBeNull();
+    expect(parseV3(JSON.stringify({ credentials: old }))).toBeNull();
+  });
+
+  it('migrates the v4 format, whose server kept a Cloudflare service token', () => {
+    const v4 = (accessClientId: string, accessClientSecret: string) =>
+      JSON.stringify({
+        ...twoAccounts(),
+        server: {
+          primaryUrl: creds.primaryUrl,
+          fallbackUrl: creds.fallbackUrl,
+          accessClientId,
+          accessClientSecret,
+        },
+      });
+    expect(parseState(v4('id.access', 'secret'))?.server.proxy).toEqual(creds.proxy);
+    // Both blank was how v4 said there was no Access in front.
+    expect(parseState(v4('', ''))?.server.proxy).toEqual({ kind: 'none' });
+  });
+
+  it('reads each kind of proxy, and rejects one it does not know', () => {
+    const withProxy = (proxy: unknown) =>
+      parseState(JSON.stringify({ ...twoAccounts(), server: { ...twoAccounts().server, proxy } }));
+    const headers = { kind: 'headers', headers: [{ name: 'X-Api-Key', value: 'k' }] };
+    expect(withProxy({ kind: 'none' })?.server.proxy).toEqual({ kind: 'none' });
+    expect(withProxy(headers)?.server.proxy).toEqual(headers);
+    expect(withProxy({ kind: 'vpn' })).toBeNull();
+    expect(withProxy({ kind: 'headers', headers: [{ name: 'X' }] })).toBeNull();
   });
 });

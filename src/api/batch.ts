@@ -8,7 +8,7 @@
  * apart, and waits out a 429 rather than firing thirty at once.
  */
 import {
-  AccessError,
+  ProxyError,
   ApiError,
   AuthError,
   ConflictError,
@@ -190,7 +190,7 @@ export interface QueueOptions {
 function stopsQueue(error: unknown): boolean {
   return (
     error instanceof NetworkError ||
-    error instanceof AccessError ||
+    error instanceof ProxyError ||
     error instanceof AuthError ||
     error instanceof ScanCancelled
   );

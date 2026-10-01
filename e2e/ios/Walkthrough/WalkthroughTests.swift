@@ -220,6 +220,9 @@ final class WalkthroughTests: XCTestCase {
 
   /// A screenshot for comparison, then the audit of the same screen.
   private func capture(_ name: String) {
+    // On a slow runner the offer to save the password can come later than
+    // signIn waits for it, over whatever screen is next.
+    dismissSystemSheets()
     let shot = settledScreenshot()
     do {
       try shot.pngRepresentation.write(to: outputDir.appendingPathComponent("\(name).png"))

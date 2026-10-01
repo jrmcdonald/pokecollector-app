@@ -46,6 +46,10 @@ again, commits that run's default-size screenshots to `screenshots/` on the
 branch, and removes the label. On a branch without a pull request, run the
 workflow by hand with **approve** ticked.
 
+Only a run where both walkthroughs passed approves. If one fails, nothing is
+committed and the label stays on, so re-running the run approves once it
+passes.
+
 A push made by the workflow does not start other workflows, so the approving
 commit has no checks of its own. The next push to the branch runs them, and
 its Simulator run is the first to compare against the new screenshots. Push

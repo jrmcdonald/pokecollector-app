@@ -322,7 +322,8 @@ jobs:
   walkthrough:
     needs: [build, simulator]
     # Also when a walkthrough failed, to report it; not when the run was
-    # cancelled (a newer push replaces it), so a partial run never approves.
+    # cancelled (a newer push replaces it). A failed walkthrough is reported
+    # but never approved; see "Approve these screenshots".
     if: ${{ !cancelled() && needs.build.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -378,8 +379,11 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      # Only from a run where both walkthroughs finished: a walkthrough that
+      # stopped early leaves a partial set, and approving it would delete the
+      # rest. The label stays on until a run passes and approves.
       - name: Approve these screenshots
-        if: always() && env.APPROVE == 'true'
+        if: always() && env.APPROVE == 'true' && needs.simulator.result == 'success'
         env:
           BRANCH: ${{ github.head_ref || github.ref_name }}
           PR: ${{ github.event.pull_request.number }}

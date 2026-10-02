@@ -3,19 +3,17 @@ import { Stack, router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
-import type { SymbolViewProps } from 'expo-symbols';
-
 import type { CollectionItem } from '@/api/schemas';
 import { CardImage, frameForVariant } from '@/components/card-image';
 import { CardTile } from '@/components/card-tile';
-import { Icon } from '@/components/icon';
+import { FilterButton } from '@/components/filter-button';
 import { SearchField } from '@/components/search-field';
 import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useCollection } from '@/hooks/queries';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
-import { minTapTarget, radius, spacing, useColors } from '@/theme';
+import { spacing, useColors } from '@/theme';
 import {
   NO_FILTER,
   SORT_LABELS,
@@ -179,52 +177,6 @@ export default function Collection() {
   );
 }
 
-/**
- * A button that opens a list of choices: the down chevron says so, unlike a
- * chip that switches something directly (HIG Pull-down buttons).
- */
-function FilterButton({
-  name,
-  label,
-  active,
-  icon,
-  onPress,
-}: {
-  /** What it filters or sorts by, for VoiceOver. */
-  name: string;
-  /** What is chosen now, shown on the button. */
-  label: string;
-  active: boolean;
-  icon?: SymbolViewProps['name'];
-  onPress(): void;
-}) {
-  const colors = useColors();
-  const tint = active ? 'onAccent' : 'text';
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${name}: ${active || icon ? label : 'all'}`}
-      accessibilityHint="Opens a list of choices"
-      onPress={onPress}
-      style={[
-        styles.filter,
-        {
-          backgroundColor: active ? colors.accent : colors.surface,
-          borderColor: active ? colors.accent : colors.outline,
-        },
-      ]}>
-      {icon ? <Icon name={icon} size={13} color={tint} /> : null}
-      <ThemedText
-        variant="label"
-        numberOfLines={1}
-        style={[styles.filterLabel, { color: colors[tint] }]}>
-        {label}
-      </ThemedText>
-      <Icon name="chevron.down" size={11} color={tint} />
-    </Pressable>
-  );
-}
-
 function CollectionRow({ item }: { item: CollectionItem }) {
   const card = item.card ?? { id: item.card_id, name: item.card_id };
   const value = cardValue(item.card, item.variant);
@@ -268,17 +220,6 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   controls: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: spacing.sm },
   buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  filter: {
-    minHeight: minTapTarget - 8,
-    maxWidth: '48%',
-    paddingHorizontal: spacing.sm + 4,
-    borderRadius: radius.sm + 2,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs + 2,
-  },
-  filterLabel: { flexShrink: 1 },
   list: { padding: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.sm },
   rowImage: { width: 48 },

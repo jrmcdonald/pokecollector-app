@@ -94,6 +94,22 @@ describe('fake PokeCollector', () => {
     expect(card.name).toBe('Pikachu');
   });
 
+  it('filters a search the way upstream does, each filter a substring', () => {
+    const names = (query: string) =>
+      SearchResponseSchema.parse(
+        json(get(`/api/cards/search?${query}&page=1&page_size=30`)),
+      ).data.map((c) => `${c.name} (${c.rarity})`);
+    // "Ultra Rare" finds only Pikachu ex; "Rare" finds every rare, which
+    // the app then narrows to plain Rares (here, none).
+    expect(names('q=pika&rarity=Ultra%20Rare')).toEqual(['Pikachu ex (Ultra Rare)']);
+    expect(names('q=pika&rarity=Rare')).toEqual(['Pikachu ex (Ultra Rare)']);
+    // No text: a filter alone is a search.
+    expect(names('set_id=sv5')).toEqual(['Koraidon ex (Double Rare)', 'Pikachu ex (Ultra Rare)']);
+    // Without accents, as upstream compares them.
+    expect(names('set_id=sv5&category=Pokemon')).toHaveLength(2);
+    expect(names('set_id=sv5&category=Trainer')).toEqual([]);
+  });
+
   it('has a batch of scans read to the end, with one photo of each kind', () => {
     const { jobs } = ScanJobListSchema.parse(json(get('/api/cards/recognize/jobs')));
     expect(jobs).toHaveLength(1);

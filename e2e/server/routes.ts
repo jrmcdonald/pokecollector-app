@@ -86,7 +86,15 @@ export function createRouter(origin: string) {
     if (path === '/api/cards/search') {
       const page = Number(url.searchParams.get('page') ?? '1') || 1;
       const pageSize = Number(url.searchParams.get('page_size') ?? '30') || 30;
-      return ok(fixtures.search(url.searchParams.get('q') ?? '', page, pageSize));
+      const param = (name: string) => url.searchParams.get(name) ?? undefined;
+      return ok(
+        fixtures.search(url.searchParams.get('q') ?? '', page, pageSize, {
+          setId: param('set_id'),
+          rarity: param('rarity'),
+          category: param('category'),
+          type: param('type'),
+        }),
+      );
     }
 
     const scanJob = path.match(/^\/api\/cards\/recognize\/jobs\/(\d+)$/);

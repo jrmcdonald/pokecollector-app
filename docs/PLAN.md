@@ -369,9 +369,11 @@ a revoked service token.
       collection", "Add to wishlist" and "Add to binder". Price history can wait.
 - [x] **Search (catalogue):** debounced (≥ 400 ms, given the rate limit),
       `page`/`page_size` infinite scroll, an owned badge computed against the
-      cached collection rather than an extra request per tile.
+      cached collection rather than an extra request per tile. Filters for set,
+      rarity, category and type, sent upstream; a filter alone is a search.
 - [x] **Sets:** list with a completion bar; the checklist shows owned vs
-      missing (missing greyed out) with a "missing only" toggle.
+      missing (missing greyed out) with a "missing only" toggle, and a search
+      by name or number and a rarity filter, both on the phone.
 - [x] **Binders:** list, then the binder's cards as a grid with owned/missing
       state. Add a card from its detail screen; remove from the binder view.
 - [x] **Wishlist:** list with prices and swipe to remove.

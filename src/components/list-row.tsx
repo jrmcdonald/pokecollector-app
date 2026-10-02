@@ -21,6 +21,8 @@ type Props = {
    * in red, as iOS does for Sign Out and similar rows.
    */
   kind?: 'navigate' | 'action' | 'destructive';
+  /** For a row that is one of a set of choices: whether it is the chosen one. */
+  selected?: boolean;
   accessibilityLabel?: string;
 };
 
@@ -33,6 +35,7 @@ export function ListRow({
   footer,
   onPress,
   kind = 'navigate',
+  selected,
   accessibilityLabel,
 }: Props) {
   const colors = useColors();
@@ -40,6 +43,7 @@ export function ListRow({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? [title, subtitle].filter(Boolean).join(', ')}
+      accessibilityState={selected === undefined ? undefined : { selected }}
       onPress={onPress}
       disabled={!onPress}
       style={({ pressed }) => [

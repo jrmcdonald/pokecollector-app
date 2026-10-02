@@ -158,6 +158,8 @@ const setRef = (id: string) => {
 
 const cardId = (c: CardInfo) => `${c.set}-${c.number}_en`;
 
+export type SearchFilters = { setId?: string; rarity?: string; category?: string; type?: string };
+
 /** Everything that depends on where the server is: the image URLs. */
 export function buildFixtures(origin: string) {
   const image = (id: string, size: 'small' | 'large') =>
@@ -449,9 +451,25 @@ export function buildFixtures(origin: string) {
     { id: 2, name: 'Staff', usage_count: 0 },
   ];
 
-  const search = (query: string, page: number, pageSize: number) => {
-    const q = query.trim().toLowerCase();
-    const hits = q ? cards.filter((c) => c.name.toLowerCase().includes(q)) : [];
+  // Upstream's filters are each a substring, without regard to case or
+  // accents: "Rare" finds "Double Rare" too, as it does there.
+  const fold = (text: string | null | undefined) =>
+    (text ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  const search = (query: string, page: number, pageSize: number, filters: SearchFilters = {}) => {
+    const q = fold(query.trim());
+    const has = (value: string | null | undefined, wanted: string | undefined) =>
+      !wanted || fold(value).includes(fold(wanted));
+    const hits = cards.filter(
+      (c) =>
+        fold(c.name).includes(q) &&
+        (!filters.setId || c.set_id === filters.setId || c.set_ref?.id === filters.setId) &&
+        has(c.rarity, filters.rarity) &&
+        has(c.supertype, filters.category) &&
+        has(JSON.stringify(c.types ?? []), filters.type),
+    );
     return {
       data: hits.slice((page - 1) * pageSize, page * pageSize).map(withOwnership),
       total_count: hits.length,

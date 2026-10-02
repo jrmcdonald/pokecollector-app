@@ -1,6 +1,13 @@
-import type { CardSet } from '@/api/schemas';
+import type { CardSet, ChecklistCard } from '@/api/schemas';
 
-import { completion, filterSets, isOwned } from '../sets';
+import {
+  checklistRarities,
+  completion,
+  filterChecklist,
+  filterSets,
+  isOwned,
+  matchesCard,
+} from '../sets';
 
 const sets: CardSet[] = [
   {
@@ -49,5 +56,75 @@ describe('isOwned', () => {
     expect(isOwned({ id: 'a', name: 'A', owned: false, owned_quantity: 2 })).toBe(true);
     expect(isOwned({ id: 'a', name: 'A', owned: true })).toBe(true);
     expect(isOwned({ id: 'a', name: 'A' })).toBe(false);
+  });
+});
+
+describe('matchesCard', () => {
+  const card = { name: 'Flabébé', number: '025' };
+
+  it('finds a name anywhere in it, without regard to case or accents', () => {
+    expect(matchesCard(card, 'flabe')).toBe(true);
+    expect(matchesCard(card, 'BÉBÉ')).toBe(true);
+    expect(matchesCard(card, 'pikachu')).toBe(false);
+  });
+
+  it('finds a number exactly, with or without its zeros or the set total', () => {
+    expect(matchesCard(card, '25')).toBe(true);
+    expect(matchesCard(card, '025')).toBe(true);
+    expect(matchesCard(card, '25/165')).toBe(true);
+    expect(matchesCard(card, '2')).toBe(false);
+    expect(matchesCard({ name: 'Pikachu', number: 'TG05' }, 'tg05')).toBe(true);
+  });
+
+  it('matches everything with no search', () => {
+    expect(matchesCard(card, '  ')).toBe(true);
+  });
+});
+
+describe('filterChecklist', () => {
+  const cards: ChecklistCard[] = [
+    { id: '1', name: 'Bulbasaur', number: '001', rarity: 'Common', owned_quantity: 1 },
+    { id: '2', name: 'Ivysaur', number: '002', rarity: 'Uncommon' },
+    { id: '3', name: 'Venusaur ex', number: '003', rarity: 'Double rare', owned: true },
+    { id: '4', name: 'Venusaur ex', number: '198', rarity: 'Special illustration rare' },
+  ];
+  const ids = (list: ChecklistCard[]) => list.map((c) => c.id);
+
+  it('combines the search with what to show', () => {
+    expect(ids(filterChecklist(cards, { show: 'all', query: 'saur', rarity: null }))).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+    ]);
+    expect(ids(filterChecklist(cards, { show: 'missing', query: 'venu', rarity: null }))).toEqual([
+      '4',
+    ]);
+    expect(ids(filterChecklist(cards, { show: 'owned', query: '', rarity: null }))).toEqual([
+      '1',
+      '3',
+    ]);
+  });
+
+  it('keeps one rarity exactly', () => {
+    expect(ids(filterChecklist(cards, { show: 'all', query: '', rarity: 'Double rare' }))).toEqual([
+      '3',
+    ]);
+  });
+});
+
+describe('checklistRarities', () => {
+  it('counts each rarity, in the order they first appear', () => {
+    expect(
+      checklistRarities([
+        { id: '1', name: 'A', rarity: 'Common' },
+        { id: '2', name: 'B', rarity: 'Uncommon' },
+        { id: '3', name: 'C', rarity: 'Common' },
+        { id: '4', name: 'D' },
+      ]),
+    ).toEqual([
+      { value: 'Common', count: 2 },
+      { value: 'Uncommon', count: 1 },
+    ]);
   });
 });

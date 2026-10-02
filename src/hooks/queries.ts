@@ -63,9 +63,21 @@ import type {
 import { useSession } from '@/session/session';
 import { forgetBatchPhotos, keepBatchPhotos, pruneBatchPhotos } from '@/utils/batch-photos';
 import type { DeckLine } from '@/utils/decklist';
+import {
+  NO_SEARCH_FILTER,
+  hasFilter,
+  searchQuery,
+  type SearchFilter,
+} from '@/utils/search-filters';
 import { showToast } from '@/utils/toast';
 
 const SEARCH_PAGE_SIZE = 30;
+/**
+ * With a rarity, the phone drops upstream's near misses ("Ultra Rare" for
+ * "Rare"), so a page shows fewer than it fetched. Bigger pages fill the
+ * screen in one request more often.
+ */
+const RARITY_PAGE_SIZE = 60;
 
 export function useKeys() {
   const { session, getClient } = useSession();
@@ -79,7 +91,7 @@ export function useKeys() {
       dashboard: [cacheId, 'dashboard'] as const,
       collection: [cacheId, 'collection'] as const,
       card: (id: string) => [cacheId, 'card', id] as const,
-      search: (q: string) => [cacheId, 'search', q] as const,
+      search: (q: string, filters: object = {}) => [cacheId, 'search', q, filters] as const,
       searchAll: [cacheId, 'search'] as const,
       wishlist: [cacheId, 'wishlist'] as const,
       sets: [cacheId, 'sets'] as const,
@@ -116,6 +128,19 @@ export function useCollection() {
   });
 }
 
+/**
+ * The collection only if it is already cached, never fetched for this: for
+ * extras, like the rarities the catalogue search offers beyond its own list.
+ */
+export function useCachedCollection() {
+  const { getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.collection,
+    queryFn: () => getCollection(getClient()),
+    enabled: false,
+  }).data;
+}
+
 export function useCard(id: string) {
   const { enabled, getClient, keys } = useKeys();
   return useQuery({
@@ -127,18 +152,23 @@ export function useCard(id: string) {
   });
 }
 
-/** Catalogue search, a page at a time. `q` should already be debounced. */
-export function useCardSearch(q: string) {
+/**
+ * Catalogue search, a page at a time. `q` should already be debounced; a
+ * filter on its own is enough to search, with no text.
+ */
+export function useCardSearch(q: string, filter: SearchFilter = NO_SEARCH_FILTER) {
   const { enabled, getClient, keys } = useKeys();
   const term = q.trim();
+  const filters = searchQuery(filter);
+  const pageSize = filter.rarity ? RARITY_PAGE_SIZE : SEARCH_PAGE_SIZE;
   return useInfiniteQuery({
-    queryKey: keys.search(term),
+    queryKey: keys.search(term, filters),
     queryFn: ({ pageParam }) =>
-      searchCards(getClient(), { q: term, page: pageParam, pageSize: SEARCH_PAGE_SIZE }),
+      searchCards(getClient(), { q: term, page: pageParam, pageSize, filters }),
     initialPageParam: 1,
     getNextPageParam: (last) =>
       last.page * last.page_size < last.total_count ? last.page + 1 : undefined,
-    enabled: enabled && term.length >= 2,
+    enabled: enabled && (term.length >= 2 || hasFilter(filter)),
     // Owned counts in results change as the collection does; keep them fresh
     // for a short while only, but do not refetch on every keystroke-return.
     staleTime: 60 * 1000,

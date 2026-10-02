@@ -96,6 +96,13 @@ final class WalkthroughTests: XCTestCase {
     wait(for: results, "Search results")
     capture("search-results")
 
+    // A filter on top of the text. Common is the first rarity offered, so it
+    // is on screen at every text size. Upstream's match also finds Uncommon;
+    // the app keeps the two Common Pikachus only.
+    go(app.buttons["Rarity: all"], to: app.buttons["Common"], "Rarity choices")
+    go(app.buttons["Common"], to: element(startingWith: "2 cards"), "Search by rarity")
+    capture("search-filtered")
+
     // No camera on the simulator, and the permission is never granted, so
     // this is the explanation shown before asking.
     go(app.tabBars.buttons["Scan"], to: element(startingWith: "Camera access"), "Scan")
@@ -131,6 +138,15 @@ final class WalkthroughTests: XCTestCase {
     capture("sets")
     go(button(startingWith: "151, "), to: button(startingWith: "Bulbasaur"), "Set checklist")
     capture("set")
+    // Searching inside the set, on the phone: "char" leaves Charmander,
+    // Charmeleon and Charizard ex.
+    type("char", into: app.textFields["Search this set"])
+    wait(for: button(startingWith: "Charizard ex"), "Set search")
+    if !button(startingWith: "Bulbasaur").waitForNonExistence(timeout: 5) {
+      diagnose("The set search left Bulbasaur in")
+      XCTFail("The set search left Bulbasaur in")
+    }
+    capture("set-search")
     back(to: button(startingWith: "151, "), "Sets, again")
     back(to: button(startingWith: "Decks"), "More, again")
 

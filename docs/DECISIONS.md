@@ -699,3 +699,35 @@ server after an erase. What changed, and why:
   appear without a fade and times read the same everywhere.
 - **The compiler cache is saved from main only.** The repository's caches
   share 10 GB, and a save from every pull request push evicted main's.
+
+## 2026-10-02 — Search filters and searching a set
+
+- **The catalogue search's filters are upstream's: set, rarity, category and
+  type.** Each changes the request, so each is one request, sent at once
+  rather than debounced, since a filter is a deliberate tap. A filter alone
+  searches, with no text. Artist, HP, rule text, subtype and dex number are
+  left out: deck-builder filters that would crowd the screen. So is sort:
+  upstream has no newest, sorts numbers as text ("10" before "2"), and on its
+  Postgres a descending price puts every unpriced card first.
+- **Rarity is matched exactly on the phone.** Upstream's filters are
+  substrings, so "Rare" also finds "Ultra Rare" and "Common" finds
+  "Uncommon". The rarity still goes upstream to narrow the search, and the
+  phone drops the near misses. Where there can be some, pages are 60 cards
+  rather than 30, up to three are fetched on their own to fill the screen,
+  the count is what has loaded ("12+ cards"), and "Look further" asks for
+  more. Exact matching upstream would be better; it would be a change there.
+- **The filter values are TCGdex's English ones** (`Pokemon`, `Fire`,
+  `Double rare`), matching an English catalogue. Rarities are a fixed list
+  plus any other the cached collection has; the collection is never fetched
+  for this.
+- **Sets are chosen from a sheet with its own search,** not an action sheet:
+  there are a couple of hundred. It reuses the Sets screen's cached list.
+- **Scan's "search instead" clears the filters,** so they cannot hide the
+  card it is looking for.
+- **A set's search is on the phone,** over the checklist it already has: no
+  requests and no debounce. It matches the name anywhere, ignoring case and
+  accents, or the number exactly, with or without leading zeros or a
+  "/165". It combines with All, Missing and Owned, and with a rarity filter
+  built from the set's own cards, with counts.
+- **`FilterButton` moved to `src/components`,** shared by Collection, Search
+  and a set's checklist.

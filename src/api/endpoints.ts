@@ -71,15 +71,17 @@ export interface SearchParams {
   q: string;
   page: number;
   pageSize?: number;
+  /** Upstream's own filters, each a substring match; see `utils/search-filters`. */
+  filters?: { set_id?: string; rarity?: string; category?: string; type?: string };
 }
 
 export function searchCards(
   client: PokeCollectorClient,
-  { q, page, pageSize = 30 }: SearchParams,
+  { q, page, pageSize = 30, filters }: SearchParams,
 ): Promise<SearchResponse> {
   return client.request('/api/cards/search', {
     schema: SearchResponseSchema,
-    query: { q, page, page_size: pageSize },
+    query: { q, page, page_size: pageSize, ...filters },
   });
 }
 

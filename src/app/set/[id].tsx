@@ -4,7 +4,9 @@ import { useMemo, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import { CardTile } from '@/components/card-tile';
+import { FilterButton } from '@/components/filter-button';
 import { ProgressBar } from '@/components/progress-bar';
+import { SearchField } from '@/components/search-field';
 import { Segmented } from '@/components/segmented';
 import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
@@ -12,26 +14,45 @@ import { ThemedView } from '@/components/themed-view';
 import { useSetChecklist } from '@/hooks/queries';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { spacing, useColors } from '@/theme';
+import { pick } from '@/utils/pick';
 import { formatPrice } from '@/utils/pricing';
-import { completion, isOwned } from '@/utils/sets';
+import { rarityLabel } from '@/utils/search-filters';
+import {
+  checklistRarities,
+  completion,
+  filterChecklist,
+  isOwned,
+  type ChecklistShow,
+} from '@/utils/sets';
 
-type Show = 'all' | 'missing' | 'owned';
-
-/** A set's checklist: every card in number order, missing ones marked. */
+/**
+ * A set's checklist: every card in number order, missing ones marked. The
+ * search and filters work over the one response, so they cost no requests.
+ */
 export default function SetChecklist() {
   const { id = '', name } = useLocalSearchParams<{ id: string; name?: string }>();
   const colors = useColors();
   const checklist = useSetChecklist(id);
   const pull = usePullToRefresh(() => checklist.refetch());
-  const [show, setShow] = useState<Show>('all');
+  const [show, setShow] = useState<ChecklistShow>('all');
+  const [query, setQuery] = useState('');
+  const [rarity, setRarity] = useState<string | null>(null);
   const data = checklist.data;
   const shown = useMemo(
-    () =>
-      (data?.cards ?? []).filter((card) =>
-        show === 'all' ? true : show === 'owned' ? isOwned(card) : !isOwned(card),
-      ),
-    [data, show],
+    () => filterChecklist(data?.cards ?? [], { show, query, rarity }),
+    [data, show, query, rarity],
   );
+  const rarities = useMemo(() => checklistRarities(data?.cards ?? []), [data]);
+  const searching = !!query.trim() || !!rarity;
+
+  async function chooseRarity() {
+    const index = await pick('Rarity', [
+      'All',
+      ...rarities.map((r) => `${rarityLabel(r.value)} (${r.count})`),
+    ]);
+    if (index === null) return;
+    setRarity(index === 0 ? null : (rarities[index - 1]?.value ?? null));
+  }
 
   return (
     <ThemedView style={styles.fill}>
@@ -43,6 +64,8 @@ export default function SetChecklist() {
           keyExtractor={(card) => card.id}
           contentContainerStyle={styles.list}
           contentInsetAdjustmentBehavior="automatic"
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={pull.refreshing}
@@ -72,7 +95,23 @@ export default function SetChecklist() {
                 height={8}
                 decorative
               />
-              <Segmented<Show>
+              <SearchField
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Name or number"
+                accessibilityLabel="Search this set"
+              />
+              {rarities.length > 1 ? (
+                <View style={styles.buttons}>
+                  <FilterButton
+                    name="Rarity"
+                    label={rarity ? rarityLabel(rarity) : 'Rarity'}
+                    active={!!rarity}
+                    onPress={chooseRarity}
+                  />
+                </View>
+              ) : null}
+              <Segmented<ChecklistShow>
                 label="Show"
                 options={[
                   { value: 'all', label: 'All' },
@@ -95,14 +134,33 @@ export default function SetChecklist() {
             />
           )}
           ListEmptyComponent={
-            <EmptyState
-              title={show === 'missing' ? 'Set complete' : 'Nothing owned yet'}
-              message={
-                show === 'missing'
-                  ? 'You own every card in this set.'
-                  : 'Cards you own from this set show up here.'
-              }
-            />
+            searching ? (
+              <EmptyState
+                title="No matches"
+                message={
+                  show === 'all'
+                    ? 'No card in this set matches.'
+                    : `No ${show} card in this set matches.`
+                }
+                action={{
+                  title: 'Clear filters',
+                  onPress: () => {
+                    setQuery('');
+                    setRarity(null);
+                    setShow('all');
+                  },
+                }}
+              />
+            ) : (
+              <EmptyState
+                title={show === 'missing' ? 'Set complete' : 'Nothing owned yet'}
+                message={
+                  show === 'missing'
+                    ? 'You own every card in this set.'
+                    : 'Cards you own from this set show up here.'
+                }
+              />
+            )
           }
         />
       ) : checklist.error ? (
@@ -119,4 +177,5 @@ const styles = StyleSheet.create({
   list: { padding: spacing.sm },
   header: { padding: spacing.sm, paddingBottom: spacing.md, gap: spacing.sm + 4 },
   progress: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });

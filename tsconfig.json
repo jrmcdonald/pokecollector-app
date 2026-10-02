@@ -11,7 +11,8 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
-  // The simulator tests' Node code has its own config (e2e/tsconfig.json):
-  // Node's types would otherwise leak into the app's.
-  "exclude": ["node_modules", "ios", "android", "e2e"]
+  // The simulator tests' and release scripts' Node code has its own configs
+  // (e2e/ and scripts/tsconfig.json): Node's types would otherwise leak into
+  // the app's.
+  "exclude": ["node_modules", "ios", "android", "e2e", "scripts"]
 }

@@ -1,9 +1,13 @@
 # Builds an unsigned IPA for AltStore to sign with a free Apple ID.
 #
-# Manual only. Standard runners cost nothing on a public repository, but a
-# build is still only needed when native code changes: a new native
-# dependency, an Expo SDK bump, or app.config.ts. JavaScript changes reach the
-# dev build over Metro.
+# Run by hand for the dev client: it is only needed when native code changes
+# (a new native dependency, an Expo SDK bump, or app.config.ts), since
+# JavaScript changes reach it over Metro. The Release workflow calls it for
+# each release's production build. Standard runners cost nothing on a public
+# repository.
+#
+# The build number is the commit count, so each build of main is higher than
+# the last, as SideStore and iOS expect of an update.
 #
 # Nothing about the server goes into the build. Set the BUNDLE_ID_PREFIX
 # Actions variable to build under your own reverse-DNS prefix.
@@ -17,13 +21,22 @@ on:
         type: choice
         options: [development, production]
         default: development
+  workflow_call:
+    inputs:
+      variant:
+        description: development or production
+        type: string
+        required: true
 
 permissions:
   contents: read
 
+# A newer build by hand replaces one still running; a release's build is never
+# cancelled. When called, github.workflow is the caller's, so the two never
+# share a group.
 concurrency:
-  group: ios-build-${{ inputs.variant }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-ios-build-${{ inputs.variant }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
 
 jobs:
   build:
@@ -36,7 +49,13 @@ jobs:
       # The dev client needs Debug for its launcher; production is a Release build.
       CONFIGURATION: ${{ inputs.variant == 'production' && 'Release' || 'Debug' }}
     steps:
+      # All of history, for the commit count.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Build number
+        run: echo "BUILD_NUMBER=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -107,10 +126,26 @@ jobs:
           zip -qry "PokeCollector-${APP_VARIANT}.ipa" Payload
           ls -lh "PokeCollector-${APP_VARIANT}.ipa"
 
+      # What the app says about itself, for a release's SideStore source:
+      # SideStore checks the version, build and usage strings against the IPA.
+      # An unsigned build has no entitlements, so that file is usually absent.
+      - name: Describe the app
+        run: |
+          app=$(ls -d Payload/*.app | head -n 1)
+          plutil -convert json -o info.json "${app}/Info.plist"
+          plutil -p "${app}/Info.plist" | grep -E 'CFBundle(ShortVersionString|Version)"'
+          entitlements=$(ls ios/*/*.entitlements 2>/dev/null | head -n 1 || true)
+          if [ -n "${entitlements}" ]; then
+            plutil -convert json -o entitlements.json "${entitlements}"
+          fi
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: PokeCollector-${{ inputs.variant }}
-          path: PokeCollector-${{ inputs.variant }}.ipa
+          path: |
+            PokeCollector-${{ inputs.variant }}.ipa
+            info.json
+            entitlements.json
           retention-days: 14
           if-no-files-found: error
 

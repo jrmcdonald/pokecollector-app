@@ -633,3 +633,39 @@ they cost one iOS build and one AltStore reinstall.
   login page in front that may need credentials adding. The connection test
   heads its failure "Could not get through Cloudflare Access" or "… the
   proxy". The onboarding and Settings screenshots change and need approving.
+
+## 2026-10-02 — Releases with release-please, installed through SideStore
+
+`PLAN.md` §9.1. Production builds were made by hand, kept 14 days as a
+workflow artifact, and copied to the phone through AltServer.
+
+- **release-please, not tags by hand.** The commits already follow
+  Conventional Commits, so release-please can choose the version and write
+  the changelog, and a release is merging its pull request. The cost: that
+  pull request is opened with `GITHUB_TOKEN`, so CI does not run on it. It
+  changes only the version and the changelog, and CI runs on main after it
+  merges. A token of our own would fix it, but is one more secret to rotate.
+- **One version, in `package.json`.** release-please's `node` type updates it
+  and `app.config.ts` reads it, so the IPA, the tag and the source agree. The
+  first release is 1.0.0 (a `Release-As` footer): the plan's MVP is done.
+- **Build number from the commit count**, set by the iOS build. It only grows
+  on main, needs no state, and a dev build by hand gets a number too.
+  SideStore compares it with the source's `buildVersion`.
+- **The build is a job of the Release workflow**, calling `ios-build.yml`.
+  A release published with `GITHUB_TOKEN` starts no other workflow, so
+  `on: release` would never run.
+- **SideStore, through a source.** SideStore signs and refreshes on the phone,
+  so AltServer no longer has to run on a PC. It reads AltStore's source
+  format, so AltStore can use the same file. The source is a release asset
+  at `releases/latest/download/source.json`: a fixed address, with nothing
+  committed back to the repository and no Pages site. It lists only the
+  newest version, which is all SideStore needs to offer an update.
+- **The source describes the built app, not the repository.** SideStore
+  checks the IPA's version, build number, size and hash, and its usage
+  strings, against the source, and refuses a mismatch. So the build saves its
+  Info.plist (and entitlements, when there are any) as JSON, and the source
+  is written from those (`scripts/release/source.ts`). The script also
+  refuses a build whose version is not the release's tag.
+- **The IPA is public.** Release assets on a public repository can be
+  downloaded by anyone. The build holds nothing about any server or account,
+  which this repository never has, so that changes nothing.

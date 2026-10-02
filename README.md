@@ -123,29 +123,39 @@ default text size and the largest one.
   [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/)
   with a service token for the app, or another reverse proxy that wants
   headers of its own.
-- **An iPhone**, a free Apple ID, and **AltStore** with AltServer on a
-  Windows PC or Mac. You don't need a Mac or a paid developer account: the app
-  is built in GitHub Actions.
+- **An iPhone**, a free Apple ID, and **[SideStore](https://sidestore.io)**
+  (or AltStore). You don't need a Mac or a paid developer account: the app is
+  built in GitHub Actions.
 
 ## Install
 
-The app isn't on the App Store. You build it in GitHub Actions and sideload
-it.
+The app isn't on the App Store. Each
+[release](https://github.com/jrmcdonald/pokecollector-app/releases) has an IPA
+built by GitHub Actions, and a source that SideStore installs and updates it
+from.
 
-1. **Run the iOS build:** Actions → **iOS build** → Run workflow, with variant
-   `production`. It takes a few minutes on a macOS runner, which is free for
-   public repositories.
-2. **Download the `PokeCollector-production` artifact** from the run and
-   unzip it to get the `.ipa`.
-3. **Install it with AltStore.** Set up AltServer and AltStore first (see
-   [AltStore's guide](https://faq.altstore.io/)). On Windows, install iTunes
-   and iCloud from Apple's website, not the Microsoft Store. Then, with the
-   phone on the same network as AltServer, open the `.ipa` in AltStore.
+1. **Set up SideStore** by following
+   [its install guide](https://docs.sidestore.io). It needs a computer once,
+   to install SideStore and pair the phone. After that, SideStore signs and
+   refreshes apps on the phone itself, without AltServer.
+2. **Add the source.** In SideStore, Sources → **+**, and enter:
+
+   ```text
+   https://github.com/jrmcdonald/pokecollector-app/releases/latest/download/source.json
+   ```
+
+3. **Install PokeCollector** from the source. New releases show up as updates
+   in SideStore.
 4. **Keep it refreshed.** Apps signed with a free Apple ID expire after 7
-   days. Leave AltServer running and AltStore renews them in the background.
+   days. SideStore renews them: open it now and then, or let its background
+   refresh do it.
 
-A free Apple ID can have three sideloaded apps at once, AltStore included, so
-there's room for the app and its development build.
+AltStore reads the same source. With AltStore Classic, AltServer has to run
+on a computer on the same network to install and refresh. Or download the
+IPA from a release and open it in either one.
+
+A free Apple ID can have three sideloaded apps at once, SideStore included,
+so there's room for the app and its development build.
 
 ## First launch
 
@@ -199,8 +209,10 @@ The app is [Expo](https://expo.dev) SDK 57 (React Native, TypeScript),
 using Expo Router, TanStack Query, zod and FlashList. All server access goes
 through `src/api`, typed from PokeCollector's OpenAPI spec in `openapi/`.
 
-**The dev loop.** Build the `development` variant (step 1 above) and install
-**PokeCollector Dev** alongside the normal app. Then, on your computer:
+**The dev loop.** Run the **iOS build** workflow by hand (Actions → iOS build
+→ Run workflow) with `development`, download the `PokeCollector-development`
+artifact, and install the IPA with SideStore as **PokeCollector Dev**,
+alongside the normal app. Then, on your computer:
 
 ```bash
 npm ci
@@ -228,6 +240,15 @@ runs Apple's accessibility audit on each screen, and compares screenshots with
 the approved ones in [`e2e/screenshots/`](e2e/screenshots). Those are the
 screenshots in this README, so they stay current. See
 [`e2e/README.md`](e2e/README.md).
+
+**Releases** are made by
+[release-please](https://github.com/googleapis/release-please) from
+[Conventional Commits](https://www.conventionalcommits.org): `feat:` raises
+the minor version, `fix:` the patch, and `feat!:` or a `BREAKING CHANGE:`
+footer the major. It keeps a "chore: release x.y.z" pull request open with the
+next changelog entry. Merging it tags the commit and publishes the release,
+and the **Release** workflow builds that commit and attaches the IPA and the
+SideStore source (`scripts/release/`). The build number is the commit count.
 
 The card art in the screenshots is a placeholder. The fake server makes up
 its cards, and real artwork belongs to Nintendo, Game Freak and The Pokémon

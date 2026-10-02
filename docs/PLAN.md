@@ -612,6 +612,19 @@ the collection and creates a Real Deck of them, in a handful of requests.
 
 ---
 
+### 9.1 Releases
+
+- [x] **Versioned releases with release-please.** Conventional Commits decide
+      the version; merging its release pull request tags the commit and
+      publishes a GitHub release with the changelog.
+- [x] **Each release carries its build.** The Release workflow calls the iOS
+      build for `production` and attaches `PokeCollector-<version>.ipa`. The
+      build number is the commit count, so every build is higher than the
+      last.
+- [x] **A SideStore source** (`source.json`) beside each release's IPA, at a
+      fixed `releases/latest/download/` address, so SideStore installs the app
+      and offers each new release as an update, with no AltServer.
+
 ## 10. Keeping up with upstream
 
 The addon's upstream version moves with Renovate, and the API is not

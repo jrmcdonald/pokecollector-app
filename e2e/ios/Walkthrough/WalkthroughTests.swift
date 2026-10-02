@@ -54,7 +54,10 @@ final class WalkthroughTests: XCTestCase {
     let entries = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH ' entries'"))
     go(button(startingWith: "Browse your collection"), to: entries.firstMatch, "Collection")
     capture("collection-grid")
-    go(app.navigationBars.buttons["Show as list"], to: button(startingWith: "Charizard ex"), "Collection as a list")
+    // The toggle's own label says the list is up: the grid's tiles start
+    // "Charizard ex" too, so the card's row alone could match the grid.
+    go(app.navigationBars.buttons["Show as list"], to: app.navigationBars.buttons["Show as grid"], "Collection as a list")
+    wait(for: button(startingWith: "Charizard ex, 151"), "Collection as a list")
     capture("collection-list")
 
     go(button(startingWith: "Charizard ex"), to: app.staticTexts["Charizard ex"].firstMatch, "Card")
@@ -380,15 +383,21 @@ final class WalkthroughTests: XCTestCase {
     }
   }
 
-  /// Taps, and waits for what the tap should show. A system sheet that came
-  /// up as it was tapped takes the tap, so once that sheet is dismissed the
-  /// tap is made again.
+  /// Taps, and waits for what the tap should show. A tap can go nowhere: a
+  /// system sheet that came up as it was tapped takes it, and a list still
+  /// laying out can move its row from under it. So when nothing has
+  /// happened after five seconds (a sheet was in the way, or the screen's
+  /// navigation bars are as they were) and the target is still there, it is
+  /// tapped once more.
   private func go(_ target: XCUIElement, to expected: XCUIElement, _ what: String) {
+    let bars = { self.app.navigationBars.allElementsBoundByIndex.map(\.identifier) }
+    let before = bars()
     tap(target)
-    if !expected.waitForExistence(timeout: 5), dismissSystemSheets(), !expected.exists,
-      target.exists
-    {
-      tap(target)
+    if !expected.waitForExistence(timeout: 5) {
+      let sheet = dismissSystemSheets()
+      if !expected.exists, target.exists, sheet || bars() == before {
+        tap(target)
+      }
     }
     wait(for: expected, what)
   }

@@ -15,15 +15,48 @@ set -euo pipefail
 name=$1
 size=$2
 
+xctestrun=$(ls build/walkthrough/Build/Products/*.xctestrun | head -n 1)
+
+# When each step of the setup starts, since the setup has taken minutes.
+step() { echo "$(date -u +%H:%M:%S) $*"; }
+
+# The first XCUITest session on a runner does one-off work on the Mac, and
+# its launch of the app has outlasted XCUITest's 60-second launch timeout:
+# on the first attempt, and never on the retry after it, though the retry
+# starts from a freshly erased simulator too. So a throwaway session goes
+# first, every time: it launches the app and quits. Only that it ran
+# matters, not how it ended.
+warm_up() {
+  local started=$SECONDS out
+  out=$(mktemp -d)
+  if TEST_RUNNER_APP_BUNDLE_ID="$APP_BUNDLE_ID" \
+    TEST_RUNNER_OUTPUT_DIR="$out" \
+    xcodebuild test-without-building \
+      -xctestrun "$xctestrun" \
+      -destination "id=$SIM_UDID" \
+      -only-testing:Walkthrough/WalkthroughTests/testLaunch \
+      > "$OUT/$name-warm-up.log" 2>&1; then
+    step "warm-up launch done in $((SECONDS - started)) s"
+  else
+    step "warm-up launch failed after $((SECONDS - started)) s (expected on a cold runner)"
+    grep -E 'error:' "$OUT/$name-warm-up.log" | head -n 3 || true
+  fi
+  rm -rf "$out"
+}
+
 # Erased every time: the Keychain holds the sign-in, and each run should start
 # at onboarding with nothing cached. A function, so a retry starts fresh too.
 prepare() {
+  step "waiting for the first boot"
   # Let the workflow's first boot finish before shutting it down mid-way.
   xcrun simctl bootstatus "$SIM_UDID" -b > /dev/null
+  step "erasing"
   xcrun simctl shutdown "$SIM_UDID" 2>/dev/null || true
   xcrun simctl erase "$SIM_UDID"
+  step "booting"
   xcrun simctl boot "$SIM_UDID"
   xcrun simctl bootstatus "$SIM_UDID" -b > /dev/null
+  step "setting up"
 
   # 9:41 and full bars, so the status bar is the same in every screenshot.
   xcrun simctl status_bar "$SIM_UDID" override \
@@ -35,22 +68,20 @@ prepare() {
   # Reduce Motion, which the app respects: images appear without fading in,
   # so a screenshot or an audit cannot catch one half drawn.
   xcrun simctl spawn "$SIM_UDID" defaults write com.apple.Accessibility ReduceMotionEnabled -bool true
+  step "installing"
   xcrun simctl install "$SIM_UDID" "$APP_PATH"
   # The first launch after an erase is slow while iOS prepares the app, and once
   # outlasted XCUITest's launch timeout. Launch it once here, where there is no
   # timeout; nothing is signed in, so the walkthrough still starts at onboarding.
+  step "launching the app once"
   xcrun simctl launch "$SIM_UDID" "$APP_BUNDLE_ID" > /dev/null
   sleep 5
   xcrun simctl terminate "$SIM_UDID" "$APP_BUNDLE_ID" || true
-  # A freshly erased simulator goes on with its own work for a while, and
-  # XCUITest's launch has timed out in it, on the first attempt and not on a
-  # retry that waited. So every attempt waits; it also gives the app a moment
-  # before it is let out to the network.
-  sleep 15
+  step "warming up XCUITest"
+  warm_up
+  step "ready"
 }
 prepare
-
-xctestrun=$(ls build/walkthrough/Build/Products/*.xctestrun | head -n 1)
 
 server_lines_before=$(wc -l < "$OUT/server.log")
 walk() {
@@ -65,6 +96,7 @@ walk() {
       -xctestrun "$xctestrun" \
       -destination "id=$SIM_UDID" \
       -resultBundlePath "$OUT/$name.xcresult" \
+      -only-testing:Walkthrough/WalkthroughTests/testWalkthrough \
       -test-timeouts-enabled YES \
       -default-test-execution-time-allowance 900 \
       -maximum-test-execution-time-allowance 900 \

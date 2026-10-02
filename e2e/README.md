@@ -65,6 +65,12 @@ fails and says so: move the pins on, and approve the screenshots again.
 
 ## Flakes
 
+Before each attempt, a throwaway XCUITest session (`testLaunch`) launches
+the app and quits, and its result is ignored. The runner's first XCUITest
+session does slow one-off work on the Mac that has timed out launching the
+app; this way the walkthrough never is that session. Its log is
+`<size>-warm-up.log`.
+
 The walkthrough runs once more, from a freshly erased simulator, only when
 its first error is XCUITest timing out launching the app or taking a
 screenshot. The first attempt's log, screenshots and `.xcresult` stay beside

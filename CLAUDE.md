@@ -46,7 +46,8 @@ JavaScript dependencies and action digests. Everything Expo decides the
 version of (React, React Native, `expo-*`, native modules) is one "Expo SDK"
 group that Renovate raises only when asked from its Dependency Dashboard. An
 SDK upgrade is `npx expo install expo@^<next> && npx expo install --fix`, then
-an iOS build.
+an iOS build, and committing the new `native/Podfile.lock` that the Simulator
+build prints.
 
 ## Releases
 
@@ -67,6 +68,8 @@ SideStore source (`scripts/release/`) to the GitHub release.
 - `src/auth/` — Keychain storage for the server and credentials.
 - `src/session/` — the signed-in session and TanStack Query setup.
 - `src/components/`, `src/hooks/`, `src/theme/`, `src/utils/`.
+- `native/Podfile.lock` — the pods' lock, copied into the generated `ios/`
+  by `scripts/ci/pod-install.sh` in CI.
 - `openapi/` — upstream's spec, one file per pinned upstream version.
   `scripts/export-openapi.sh <version>` exports a new one.
 - `e2e/` — the simulator tests: a fake PokeCollector with made-up data, and

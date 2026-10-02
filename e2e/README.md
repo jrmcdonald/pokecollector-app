@@ -58,8 +58,27 @@ the branch's run in progress, and with it the approval. Re-running an earlier ru
 commit it ran on before.
 
 The approved screenshots belong to one simulator model and iOS version,
-recorded in `screenshots/device.txt`. When the runner's newest model changes,
-every screenshot differs, and they need approving again.
+recorded in `screenshots/device.txt`. The workflow pins them, with the runner
+image and Xcode (`SIM_DEVICE`, `SIM_OS` and `XCODE_VERSION` in
+`simulator.yml`). When the runner image stops offering them, the workflow
+fails and says so: move the pins on, and approve the screenshots again.
+
+## Flakes
+
+The walkthrough runs once more, from a freshly erased simulator, only when
+its first error is XCUITest timing out launching the app or taking a
+screenshot. The first attempt's log, screenshots and `.xcresult` stay beside
+the second's, as `<size>-attempt1`. A failed check is never retried.
+
+The simulator runs with Reduce Motion on, so images appear without a fade,
+and the app with `TZ=UTC`.
+
+## Pods
+
+`ios/` is generated, so the pods' lock lives in `native/Podfile.lock` and is
+copied in after `expo prebuild` (`scripts/ci/pod-install.sh`). When it no
+longer matches, after an Expo SDK upgrade say, the build job warns and prints
+the new one in its log: commit that as `native/Podfile.lock`.
 
 ## Running the fake server locally
 

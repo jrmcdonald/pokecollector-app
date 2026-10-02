@@ -56,7 +56,9 @@ export function FilterButton({
 const styles = StyleSheet.create({
   filter: {
     minHeight: minTapTarget - 8,
-    maxWidth: '48%',
+    // A row to itself before it is cut short: at the largest text sizes even
+    // "Common" outgrows half the screen, and the rows wrap anyway.
+    maxWidth: '100%',
     paddingHorizontal: spacing.sm + 4,
     borderRadius: radius.sm + 2,
     borderWidth: 1,

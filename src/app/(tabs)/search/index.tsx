@@ -13,6 +13,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useCachedCollection, useCardSearch } from '@/hooks/queries';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useCardColumns } from '@/hooks/use-large-text';
 import { spacing, useColors } from '@/theme';
 import { pick } from '@/utils/pick';
 import {
@@ -44,6 +45,7 @@ const FILL_TO = 24;
 const MAX_AUTO_PAGES = 3;
 
 export default function Search() {
+  const columns = useCardColumns();
   const colors = useColors();
   // Scan's "search instead" opens this tab with what the scanner read.
   const { q } = useLocalSearchParams<{ q?: string }>();
@@ -135,7 +137,10 @@ export default function Search() {
     <ThemedView style={styles.fill}>
       <FlashList
         data={results}
-        numColumns={3}
+        // A new list when the text size changes the columns: FlashList
+        // cannot change them in place.
+        key={columns}
+        numColumns={columns}
         keyExtractor={(card) => card.id}
         contentContainerStyle={styles.list}
         contentInsetAdjustmentBehavior="automatic"
@@ -191,6 +196,7 @@ export default function Search() {
         onEndReached={lookFurther}
         renderItem={({ item }) => (
           <CardTile
+            layout={columns === 1 ? 'row' : 'tile'}
             card={item}
             detail={[item.set_ref?.abbreviation ?? item.set_id?.toUpperCase(), item.number]
               .filter(Boolean)

@@ -13,6 +13,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useSetChecklist } from '@/hooks/queries';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
+import { useCardColumns } from '@/hooks/use-large-text';
 import { spacing, useColors } from '@/theme';
 import { pick } from '@/utils/pick';
 import { formatPrice } from '@/utils/pricing';
@@ -31,6 +32,7 @@ import {
  */
 export default function SetChecklist() {
   const { id = '', name } = useLocalSearchParams<{ id: string; name?: string }>();
+  const columns = useCardColumns();
   const colors = useColors();
   const checklist = useSetChecklist(id);
   const pull = usePullToRefresh(() => checklist.refetch());
@@ -60,7 +62,10 @@ export default function SetChecklist() {
       {data ? (
         <FlashList
           data={shown}
-          numColumns={3}
+          // A new list when the text size changes the columns: FlashList
+          // cannot change them in place.
+          key={columns}
+          numColumns={columns}
           keyExtractor={(card) => card.id}
           contentContainerStyle={styles.list}
           contentInsetAdjustmentBehavior="automatic"
@@ -125,6 +130,7 @@ export default function SetChecklist() {
           }
           renderItem={({ item: card }) => (
             <CardTile
+              layout={columns === 1 ? 'row' : 'tile'}
               card={card}
               detail={[card.number, formatPrice(card.price_trend ?? card.price_market)]
                 .filter(Boolean)

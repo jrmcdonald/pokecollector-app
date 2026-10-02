@@ -10,6 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useBinderCards, useIsOnline, useRemoveFromBinder } from '@/hooks/queries';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
+import { useCardColumns } from '@/hooks/use-large-text';
 import { spacing, useColors } from '@/theme';
 import { isPlanned } from '@/utils/binders';
 import { formatPrice, formatTotal } from '@/utils/pricing';
@@ -24,6 +25,7 @@ import { showToast } from '@/utils/toast';
 export default function BinderDetail() {
   const { id = '', name } = useLocalSearchParams<{ id: string; name?: string }>();
   const binderId = Number(id);
+  const columns = useCardColumns();
   const colors = useColors();
   const online = useIsOnline();
   const binder = useBinderCards(binderId);
@@ -58,7 +60,10 @@ export default function BinderDetail() {
       {data ? (
         <FlashList
           data={data.cards}
-          numColumns={3}
+          // A new list when the text size changes the columns: FlashList
+          // cannot change them in place.
+          key={columns}
+          numColumns={columns}
           keyExtractor={(card) => String(card.binder_card_id)}
           contentContainerStyle={styles.list}
           refreshControl={
@@ -71,6 +76,7 @@ export default function BinderDetail() {
           ListHeaderComponent={<Summary data={data} planned={planned} />}
           renderItem={({ item: card }) => (
             <CardTile
+              layout={columns === 1 ? 'row' : 'tile'}
               card={card}
               detail={[card.variant, formatPrice(card.price_market)].filter(Boolean).join(' · ')}
               quantity={

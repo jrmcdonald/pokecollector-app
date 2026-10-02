@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { useAccessibilityText } from '@/hooks/use-large-text';
 import { minTapTarget, radius, spacing, useColors } from '@/theme';
 
 import { ThemedText } from './themed-text';
@@ -11,7 +12,9 @@ type Option<T extends string> = { value: T; label: string };
  * Two or three views of the same list, as one joined control: the iOS
  * segmented control (HIG). Drawn in JavaScript because the native one needs
  * a library, and so an iOS build. Each segment is a radio with its selected
- * state, so VoiceOver reads "Missing, 2 of 3, selected".
+ * state, so VoiceOver reads "Missing, 2 of 3, selected". At the
+ * accessibility text sizes the segments stack, one per row, as a third of
+ * the screen no longer holds a word like "Missing".
  */
 export function Segmented<T extends string>({
   options,
@@ -25,10 +28,15 @@ export function Segmented<T extends string>({
   label: string;
 }) {
   const colors = useColors();
+  const stacked = useAccessibilityText();
   return (
     <View
       accessibilityLabel={label}
-      style={[styles.track, { backgroundColor: colors.surface, borderColor: colors.outline }]}>
+      style={[
+        styles.track,
+        stacked && styles.stacked,
+        { backgroundColor: colors.surface, borderColor: colors.outline },
+      ]}>
       {options.map((option, index) => {
         const selected = option.value === value;
         return (
@@ -42,10 +50,14 @@ export function Segmented<T extends string>({
               Haptics.selectionAsync().catch(() => undefined);
               onChange(option.value);
             }}
-            style={[styles.segment, selected && { backgroundColor: colors.accent }]}>
+            style={[
+              styles.segment,
+              !stacked && styles.side,
+              selected && { backgroundColor: colors.accent },
+            ]}>
             <ThemedText
               variant="label"
-              numberOfLines={1}
+              numberOfLines={stacked ? undefined : 1}
               style={{ color: selected ? colors.onAccent : colors.text }}>
               {option.label}
             </ThemedText>
@@ -64,12 +76,14 @@ const styles = StyleSheet.create({
     padding: 3,
     gap: 3,
   },
+  stacked: { flexDirection: 'column' },
   segment: {
-    flex: 1,
     minHeight: minTapTarget - 6,
     borderRadius: radius.sm + 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.sm,
   },
+  /** Side by side, the segments share the width equally. */
+  side: { flex: 1 },
 });

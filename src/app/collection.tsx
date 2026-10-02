@@ -13,6 +13,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useCollection } from '@/hooks/queries';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
+import { useCardColumns } from '@/hooks/use-large-text';
 import { spacing, useColors } from '@/theme';
 import {
   NO_FILTER,
@@ -31,6 +32,7 @@ import { cardValue, formatPrice } from '@/utils/pricing';
 const SORTS = Object.keys(SORT_LABELS) as CollectionSort[];
 
 export default function Collection() {
+  const columns = useCardColumns();
   const colors = useColors();
   const collection = useCollection();
   const pull = usePullToRefresh(() => collection.refetch());
@@ -126,9 +128,9 @@ export default function Collection() {
 
       {items ? (
         <FlashList
-          key={layout}
+          key={`${layout}-${columns}`}
           data={shown}
-          numColumns={layout === 'grid' ? 3 : 1}
+          numColumns={layout === 'grid' ? columns : 1}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
           keyboardDismissMode="on-drag"
@@ -142,6 +144,7 @@ export default function Collection() {
           renderItem={({ item }) =>
             layout === 'grid' ? (
               <CardTile
+                layout={columns === 1 ? 'row' : 'tile'}
                 card={item.card ?? { id: item.card_id, name: item.card_id }}
                 detail={formatPrice(cardValue(item.card, item.variant))}
                 quantity={item.quantity}

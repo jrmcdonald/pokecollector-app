@@ -285,27 +285,36 @@ final class WalkthroughTests: XCTestCase {
 
   /// The screen once it stops changing: card images load, and lists settle
   /// after scrolling, in their own time. A fixed second once caught the card
-  /// screen before its image arrived. First any spinner goes, then two
-  /// identical frames a second apart count as settled; a screen that never
-  /// settles (a blinking cursor) is taken after ten seconds. A system sheet
-  /// that slides in meanwhile is dismissed, and the settling starts again.
-  /// Few frames: screenshots are slow on a busy runner, and XCUITest has
-  /// timed out asking for one.
+  /// screen before its image arrived. First any spinner goes, then three
+  /// identical frames a second apart count as settled: with two, Home (the
+  /// first screen to load images on a freshly erased simulator) was once
+  /// taken with its card frames still empty, the images served but not yet
+  /// drawn. A screen that never settles (a blinking cursor) is taken after
+  /// ten seconds. A system sheet that slides in meanwhile is dismissed, and
+  /// the settling starts again. Few frames: screenshots are slow on a busy
+  /// runner, and XCUITest has timed out asking for one.
   private func settledScreenshot() -> XCUIScreenshot {
     let spinning = app.activityIndicators.firstMatch
     if spinning.exists { _ = spinning.waitForNonExistence(timeout: 10) }
     Thread.sleep(forTimeInterval: 1.0)
     var shot = XCUIScreen.main.screenshot()
+    var unchanged = 0
     let deadline = Date().addingTimeInterval(10)
     while Date() < deadline {
       Thread.sleep(forTimeInterval: 1.0)
       if dismissSystemSheets() {
         Thread.sleep(forTimeInterval: 1.0)
         shot = XCUIScreen.main.screenshot()
+        unchanged = 0
         continue
       }
       let next = XCUIScreen.main.screenshot()
-      if next.pngRepresentation == shot.pngRepresentation { return next }
+      if next.pngRepresentation == shot.pngRepresentation {
+        unchanged += 1
+        if unchanged == 2 { return next }
+      } else {
+        unchanged = 0
+      }
       shot = next
     }
     return shot

@@ -34,6 +34,9 @@ final class WalkthroughTests: XCTestCase {
     guard let output = env["OUTPUT_DIR"] else { throw MissingSetting(name: "OUTPUT_DIR") }
     if let url = env["SERVER_URL"], !url.isEmpty { serverURL = url }
     app = XCUIApplication(bundleIdentifier: bundleId)
+    // Times on screen (a scan's, say) are shown in the phone's time zone; one
+    // zone everywhere, so a local run matches CI's approved screenshots.
+    app.launchEnvironment["TZ"] = "UTC"
     outputDir = URL(fileURLWithPath: output, isDirectory: true)
     try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
     try "screen\ttype\tissue\telement\tframe\n"
@@ -58,23 +61,30 @@ final class WalkthroughTests: XCTestCase {
     tap(button(startingWith: "Charizard ex"))
     wait(for: app.staticTexts["Charizard ex"].firstMatch, "Card")
     capture("card")
-    app.swipeUp()
+    scrollToEnd()
     // The scroll indicator stays a moment after the scroll stops, then fades.
     // Holding still, it can pass for a settled screen, so let it go first.
     Thread.sleep(forTimeInterval: 3.0)
     capture("card-scrolled")
-    back()
-    back()
+    back(to: button(startingWith: "Charizard ex"), "Collection, again")
+    back(to: button(startingWith: "Browse your collection"), "Home, again")
 
     tab("Search")
     let field = app.textFields["Search the catalogue"]
     wait(for: field, "Search")
     capture("search")
-    type("pika", into: field)
+    type("pika", into: field, slowly: true)
     // The count, not a Pikachu: typed slowly, the search can go out for "pi"
     // first, and those results have Pikachus too, among Pidgey and Caterpie.
     // Only "pika" finds exactly the fake server's four.
-    wait(for: element(startingWith: "4 cards"), "Search results")
+    let results = element(startingWith: "4 cards")
+    if !results.waitForExistence(timeout: 10) {
+      // At the largest text size a run has shown "pika" in the field with the
+      // screen still empty and no search sent: the app had not taken in what
+      // was typed. Once more, as a person would.
+      type("pika", into: field, slowly: true)
+    }
+    wait(for: results, "Search results")
     capture("search-results")
 
     // No camera on the simulator, and the permission is never granted, so
@@ -96,8 +106,8 @@ final class WalkthroughTests: XCTestCase {
     wait(for: app.buttons["Done"], "A scanned photo")
     capture("scan-photo")
     tap(app.buttons["Done"])
-    back()
-    back()
+    back(to: button(startingWith: "6 photos"), "Scans to review, again")
+    back(to: button(startingWith: "5 scanned cards to review"), "Scan, again")
 
     tab("Binders")
     wait(for: button(startingWith: "151 master set"), "Binders")
@@ -105,7 +115,7 @@ final class WalkthroughTests: XCTestCase {
     tap(button(startingWith: "151 master set"))
     wait(for: button(startingWith: "Bulbasaur"), "Planned binder")
     capture("binder")
-    back()
+    back(to: button(startingWith: "151 master set"), "Binders, again")
 
     tab("More")
     wait(for: button(startingWith: "Wishlist"), "More")
@@ -114,7 +124,7 @@ final class WalkthroughTests: XCTestCase {
     tap(button(startingWith: "Wishlist"))
     wait(for: element(startingWith: "To buy everything"), "Wishlist")
     capture("wishlist")
-    back()
+    back(to: button(startingWith: "Sets"), "More, again")
 
     tap(button(startingWith: "Sets"))
     wait(for: button(startingWith: "151, "), "Sets")
@@ -122,8 +132,8 @@ final class WalkthroughTests: XCTestCase {
     tap(button(startingWith: "151, "))
     wait(for: button(startingWith: "Bulbasaur"), "Set checklist")
     capture("set")
-    back()
-    back()
+    back(to: button(startingWith: "151, "), "Sets, again")
+    back(to: button(startingWith: "Decks"), "More, again")
 
     // A planned deck with cards missing, and the paste screen for adding a
     // prebuilt one (looking cards up writes, which the fake server refuses).
@@ -133,13 +143,12 @@ final class WalkthroughTests: XCTestCase {
     tap(button(startingWith: "Lost Box"))
     wait(for: button(startingWith: "Roaring Moon ex"), "Deck")
     capture("deck")
-    back()
+    back(to: button(startingWith: "Lost Box"), "Decks, again")
     tap(app.navigationBars.buttons["Add a prebuilt deck"])
     wait(for: app.textFields["Deck name"], "Add a prebuilt deck")
     capture("deck-import")
-    back()
-    wait(for: button(startingWith: "Lost Box"), "Decks, again")
-    back()
+    back(to: button(startingWith: "Lost Box"), "Decks, again")
+    back(to: button(startingWith: "Settings"), "More, again")
 
     tap(button(startingWith: "Settings"))
     wait(for: button(startingWith: "Server and login"), "Settings")
@@ -164,7 +173,12 @@ final class WalkthroughTests: XCTestCase {
     while Date() < deadline, !primary.exists, !tabs.exists {
       Thread.sleep(forTimeInterval: 0.25)
     }
-    guard primary.exists else { return }
+    if tabs.exists { return }
+    if !primary.exists {
+      diagnose("The app did not start")
+      XCTFail("The app did not start: neither onboarding nor the tabs appeared")
+      return
+    }
     capture("onboarding")
 
     type(serverURL, into: primary)
@@ -181,6 +195,9 @@ final class WalkthroughTests: XCTestCase {
       if unreachable.exists, retries < 2 {
         retries += 1
         tap(app.buttons["Connect"])
+        // The message stays up while the next test runs; wait for it to go,
+        // so one failure is not counted again and the retry gets its chance.
+        _ = unreachable.waitForNonExistence(timeout: 10)
       }
       Thread.sleep(forTimeInterval: 0.5)
     }
@@ -195,13 +212,19 @@ final class WalkthroughTests: XCTestCase {
 
   /// Sheets iOS shows on a fresh simulator that cover the app: the offer to
   /// save the password after signing in, and the keyboard's first-use tip.
-  private func dismissSystemSheets() {
+  @discardableResult
+  private func dismissSystemSheets() -> Bool {
+    var dismissed = false
     for owner in [app!, springboard] {
       for label in ["Not Now", "Continue"] {
         let button = owner.buttons[label]
-        if button.exists, button.isHittable { button.tap() }
+        if button.exists, button.isHittable {
+          button.tap()
+          dismissed = true
+        }
       }
     }
+    return dismissed
   }
 
   /// When a step fails: what was on screen, as a screenshot and as the
@@ -243,20 +266,29 @@ final class WalkthroughTests: XCTestCase {
     audit(name)
   }
 
-  /// The screen once it stops changing: card images load and fade in, and
-  /// lists settle after scrolling, in their own time. A fixed second once
-  /// caught the card screen before its image arrived. Three identical frames,
-  /// half a second apart, count as settled; a screen that never settles (a
-  /// blinking cursor) is taken after ten seconds.
+  /// The screen once it stops changing: card images load, and lists settle
+  /// after scrolling, in their own time. A fixed second once caught the card
+  /// screen before its image arrived. First any spinner goes, then two
+  /// identical frames a second apart count as settled; a screen that never
+  /// settles (a blinking cursor) is taken after ten seconds. A system sheet
+  /// that slides in meanwhile is dismissed, and the settling starts again.
+  /// Few frames: screenshots are slow on a busy runner, and XCUITest has
+  /// timed out asking for one.
   private func settledScreenshot() -> XCUIScreenshot {
+    let spinning = app.activityIndicators.firstMatch
+    if spinning.exists { _ = spinning.waitForNonExistence(timeout: 10) }
     Thread.sleep(forTimeInterval: 1.0)
     var shot = XCUIScreen.main.screenshot()
-    var steady = 0
     let deadline = Date().addingTimeInterval(10)
-    while steady < 2, Date() < deadline {
-      Thread.sleep(forTimeInterval: 0.5)
+    while Date() < deadline {
+      Thread.sleep(forTimeInterval: 1.0)
+      if dismissSystemSheets() {
+        Thread.sleep(forTimeInterval: 1.0)
+        shot = XCUIScreen.main.screenshot()
+        continue
+      }
       let next = XCUIScreen.main.screenshot()
-      steady = next.pngRepresentation == shot.pngRepresentation ? steady + 1 : 0
+      if next.pngRepresentation == shot.pngRepresentation { return next }
       shot = next
     }
     return shot
@@ -271,9 +303,16 @@ final class WalkthroughTests: XCTestCase {
     // again after settling, and only issues found both times are recorded.
     let first = auditPass(screen)
     guard !first.isEmpty else { return }
-    Thread.sleep(forTimeInterval: 2.0)
+    // The issues that came and went were text found in the screen's pixels
+    // with no element, on screens of card images. Settled, not a fixed wait.
+    _ = settledScreenshot()
+    // Compared without the frame: a reproducible issue on an element that
+    // moved by a point between passes is still the same issue.
+    let seen = Set(first.map { $0.dropLast().joined(separator: "\t") })
     let second = auditPass(screen)
-    for issue in second where first.contains(issue) { record(issue) }
+    for issue in second where seen.contains(issue.dropLast().joined(separator: "\t")) {
+      record(issue)
+    }
   }
 
   private func auditPass(_ screen: String) -> [[String]] {
@@ -373,14 +412,14 @@ final class WalkthroughTests: XCTestCase {
   /// typed "halhost:8443" for "https://localhost:8443"), so it waits for the
   /// keyboard, and retypes a character at a time if the value is wrong. A
   /// secure field's value cannot be read back; it is typed slowly from the
-  /// start.
-  private func type(_ text: String, into field: XCUIElement) {
+  /// start, as is anything asked to be.
+  private func type(_ text: String, into field: XCUIElement, slowly: Bool = false) {
     let secure = field.elementType == .secureTextField
     for attempt in 1...3 {
       tap(field)
       _ = app.keyboards.firstMatch.waitForExistence(timeout: 5)
       clear(field)
-      if attempt == 1 && !secure {
+      if attempt == 1 && !secure && !slowly {
         field.typeText(text)
       } else {
         for character in text {
@@ -415,7 +454,37 @@ final class WalkthroughTests: XCTestCase {
     tap(app.tabBars.buttons[name])
   }
 
-  private func back() {
+  /// Back one screen, and waits for the screen before it: a second tap during
+  /// the animation can land on the outgoing screen's bar, which is still there.
+  /// The previous screen is in the tree as soon as the animation starts, and
+  /// both bars are during it, so it waits for the navigation bars to change
+  /// and then hold still. Not a failure if they never change: a screen
+  /// without a title may share its bar's identifier.
+  private func back(to previous: XCUIElement, _ what: String) {
+    let bars = { self.app.navigationBars.allElementsBoundByIndex.map(\.identifier) }
+    let before = bars()
     tap(app.navigationBars.buttons.element(boundBy: 0))
+    var last = before
+    let deadline = Date().addingTimeInterval(5)
+    while Date() < deadline {
+      Thread.sleep(forTimeInterval: 0.5)
+      let now = bars()
+      if now != before, now == last { break }
+      last = now
+    }
+    wait(for: previous, what)
+  }
+
+  /// Scrolls until the screen stops moving, so a scrolled screenshot is of
+  /// the end of the content rather than wherever a fling happened to stop.
+  private func scrollToEnd() {
+    var before = XCUIScreen.main.screenshot().pngRepresentation
+    for _ in 0..<5 {
+      app.swipeUp(velocity: .slow)
+      Thread.sleep(forTimeInterval: 1.0)
+      let after = XCUIScreen.main.screenshot().pngRepresentation
+      if after == before { return }
+      before = after
+    }
   }
 }

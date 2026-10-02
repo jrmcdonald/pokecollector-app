@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:https';
 import { parseArgs } from 'node:util';
 
-import { createRouter } from './routes.ts';
+import { createRouter, type Reply } from './routes.ts';
 
 const { values } = parseArgs({
   options: {
@@ -39,12 +39,20 @@ const server = createServer(
       for (const [name, value] of Object.entries(req.headers)) {
         headers[name] = Array.isArray(value) ? value.join(', ') : value;
       }
-      const reply = route({
-        method: req.method ?? 'GET',
-        url: req.url ?? '/',
-        headers,
-        body: Buffer.concat(chunks).toString('utf8'),
-      });
+      // A request the routes cannot handle (a malformed %-escape, say) is a
+      // 500 for that request, not the end of the server for the whole run.
+      let reply: Reply;
+      try {
+        reply = route({
+          method: req.method ?? 'GET',
+          url: req.url ?? '/',
+          headers,
+          body: Buffer.concat(chunks).toString('utf8'),
+        });
+      } catch (error) {
+        console.error(error);
+        reply = { status: 500, json: { detail: String(error) } };
+      }
       console.log(`${req.method} ${req.url} ${reply.status}`);
       if ('png' in reply) {
         res.writeHead(reply.status, {
@@ -62,5 +70,12 @@ const server = createServer(
     });
   },
 );
+
+// iOS keeps idle connections open and reuses them. Node's default of five
+// seconds closes them sooner, and a request sent as one closes fails in the
+// app with "connection lost": a sign-in is never retried. Keep them longer
+// than iOS does.
+server.keepAliveTimeout = 120_000;
+server.headersTimeout = 125_000;
 
 server.listen(port, () => console.log(`Fake PokeCollector on https://localhost:${port}`));

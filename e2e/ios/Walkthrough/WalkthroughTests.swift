@@ -43,6 +43,15 @@ final class WalkthroughTests: XCTestCase {
       .write(to: auditFile, atomically: true, encoding: .utf8)
   }
 
+  /// Not a check: walkthrough.sh runs this alone before the walkthrough, so
+  /// the runner's slow first XCUITest session is spent on it, and ignores
+  /// how it ends.
+  func testLaunch() throws {
+    app.launch()
+    _ = app.wait(for: .runningForeground, timeout: 30)
+    app.terminate()
+  }
+
   func testWalkthrough() throws {
     app.launch()
     signIn()

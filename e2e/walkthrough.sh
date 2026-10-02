@@ -42,6 +42,11 @@ prepare() {
   xcrun simctl launch "$SIM_UDID" "$APP_BUNDLE_ID" > /dev/null
   sleep 5
   xcrun simctl terminate "$SIM_UDID" "$APP_BUNDLE_ID" || true
+  # A freshly erased simulator goes on with its own work for a while, and
+  # XCUITest's launch has timed out in it, on the first attempt and not on a
+  # retry that waited. So every attempt waits; it also gives the app a moment
+  # before it is let out to the network.
+  sleep 15
 }
 prepare
 
@@ -95,9 +100,6 @@ if [ "$status" -ne 0 ] &&
   # Under set -e, so a step that fails here stops the run with its own error
   # instead of leaving the walkthrough a broken simulator.
   prepare
-  # A simulator erased and booted twice has been slow to let the app out to
-  # the network; give it a moment before the walkthrough starts timing.
-  sleep 15
   server_lines_before=$(wc -l < "$OUT/server.log")
   set +e
   walk

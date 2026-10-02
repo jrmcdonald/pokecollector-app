@@ -25,6 +25,11 @@ type Props = {
    * VoiceOver's Actions rotor, so no gesture is the only way (WCAG 2.5.1).
    */
   actions?: TileAction[];
+  /**
+   * A tile in a grid, or a row with the name beside a small image: for a
+   * grid of one column, at the accessibility text sizes (`useCardColumns`).
+   */
+  layout?: 'tile' | 'row';
 };
 
 export type TileAction = { name: string; label: string; destructive?: boolean; onAction(): void };
@@ -38,6 +43,7 @@ export function CardTile({
   variant,
   photoItemId,
   actions = [],
+  layout = 'tile',
 }: Props) {
   const colors = useColors();
   const href = { pathname: '/card/[id]', params: { id: card.id } } as const;
@@ -52,6 +58,16 @@ export function CardTile({
     if (index !== null) actions[index]?.onAction();
   }
 
+  const image = (
+    <CardImage
+      card={card}
+      size="small"
+      style={layout === 'row' ? styles.rowImage : undefined}
+      frame={missing ? 'missing' : frameForVariant(variant)}
+      photoItemId={photoItemId}
+    />
+  );
+
   // Not expo-router's Link.Menu: its native preview wrapper hid every tile
   // in a list from VoiceOver (the simulator audit found binders empty).
   return (
@@ -64,47 +80,77 @@ export function CardTile({
       }
       onPress={() => router.push(href)}
       onLongPress={actions.length ? showActions : undefined}
-      style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
-      <View>
-        <CardImage
-          card={card}
-          size="small"
-          frame={missing ? 'missing' : frameForVariant(variant)}
-          photoItemId={photoItemId}
-        />
-        {missing ? (
-          <View style={[styles.mark, { backgroundColor: colors.background }]}>
-            <ThemedText variant="caption" color="textSecondary" style={styles.markText}>
-              Missing
-            </ThemedText>
+      style={({ pressed }) => [
+        layout === 'row' ? styles.row : styles.tile,
+        pressed && styles.pressed,
+      ]}>
+      {layout === 'row' ? (
+        <>
+          {image}
+          {/* Beside the image rather than over it: at these sizes a mark
+              would cover the card. Nothing is cut short; the row grows. */}
+          <View style={styles.rowText}>
+            <ThemedText variant="label">{card.name}</ThemedText>
+            {detail ? (
+              <ThemedText variant="figureSmall" color="textSecondary">
+                {detail}
+              </ThemedText>
+            ) : null}
+            {missing ? (
+              <ThemedText variant="caption" color="textSecondary">
+                Missing
+              </ThemedText>
+            ) : quantity > 1 ? (
+              <ThemedText variant="figureSmall">×{quantity}</ThemedText>
+            ) : null}
           </View>
-        ) : null}
-        {quantity > 1 ? (
-          <View
-            style={[
-              styles.badge,
-              { backgroundColor: colors.background, borderColor: colors.outline },
-            ]}>
-            <ThemedText variant="figureSmall" style={styles.badgeText}>
-              ×{quantity}
-            </ThemedText>
+        </>
+      ) : (
+        <>
+          <View>
+            {image}
+            {missing ? (
+              <View style={[styles.mark, { backgroundColor: colors.background }]}>
+                <ThemedText
+                  variant="caption"
+                  color="textSecondary"
+                  numberOfLines={1}
+                  style={styles.markText}>
+                  Missing
+                </ThemedText>
+              </View>
+            ) : null}
+            {quantity > 1 ? (
+              <View
+                style={[
+                  styles.badge,
+                  { backgroundColor: colors.background, borderColor: colors.outline },
+                ]}>
+                <ThemedText variant="figureSmall" style={styles.badgeText}>
+                  ×{quantity}
+                </ThemedText>
+              </View>
+            ) : null}
           </View>
-        ) : null}
-      </View>
-      <ThemedText variant="label" numberOfLines={2} style={styles.name}>
-        {card.name}
-      </ThemedText>
-      {detail ? (
-        <ThemedText variant="figureSmall" color="textSecondary" numberOfLines={1}>
-          {detail}
-        </ThemedText>
-      ) : null}
+          <ThemedText variant="label" numberOfLines={2} style={styles.name}>
+            {card.name}
+          </ThemedText>
+          {detail ? (
+            <ThemedText variant="figureSmall" color="textSecondary" numberOfLines={1}>
+              {detail}
+            </ThemedText>
+          ) : null}
+        </>
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   tile: { flex: 1, padding: spacing.xs },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.sm },
+  rowImage: { width: 64 },
+  rowText: { flex: 1, gap: 2 },
   pressed: { opacity: 0.7 },
   name: { marginTop: spacing.sm },
   mark: {

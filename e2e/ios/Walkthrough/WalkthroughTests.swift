@@ -285,27 +285,36 @@ final class WalkthroughTests: XCTestCase {
 
   /// The screen once it stops changing: card images load, and lists settle
   /// after scrolling, in their own time. A fixed second once caught the card
-  /// screen before its image arrived. First any spinner goes, then two
-  /// identical frames a second apart count as settled; a screen that never
-  /// settles (a blinking cursor) is taken after ten seconds. A system sheet
-  /// that slides in meanwhile is dismissed, and the settling starts again.
-  /// Few frames: screenshots are slow on a busy runner, and XCUITest has
-  /// timed out asking for one.
+  /// screen before its image arrived. First any spinner goes, then three
+  /// identical frames a second apart count as settled: with two, Home (the
+  /// first screen to load images on a freshly erased simulator) was once
+  /// taken with its card frames still empty, the images served but not yet
+  /// drawn. A screen that never settles (a blinking cursor) is taken after
+  /// ten seconds. A system sheet that slides in meanwhile is dismissed, and
+  /// the settling starts again. Few frames: screenshots are slow on a busy
+  /// runner, and XCUITest has timed out asking for one.
   private func settledScreenshot() -> XCUIScreenshot {
     let spinning = app.activityIndicators.firstMatch
     if spinning.exists { _ = spinning.waitForNonExistence(timeout: 10) }
     Thread.sleep(forTimeInterval: 1.0)
     var shot = XCUIScreen.main.screenshot()
+    var unchanged = 0
     let deadline = Date().addingTimeInterval(10)
     while Date() < deadline {
       Thread.sleep(forTimeInterval: 1.0)
       if dismissSystemSheets() {
         Thread.sleep(forTimeInterval: 1.0)
         shot = XCUIScreen.main.screenshot()
+        unchanged = 0
         continue
       }
       let next = XCUIScreen.main.screenshot()
-      if next.pngRepresentation == shot.pngRepresentation { return next }
+      if next.pngRepresentation == shot.pngRepresentation {
+        unchanged += 1
+        if unchanged == 2 { return next }
+      } else {
+        unchanged = 0
+      }
       shot = next
     }
     return shot
@@ -453,13 +462,13 @@ final class WalkthroughTests: XCTestCase {
   /// Types into a field and checks it took. On a fresh simulator the first
   /// characters can be lost while the keyboard is still appearing (one run
   /// typed "halhost:8443" for "https://localhost:8443"), so it waits for the
-  /// keyboard, and retypes a character at a time if the value is wrong. A
+  /// field's focus and the keyboard, and retypes a character at a time if the value is wrong. A
   /// secure field's value cannot be read back; it is typed slowly from the
   /// start, as is anything asked to be.
   private func type(_ text: String, into field: XCUIElement, slowly: Bool = false) {
     let secure = field.elementType == .secureTextField
     for attempt in 1...3 {
-      tap(field)
+      focus(field)
       _ = app.keyboards.firstMatch.waitForExistence(timeout: 5)
       clear(field)
       if attempt == 1 && !secure && !slowly {
@@ -478,6 +487,32 @@ final class WalkthroughTests: XCTestCase {
     }
     // Return closes the keyboard, so it cannot cover the next field.
     field.typeText("\n")
+  }
+
+  /// Taps a field until it has the keyboard's focus. On a slow runner a tap
+  /// on a screen just shown has missed (one run then failed outright typing
+  /// into Primary address: "Neither element nor any descendant has keyboard
+  /// focus"), and typing into a field without focus is an error XCUITest
+  /// does not let the walkthrough recover from.
+  private func focus(_ field: XCUIElement) {
+    for _ in 1...3 {
+      tap(field)
+      let deadline = Date().addingTimeInterval(5)
+      while Date() < deadline {
+        if hasFocus(field) { return }
+        Thread.sleep(forTimeInterval: 0.25)
+      }
+    }
+    diagnose("\(field) never took the keyboard's focus")
+    XCTFail("\(field) never took the keyboard's focus")
+  }
+
+  /// Found the way capture() finds what has focus, by a query, and matched
+  /// to the field by its frame.
+  private func hasFocus(_ field: XCUIElement) -> Bool {
+    let focused = app.descendants(matching: field.elementType)
+      .matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
+    return focused.exists && focused.frame == field.frame
   }
 
   /// Deletes what a field holds. An empty field reports its placeholder as

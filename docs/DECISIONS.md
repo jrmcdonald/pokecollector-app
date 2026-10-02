@@ -731,3 +731,30 @@ server after an erase. What changed, and why:
   built from the set's own cards, with counts.
 - **`FilterButton` moved to `src/components`,** shared by Collection, Search
   and a set's checklist.
+
+## 2026-10-02 — Card grids and segmented controls at the largest text sizes
+
+The simulator's largest-text screenshots showed a set's checklist cut short:
+"Mi…" and "O…" for Missing and Owned, the Missing mark broken over two lines
+on the card, and names broken mid-word ("Char/ma…") in three columns.
+
+- **Card grids take their columns from the text size** (`useCardColumns`):
+  three, two from the largest standard size (about 1.35×), and one from the
+  first accessibility size (about 1.65×). Search, a set, a binder and the
+  collection's grid all use it. FlashList cannot change its columns in
+  place, so the list is keyed on them.
+- **In one column a tile is a row** (`CardTile`'s `layout="row"`): a small
+  image with the name, detail and Missing or ×2 beside it, as words, and
+  nothing cut short. Over a full-width image the marks would cover the card,
+  and the image alone would fill the screen. Home's horizontal strips keep
+  tiles.
+- **Segmented controls stack** at the accessibility sizes, one segment per
+  row, still radios with their positions. A third of the screen does not
+  hold "Missing" there.
+- **Both read the text size once, when the screen opens.** Following every
+  change, the largest-size walkthrough found the set and search screens'
+  text cut in half after the accessibility audit, which tries other sizes
+  for a moment: a list rebuilt for new columns mid-audit appears to have
+  been measured at the passing size and drawn at the real one. A size
+  changed in Settings now applies when the screen next opens.
+- At the default size nothing changes, so the approved screenshots stand.

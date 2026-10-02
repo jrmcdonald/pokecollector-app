@@ -43,6 +43,16 @@ describe('useCardColumns', () => {
   });
 });
 
+it('keeps the columns a screen opened with when the text size changes', async () => {
+  mockFontScale = 3.118;
+  const { result, rerender } = await renderHook(() => useCardColumns());
+  expect(result.current).toBe(1);
+  // As Apple's audit does for a moment, or Settings while the screen is open.
+  mockFontScale = 1;
+  await rerender({});
+  expect(result.current).toBe(1);
+});
+
 describe('Segmented at the accessibility sizes', () => {
   const show = (
     <Segmented<'all' | 'missing' | 'owned'>

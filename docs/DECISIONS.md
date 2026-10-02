@@ -751,4 +751,10 @@ on the card, and names broken mid-word ("Char/ma…") in three columns.
 - **Segmented controls stack** at the accessibility sizes, one segment per
   row, still radios with their positions. A third of the screen does not
   hold "Missing" there.
+- **Both read the text size once, when the screen opens.** Following every
+  change, the largest-size walkthrough found the set and search screens'
+  text cut in half after the accessibility audit, which tries other sizes
+  for a moment: a list rebuilt for new columns mid-audit appears to have
+  been measured at the passing size and drawn at the real one. A size
+  changed in Settings now applies when the screen next opens.
 - At the default size nothing changes, so the approved screenshots stand.

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useWindowDimensions } from 'react-native';
 
 /** The largest standard Dynamic Type size is about 1.35×. */
@@ -21,7 +22,7 @@ export function useLargeText(): boolean {
  * stack then (HIG Typography: Dynamic Type sizes).
  */
 export function useAccessibilityText(): boolean {
-  return useWindowDimensions().fontScale >= ACCESSIBILITY;
+  return useOpeningFontScale() >= ACCESSIBILITY;
 }
 
 /**
@@ -30,6 +31,22 @@ export function useAccessibilityText(): boolean {
  * beside a small image. Names break mid-word otherwise ("Char/mander").
  */
 export function useCardColumns(): 1 | 2 | 3 {
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useOpeningFontScale();
   return fontScale >= ACCESSIBILITY ? 1 : fontScale >= LARGE ? 2 : 3;
+}
+
+/**
+ * The text size when the screen opened, kept until it closes. Following
+ * every change, the simulator walkthrough at the largest size found a grid
+ * screen's text cut in half after the accessibility audit, which tries
+ * other text sizes for a moment: as if its list, rebuilt when its columns
+ * changed, was measured at the passing size and drawn at the real one.
+ * Screens that kept their layout were unaffected. A size changed in
+ * Settings applies when the screen is next opened (the Search tab, which
+ * stays open, when the app restarts), and a list keeps its place meanwhile.
+ */
+function useOpeningFontScale(): number {
+  const { fontScale } = useWindowDimensions();
+  const [opening] = useState(fontScale);
+  return opening;
 }

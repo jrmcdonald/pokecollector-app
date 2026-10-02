@@ -36,6 +36,8 @@ on:
       - 'app.config.ts'
       - 'package.json'
       - 'package-lock.json'
+      - 'native/**'
+      - 'scripts/ci/**'
       - '.github/workflows/simulator.yml'
   pull_request:
     types: [opened, synchronize, reopened, labeled]
@@ -46,6 +48,8 @@ on:
       - 'app.config.ts'
       - 'package.json'
       - 'package-lock.json'
+      - 'native/**'
+      - 'scripts/ci/**'
       - '.github/workflows/simulator.yml'
   workflow_dispatch:
     inputs:
@@ -57,18 +61,36 @@ on:
 permissions:
   contents: read
 
+# A label other than approve-screenshots starts a run that does nothing, but
+# concurrency applies before any job's `if:`. In the branch's group it would
+# cancel the real run, and its own skipped jobs would count as a pass: Renovate
+# labels every pull request it opens, then automerges. So it gets a group of
+# its own.
 concurrency:
-  group: simulator-${{ github.head_ref || github.ref_name }}
+  group: simulator-${{ github.head_ref || github.ref_name }}${{ github.event.action == 'labeled' && github.event.label.name != 'approve-screenshots' && format('-ignored-{0}', github.run_id) || '' }}
   cancel-in-progress: true
+
+# Bash with pipefail, so `cmd | tee log` fails when cmd does.
+defaults:
+  run:
+    shell: bash
 
 env:
   EXPO_NO_TELEMETRY: 1
+  HOMEBREW_NO_AUTO_UPDATE: 1
+  # Pinned, so a new runner image cannot change the build or the screenshots
+  # under an unchanged commit, and the build and walkthrough runners match.
+  # The approved screenshots belong to this device (e2e/screenshots/device.txt);
+  # changing any of these means approving them again.
+  XCODE_VERSION: '26.6'
+  SIM_DEVICE: iPhone 17 Pro
+  SIM_OS: '26.5'
 
 jobs:
   build:
     # Other labels are not a reason to spend the time.
     if: github.event.action != 'labeled' || github.event.label.name == 'approve-screenshots'
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 60
     env:
       APP_VARIANT: production
@@ -86,6 +108,7 @@ jobs:
 
       - name: Toolchain
         run: |
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
           xcodebuild -version
           node --version
           brew install xcodegen ccache
@@ -107,7 +130,9 @@ jobs:
           path: |
             ios/Pods
             ~/Library/Caches/CocoaPods
-          key: pods-production-${{ hashFiles('package-lock.json', 'app.config.ts') }}
+          # Its own prefix: these pods are installed with ccache, the iOS
+          # build's are not. The Xcode version too, for prebuilt frameworks.
+          key: pods-simulator-${{ env.XCODE_VERSION }}-${{ hashFiles('package-lock.json', 'app.config.ts', 'native/Podfile.lock') }}
 
       # Compiled objects from earlier runs. ccache looks each one up by its
       # inputs, so an older cache still serves every file that has not
@@ -127,12 +152,11 @@ jobs:
       # This touches only the generated project on the runner, not the app's
       # configuration.
       - name: Install pods
-        working-directory: ios
         run: |
-          jq '. + {"apple.ccacheEnabled": "true"}' Podfile.properties.json > Podfile.properties.tmp
-          mv Podfile.properties.tmp Podfile.properties.json
-          pod install | tee ../pod-install.log
-          grep -i ccache ../pod-install.log || echo "::warning::pod install did not mention ccache"
+          jq '. + {"apple.ccacheEnabled": "true"}' ios/Podfile.properties.json > ios/Podfile.properties.tmp
+          mv ios/Podfile.properties.tmp ios/Podfile.properties.json
+          scripts/ci/pod-install.sh pod-install.log
+          grep -i ccache pod-install.log || echo "::warning::pod install did not mention ccache"
 
       # Release, so the JavaScript is bundled in and no Metro is needed. Built
       # for any simulator, so no simulator is needed here: the walkthrough
@@ -151,18 +175,22 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build/app \
             ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
-            | tee build/app-build.log | grep -E 'error:|\*\* BUILD' || true
+            | tee build/app-build.log | { grep -E 'error:|\*\* BUILD' || true; }
           ccache --show-stats
           # A cache that is never asked looks the same as one that works until
           # the timings are compared, so say so in the run.
           calls=$(ccache --print-stats | awk '$1 ~ /^(direct_cache_hit|preprocessed_cache_hit|cache_miss)$/ { n += $2 } END { print n + 0 }')
           echo "ccache answered ${calls} compiler calls"
           [ "${calls}" -gt 0 ] || echo "::warning::ccache saw no compiler calls; the build did not go through it"
-          test -d build/app/Build/Products/Release-iphonesimulator/*.app
+          # The .app exists before its build finishes, so only this says it did.
+          grep -q '\*\* BUILD SUCCEEDED' build/app-build.log
 
       # Saved even if the build failed, so the next run still starts warmer.
+      # Only from main: the repository's caches share 10 GB, oldest out
+      # first, and a save from every pull request push would push out main's,
+      # the one every new pull request starts from.
       - name: Save the compiler cache
-        if: always()
+        if: always() && github.ref == 'refs/heads/main'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.ccache
@@ -177,7 +205,7 @@ jobs:
             -scheme Walkthrough \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build/walkthrough \
-            | tee build/walkthrough-build.log | grep -E 'error:|\*\* TEST BUILD' || true
+            | tee build/walkthrough-build.log | { grep -E 'error:|\*\* TEST BUILD' || true; }
           grep -q '\*\* TEST BUILD SUCCEEDED' build/walkthrough-build.log
 
       # A tarball, because artifacts lose the executable bit, and an app
@@ -192,7 +220,9 @@ jobs:
         with:
           name: simulator-builds
           path: simulator-builds.tgz
-          retention-days: 1
+          # Long enough to re-run a failed walkthrough the next day.
+          retention-days: 3
+          overwrite: true
           if-no-files-found: error
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -202,14 +232,18 @@ jobs:
           path: |
             build/*.log
             pod-install.log
+            ios/Podfile.lock
           retention-days: 7
+          overwrite: true
           if-no-files-found: ignore
 
   simulator:
     name: simulator (${{ matrix.name }})
     needs: build
-    runs-on: macos-latest
-    timeout-minutes: 30
+    runs-on: macos-26
+    # A walkthrough takes 7 to 17 minutes, and one that times out runs once
+    # more from a freshly erased simulator.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -226,29 +260,28 @@ jobs:
       # repository, and the next step writes into it.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      # The newest "iPhone NN Pro" on the newest iOS, booted before anything
-      # else: a runner's first boot does one-off work that stalled the app for
-      # up to a minute at a time when left to the walkthrough, and the setup
-      # below gives it time to finish. The model's name goes next to the approved
+      # The pinned device on the pinned iOS, booted before anything else: a
+      # runner's first boot does one-off work that stalled the app for up to a
+      # minute at a time when left to the walkthrough, and the setup below
+      # gives it time to finish. The device's name goes next to the approved
       # screenshots, since they only match on the same model.
       - name: Pick and boot a simulator
         run: |
-          read -r udid device < <(xcrun simctl list devices available --json | jq -r '
-            [.devices | to_entries[] | select(.key | test("iOS")) | .key as $runtime
-             | .value[] | select(.name | test("^iPhone [0-9]+ Pro$"))
-             | {udid, name, ios: ($runtime | sub(".*iOS-"; "") | gsub("-"; "."))}]
-            | sort_by(.name, (.ios | split(".") | map(tonumber))) | last
-            | "\(.udid) \(.name), iOS \(.ios)"')
-          if [ -z "${udid}" ] || [ "${udid}" = null ]; then
-            echo "::error::No iPhone Pro simulator available" >&2
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          runtime="com.apple.CoreSimulator.SimRuntime.iOS-${SIM_OS//./-}"
+          udid=$(xcrun simctl list devices available --json | jq -r --arg runtime "${runtime}" --arg name "${SIM_DEVICE}" '
+            [.devices[$runtime][]? | select(.name == $name) | .udid] | first // empty')
+          if [ -z "${udid}" ]; then
+            echo "::error::No ${SIM_DEVICE} on iOS ${SIM_OS} on this runner; update SIM_DEVICE and SIM_OS, and approve the screenshots again" >&2
             xcrun simctl list devices available
             exit 1
           fi
+          device="${SIM_DEVICE}, iOS ${SIM_OS}"
           echo "Using ${device} (${udid})"
           mkdir -p "${OUT}"
           echo "${device}" > "${OUT}/device.txt"
           echo "SIM_UDID=${udid}" >> "$GITHUB_ENV"
-          xcrun simctl boot "${udid}"
+          xcrun simctl boot "${udid}" || xcrun simctl bootstatus "${udid}"
 
       # The fake server uses nothing but Node itself: no npm install here.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -272,23 +305,34 @@ jobs:
       # and a short life for a certificate from a user-installed root.
       - name: Start the fake server
         run: |
+          # Homebrew's OpenSSL 3 by name: -addext and these extensions are
+          # what iOS checks, and LibreSSL's openssl handles them differently.
+          openssl="$(brew --prefix openssl@3)/bin/openssl"
+          [ -x "${openssl}" ] || brew install openssl@3
+          "${openssl}" version
           tls="${RUNNER_TEMP}/tls"
           mkdir -p "${tls}"
           cd "${tls}"
-          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -keyout ca-key.pem -out ca.pem \
+          "${openssl}" req -x509 -newkey rsa:2048 -nodes -days 2 -keyout ca-key.pem -out ca.pem \
             -subj "/CN=PokeCollector walkthrough CA" \
             -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign"
-          openssl req -newkey rsa:2048 -nodes -keyout server-key.pem -out server.csr -subj "/CN=localhost"
+          "${openssl}" req -newkey rsa:2048 -nodes -keyout server-key.pem -out server.csr -subj "/CN=localhost"
           printf '%s\n' "subjectAltName=DNS:localhost,IP:127.0.0.1" "extendedKeyUsage=serverAuth" \
             "basicConstraints=CA:FALSE" "keyUsage=critical,digitalSignature,keyEncipherment" > server.ext
-          openssl x509 -req -in server.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -days 2 \
+          "${openssl}" x509 -req -in server.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -days 2 \
             -sha256 -extfile server.ext -out server.pem
           echo "CA_CERT=${tls}/ca.pem" >> "$GITHUB_ENV"
           cd "${GITHUB_WORKSPACE}"
           nohup node e2e/server/fake-server.ts --port 8443 \
             --cert "${tls}/server.pem" --key "${tls}/server-key.pem" > "${OUT}/server.log" 2>&1 &
+          server=$!
           for _ in $(seq 1 30); do
-            curl -fsS --cacert "${tls}/ca.pem" "${SERVER_URL}/api/auth/mode" && exit 0
+            if ! kill -0 "${server}" 2>/dev/null; then
+              echo "::error::The fake server exited" >&2
+              cat "${OUT}/server.log"
+              exit 1
+            fi
+            curl -fsS --max-time 3 --cacert "${tls}/ca.pem" "${SERVER_URL}/api/auth/mode" && exit 0
             sleep 1
           done
           cat "${OUT}/server.log"
@@ -306,6 +350,7 @@ jobs:
             e2e-output
             !e2e-output/*.xcresult
           retention-days: 14
+          overwrite: true
           if-no-files-found: ignore
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -314,6 +359,7 @@ jobs:
           name: simulator-results-${{ matrix.name }}
           path: e2e-output/*.xcresult
           retention-days: 7
+          overwrite: true
           if-no-files-found: ignore
 
   # The check to look at, under the name it has always had: it compares the
@@ -364,7 +410,9 @@ jobs:
           if [ -f "${RUNNER_TEMP}/outputs/simulator-output-default/device.txt" ]; then
             cp "${RUNNER_TEMP}/outputs/simulator-output-default/device.txt" "${OUT}/device.txt"
           fi
-          ls -R "${OUT}" | head -n 80
+          # Not a pipe into head: under pipefail, ls stopped early fails the step.
+          ls -R "${OUT}" > "${RUNNER_TEMP}/outputs.txt"
+          head -n 80 "${RUNNER_TEMP}/outputs.txt"
 
       - name: Report
         id: report
@@ -377,6 +425,7 @@ jobs:
           name: simulator-screenshots
           path: e2e-output
           retention-days: 14
+          overwrite: true
           if-no-files-found: ignore
 
       # Only from a run where both walkthroughs finished: a walkthrough that

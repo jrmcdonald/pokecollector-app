@@ -50,6 +50,35 @@ const pngs = (dir: string) =>
     : [];
 const readText = (file: string) => (existsSync(file) ? readFileSync(file, 'utf8').trim() : '');
 
+/**
+ * Where a diff's changed pixels are, as a share of the screen from the top
+ * and left, so a change can be told from the log: a keyboard is the bottom
+ * third, a status bar the top few per cent. pixelmatch paints them pure red.
+ */
+function where(diff: InstanceType<typeof PNG>): string {
+  let top = diff.height;
+  let bottom = -1;
+  let left = diff.width;
+  let right = -1;
+  for (let y = 0; y < diff.height; y++) {
+    for (let x = 0; x < diff.width; x++) {
+      const i = (y * diff.width + x) * 4;
+      if (diff.data[i] === 255 && diff.data[i + 1] === 0 && diff.data[i + 2] === 0) {
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+        left = Math.min(left, x);
+        right = Math.max(right, x);
+      }
+    }
+  }
+  if (bottom < 0) return 'nowhere in particular';
+  const pct = (n: number, of: number) => `${Math.round((n / of) * 100)}%`;
+  return (
+    `from ${pct(top, diff.height)} to ${pct(bottom + 1, diff.height)} down, ` +
+    `${pct(left, diff.width)} to ${pct(right + 1, diff.width)} across`
+  );
+}
+
 // --- Accessibility audit, per text size -----------------------------------
 
 const SIZES: [dir: string, title: string][] = [
@@ -136,7 +165,7 @@ if (actual.length === 0) {
     if (share > TOLERANCE) {
       mkdirSync(diffDir, { recursive: true });
       writeFileSync(join(diffDir, name), PNG.sync.write(diff));
-      rows.push(`| ${name} | changed: ${(share * 100).toFixed(2)}% of pixels |`);
+      rows.push(`| ${name} | changed: ${(share * 100).toFixed(2)}% of pixels, ${where(diff)} |`);
       failed = true;
     }
   }

@@ -669,3 +669,33 @@ workflow artifact, and copied to the phone through AltServer.
 - **The IPA is public.** Release assets on a public repository can be
   downloaded by anyone. The build holds nothing about any server or account,
   which this repository never has, so that changes nothing.
+
+## 2026-10-02 — Simulator CI: pinned, locked, and told apart from flakes
+
+A review of the Simulator workflow's first 55 runs found its failures were
+mostly the runner, not the app: XCUITest timing out on a slow simulator,
+screens caught mid-change, and an app that sometimes could not reach the fake
+server after an erase. What changed, and why:
+
+- **Pinned runner, Xcode and simulator** (`macos-26`, Xcode 26.6, iPhone 17
+  Pro on iOS 26.5), instead of `macos-latest` and the newest iPhone Pro. A
+  new image used to change every screenshot under an unchanged commit, and
+  could give the build and the walkthrough different Xcodes. Moving on is a
+  deliberate change of the pins and a new approval.
+- **`native/Podfile.lock`**, copied in after `expo prebuild`. The `ios/`
+  folder is regenerated each run, so pods had no lock, and a new release of
+  one (expo-image's SDWebImage, say) could change the build. Not
+  `--deployment`: a stale lock after an SDK upgrade resolves what changed and
+  says so in the log, rather than failing the build.
+- **No quiet build from source.** React Native and Hermes look for their
+  prebuilt binaries with one unretried request, and on a failure compile
+  everything instead. `scripts/ci/pod-install.sh` treats that as a failed
+  `pod install` and tries again.
+- **A label other than approve-screenshots gets a concurrency group of its
+  own.** In the branch's group, its run (which does nothing) cancelled the
+  real one, and its skipped jobs counted as a pass on Renovate's pull
+  requests, which are labelled and automerged.
+- **Reduce Motion on the simulator and a TZ of UTC for the app**, so images
+  appear without a fade and times read the same everywhere.
+- **The compiler cache is saved from main only.** The repository's caches
+  share 10 GB, and a save from every pull request push evicted main's.

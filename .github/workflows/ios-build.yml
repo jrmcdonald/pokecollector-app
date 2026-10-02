@@ -38,14 +38,22 @@ concurrency:
   group: ${{ github.workflow }}-ios-build-${{ inputs.variant }}
   cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
 
+# Bash with pipefail, so `cmd | tee log` fails when cmd does.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
-    runs-on: macos-latest
+    # Pinned, like the Simulator workflow's, so a new runner image cannot
+    # change a build under an unchanged commit.
+    runs-on: macos-26
     timeout-minutes: 60
     env:
       APP_VARIANT: ${{ inputs.variant }}
       BUNDLE_ID_PREFIX: ${{ vars.BUNDLE_ID_PREFIX }}
       EXPO_NO_TELEMETRY: 1
+      XCODE_VERSION: '26.6'
       # The dev client needs Debug for its launcher; production is a Release build.
       CONFIGURATION: ${{ inputs.variant == 'production' && 'Release' || 'Debug' }}
     steps:
@@ -64,6 +72,7 @@ jobs:
 
       - name: Toolchain
         run: |
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
           xcodebuild -version
           pod --version
 
@@ -72,18 +81,17 @@ jobs:
       - name: Generate the native project
         run: npx expo prebuild --platform ios --clean --no-install
 
-      # Podfile.lock does not exist until pod install runs, so key on what
-      # decides the pods: the npm lock file and the app config.
+      # Key on what decides the pods: the npm lock file, the app config and
+      # the committed Podfile.lock, and the Xcode they were installed with.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ios/Pods
             ~/Library/Caches/CocoaPods
-          key: pods-${{ inputs.variant }}-${{ hashFiles('package-lock.json', 'app.config.ts') }}
+          key: pods-${{ inputs.variant }}-${{ env.XCODE_VERSION }}-${{ hashFiles('package-lock.json', 'app.config.ts', 'native/Podfile.lock') }}
 
       - name: Install pods
-        working-directory: ios
-        run: pod install
+        run: scripts/ci/pod-install.sh pod-install.log ${{ inputs.variant == 'development' && '--no-lock-report' || '' }}
 
       # Prebuild names the workspace and scheme after the app's display name,
       # which differs between variants ("PokeCollector Dev" → PokeCollectorDev).
@@ -116,7 +124,8 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            | tee build.log | grep -E 'error:|\*\* ARCHIVE' || true
+            | tee build.log | { grep -E 'error:|\*\* ARCHIVE' || true; }
+          grep -q '\*\* ARCHIVE SUCCEEDED' build.log
           test -d build/App.xcarchive/Products/Applications
 
       - name: Package the IPA
@@ -153,6 +162,8 @@ jobs:
         if: failure()
         with:
           name: build-log-${{ inputs.variant }}
-          path: build.log
+          path: |
+            build.log
+            pod-install.log
           retention-days: 7
           if-no-files-found: ignore

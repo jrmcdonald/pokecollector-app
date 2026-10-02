@@ -51,15 +51,13 @@ final class WalkthroughTests: XCTestCase {
     wait(for: element(startingWith: "Collection value"), "Home")
     capture("home")
 
-    tap(button(startingWith: "Browse your collection"))
-    wait(for: app.staticTexts.matching(NSPredicate(format: "label ENDSWITH ' entries'")).firstMatch, "Collection")
+    let entries = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH ' entries'"))
+    go(button(startingWith: "Browse your collection"), to: entries.firstMatch, "Collection")
     capture("collection-grid")
-    tap(app.navigationBars.buttons["Show as list"])
-    wait(for: button(startingWith: "Charizard ex"), "Collection as a list")
+    go(app.navigationBars.buttons["Show as list"], to: button(startingWith: "Charizard ex"), "Collection as a list")
     capture("collection-list")
 
-    tap(button(startingWith: "Charizard ex"))
-    wait(for: app.staticTexts["Charizard ex"].firstMatch, "Card")
+    go(button(startingWith: "Charizard ex"), to: app.staticTexts["Charizard ex"].firstMatch, "Card")
     capture("card")
     scrollToEnd()
     // The scroll indicator stays a moment after the scroll stops, then fades.
@@ -69,9 +67,8 @@ final class WalkthroughTests: XCTestCase {
     back(to: button(startingWith: "Charizard ex"), "Collection, again")
     back(to: button(startingWith: "Browse your collection"), "Home, again")
 
-    tab("Search")
     let field = app.textFields["Search the catalogue"]
-    wait(for: field, "Search")
+    go(app.tabBars.buttons["Search"], to: field, "Search")
     capture("search")
     type("pika", into: field, slowly: true)
     // The count, not a Pikachu: typed slowly, the search can go out for "pi"
@@ -89,72 +86,57 @@ final class WalkthroughTests: XCTestCase {
 
     // No camera on the simulator, and the permission is never granted, so
     // this is the explanation shown before asking.
-    tab("Scan")
-    wait(for: element(startingWith: "Camera access"), "Scan")
+    go(app.tabBars.buttons["Scan"], to: element(startingWith: "Camera access"), "Scan")
     capture("scan")
 
     // A batch sent earlier and left for later (see the fake server's
     // fixtures): the list, the review, and one photo opened. Reviewing needs
     // no camera, so it is reachable from here too.
-    tap(button(startingWith: "5 scanned cards to review"))
-    wait(for: button(startingWith: "6 photos"), "Scans to review")
+    go(button(startingWith: "5 scanned cards to review"), to: button(startingWith: "6 photos"), "Scans to review")
     capture("scans")
-    tap(button(startingWith: "6 photos"))
-    wait(for: button(startingWith: "Photo 1, Pikachu"), "Scan review")
+    go(button(startingWith: "6 photos"), to: button(startingWith: "Photo 1, Pikachu"), "Scan review")
     capture("scan-review")
-    tap(button(startingWith: "Photo 1, Pikachu"))
-    wait(for: app.buttons["Done"], "A scanned photo")
+    go(button(startingWith: "Photo 1, Pikachu"), to: app.buttons["Done"], "A scanned photo")
     capture("scan-photo")
     tap(app.buttons["Done"])
     back(to: button(startingWith: "6 photos"), "Scans to review, again")
     back(to: button(startingWith: "5 scanned cards to review"), "Scan, again")
 
-    tab("Binders")
-    wait(for: button(startingWith: "151 master set"), "Binders")
+    go(app.tabBars.buttons["Binders"], to: button(startingWith: "151 master set"), "Binders")
     capture("binders")
-    tap(button(startingWith: "151 master set"))
-    wait(for: button(startingWith: "Bulbasaur"), "Planned binder")
+    go(button(startingWith: "151 master set"), to: button(startingWith: "Bulbasaur"), "Planned binder")
     capture("binder")
     back(to: button(startingWith: "151 master set"), "Binders, again")
 
-    tab("More")
-    wait(for: button(startingWith: "Wishlist"), "More")
+    go(app.tabBars.buttons["More"], to: button(startingWith: "Wishlist"), "More")
     capture("more")
 
-    tap(button(startingWith: "Wishlist"))
-    wait(for: element(startingWith: "To buy everything"), "Wishlist")
+    go(button(startingWith: "Wishlist"), to: element(startingWith: "To buy everything"), "Wishlist")
     capture("wishlist")
     back(to: button(startingWith: "Sets"), "More, again")
 
-    tap(button(startingWith: "Sets"))
-    wait(for: button(startingWith: "151, "), "Sets")
+    go(button(startingWith: "Sets"), to: button(startingWith: "151, "), "Sets")
     capture("sets")
-    tap(button(startingWith: "151, "))
-    wait(for: button(startingWith: "Bulbasaur"), "Set checklist")
+    go(button(startingWith: "151, "), to: button(startingWith: "Bulbasaur"), "Set checklist")
     capture("set")
     back(to: button(startingWith: "151, "), "Sets, again")
     back(to: button(startingWith: "Decks"), "More, again")
 
     // A planned deck with cards missing, and the paste screen for adding a
     // prebuilt one (looking cards up writes, which the fake server refuses).
-    tap(button(startingWith: "Decks"))
-    wait(for: button(startingWith: "Lost Box"), "Decks")
+    go(button(startingWith: "Decks"), to: button(startingWith: "Lost Box"), "Decks")
     capture("decks")
-    tap(button(startingWith: "Lost Box"))
-    wait(for: button(startingWith: "Roaring Moon ex"), "Deck")
+    go(button(startingWith: "Lost Box"), to: button(startingWith: "Roaring Moon ex"), "Deck")
     capture("deck")
     back(to: button(startingWith: "Lost Box"), "Decks, again")
-    tap(app.navigationBars.buttons["Add a prebuilt deck"])
-    wait(for: app.textFields["Deck name"], "Add a prebuilt deck")
+    go(app.navigationBars.buttons["Add a prebuilt deck"], to: app.textFields["Deck name"], "Add a prebuilt deck")
     capture("deck-import")
     back(to: button(startingWith: "Lost Box"), "Decks, again")
     back(to: button(startingWith: "Settings"), "More, again")
 
-    tap(button(startingWith: "Settings"))
-    wait(for: button(startingWith: "Server and login"), "Settings")
+    go(button(startingWith: "Settings"), to: button(startingWith: "Server and login"), "Settings")
     capture("settings")
-    tap(button(startingWith: "Server and login"))
-    wait(for: element(startingWith: "Using the"), "Server and login")
+    go(button(startingWith: "Server and login"), to: element(startingWith: "Using the"), "Server and login")
     capture("connection")
 
     if !findings.isEmpty {
@@ -377,11 +359,31 @@ final class WalkthroughTests: XCTestCase {
       .firstMatch
   }
 
+  /// Waits for an element, clearing any system sheet that comes up over the
+  /// app meanwhile: iOS's offer to save the password has arrived over Home
+  /// a minute after signing in.
   private func wait(for element: XCUIElement, _ what: String, timeout: TimeInterval = 20) {
-    if !element.waitForExistence(timeout: timeout) {
+    let deadline = Date().addingTimeInterval(timeout)
+    while !element.waitForExistence(timeout: 1), Date() < deadline {
+      dismissSystemSheets()
+    }
+    if !element.exists {
       diagnose("\(what) did not appear")
       XCTFail("\(what) did not appear")
     }
+  }
+
+  /// Taps, and waits for what the tap should show. A system sheet that came
+  /// up as it was tapped takes the tap, so once that sheet is dismissed the
+  /// tap is made again.
+  private func go(_ target: XCUIElement, to expected: XCUIElement, _ what: String) {
+    tap(target)
+    if !expected.waitForExistence(timeout: 5), dismissSystemSheets(), !expected.exists,
+      target.exists
+    {
+      tap(target)
+    }
+    wait(for: expected, what)
   }
 
   /// Taps, scrolling first when the element is below the fold, as it often
@@ -450,10 +452,6 @@ final class WalkthroughTests: XCTestCase {
     field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count + 4))
   }
 
-  private func tab(_ name: String) {
-    tap(app.tabBars.buttons[name])
-  }
-
   /// Back one screen, and waits for the screen before it: a second tap during
   /// the animation can land on the outgoing screen's bar, which is still there.
   /// The previous screen is in the tree as soon as the animation starts, and
@@ -464,6 +462,10 @@ final class WalkthroughTests: XCTestCase {
     let bars = { self.app.navigationBars.allElementsBoundByIndex.map(\.identifier) }
     let before = bars()
     tap(app.navigationBars.buttons.element(boundBy: 0))
+    // A system sheet that came up as it was tapped takes the tap.
+    if !previous.waitForExistence(timeout: 5), dismissSystemSheets(), bars() == before {
+      tap(app.navigationBars.buttons.element(boundBy: 0))
+    }
     var last = before
     let deadline = Date().addingTimeInterval(5)
     while Date() < deadline {

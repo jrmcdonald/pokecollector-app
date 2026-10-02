@@ -5,16 +5,23 @@
  *                            JavaScript from Metro on the PC
  *   APP_VARIANT=production   "PokeCollector" — the JavaScript bundled in
  *
- * They need different bundle IDs to coexist. Together with AltStore they are
- * the three apps a free Apple ID allows. Don't change these IDs casually: each
- * new one uses one of the ten App IDs a free account may register a week.
+ * They need different bundle IDs to coexist. Together with SideStore (or
+ * AltStore) they are the three apps a free Apple ID allows. Don't change
+ * these IDs casually: each new one uses one of the ten App IDs a free account
+ * may register a week.
  *
  * Nothing secret or personal belongs here: this repository is public. The
  * server addresses and credentials are entered on the phone. The bundle ID
  * prefix defaults to this repository's GitHub namespace; a fork sets
  * BUNDLE_ID_PREFIX (locally, or as an Actions variable of the same name).
+ *
+ * The version is package.json's, which release-please sets. The build number
+ * is BUILD_NUMBER, which the iOS build sets to the commit count: SideStore
+ * checks both against its source, and a new build needs a higher number.
  */
 import type { ConfigContext, ExpoConfig } from 'expo/config';
+
+import { version } from './package.json';
 
 type Variant = 'development' | 'production';
 
@@ -24,6 +31,14 @@ function variant(): Variant {
   const value = process.env.APP_VARIANT ?? 'development';
   if (value !== 'development' && value !== 'production') {
     throw new Error(`APP_VARIANT must be development or production, not ${value}`);
+  }
+  return value;
+}
+
+function buildNumber(): string {
+  const value = process.env.BUILD_NUMBER?.trim() || '1';
+  if (!/^[1-9]\d*$/.test(value)) {
+    throw new Error(`BUILD_NUMBER must be a positive whole number, not ${value}`);
   }
   return value;
 }
@@ -51,7 +66,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: v.name,
     slug: 'pokecollector',
-    version: '0.1.0',
+    version,
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: v.scheme,
@@ -59,6 +74,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     platforms: ['ios'],
     ios: {
       bundleIdentifier: `${bundleIdPrefix()}.${v.suffix}`,
+      buildNumber: buildNumber(),
       supportsTablet: false,
       icon: './assets/expo.icon',
       infoPlist: {

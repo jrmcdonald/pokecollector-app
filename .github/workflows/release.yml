@@ -1,0 +1,105 @@
+# Releases, with release-please.
+#
+# Every push to main updates a "chore: release x.y.z" pull request from the
+# Conventional Commits since the last release: feat raises the minor version,
+# fix the patch, and a "!" or BREAKING CHANGE the major. It holds the next
+# CHANGELOG.md entry and the version in package.json. Merging it tags the
+# commit and publishes a GitHub release, and this workflow then builds that
+# commit for production and attaches the IPA and a SideStore source to the
+# release.
+#
+# The release pull request is opened with GITHUB_TOKEN, so other workflows do
+# not run on it (GitHub's rule against workflows starting workflows). It only
+# changes the version and the changelog, and CI runs on main once it merges.
+# The repository must allow GitHub Actions to create pull requests (Settings →
+# Actions → General).
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# One at a time, and never cancelled: a cancelled run could leave a release
+# without its IPA.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  build:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ios-build.yml
+    with:
+      variant: production
+
+  publish:
+    needs: [release-please, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.release-please.outputs.tag }}
+      VERSION: ${{ needs.release-please.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: PokeCollector-production
+          path: build
+
+      - name: Name the IPA after its version
+        run: mv build/PokeCollector-production.ipa "build/PokeCollector-${VERSION}.ipa"
+
+      - name: Write the SideStore source
+        run: |
+          gh release view "${TAG}" --json body --jq .body > build/notes.md
+          node scripts/release/write-source.ts \
+            --ipa "build/PokeCollector-${VERSION}.ipa" \
+            --info build/info.json \
+            --entitlements build/entitlements.json \
+            --repository "${GITHUB_REPOSITORY}" \
+            --tag "${TAG}" \
+            --date "$(gh release view "${TAG}" --json publishedAt --jq .publishedAt)" \
+            --notes build/notes.md \
+            --out build/source.json
+
+      - name: Attach them to the release
+        run: |
+          gh release upload "${TAG}" "build/PokeCollector-${VERSION}.ipa" build/source.json --clobber
+          {
+            echo "### ${TAG}"
+            echo
+            echo "- IPA: \`PokeCollector-${VERSION}.ipa\`"
+            echo "- SideStore source: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/source.json"
+          } >> "$GITHUB_STEP_SUMMARY"

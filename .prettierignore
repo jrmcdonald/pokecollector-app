@@ -3,5 +3,6 @@ ios/
 android/
 .expo/
 package-lock.json
-# release-please writes it, in its own style.
+# release-please writes these, in its own style.
 CHANGELOG.md
+.release-please-manifest.json

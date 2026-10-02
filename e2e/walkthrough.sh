@@ -107,7 +107,7 @@ if [ "$status" -ne 0 ] &&
   set -e
 fi
 
-grep -E '^AUDIT|error:|Test Case .* failed|\*\* TEST' "$OUT/$name.log" || true
+grep -E '^AUDIT|^CAPTURE|error:|Test Case .* failed|\*\* TEST' "$OUT/$name.log" || true
 
 if [ "$status" -ne 0 ]; then
   # What the walkthrough saw when it stopped, and what the app asked the

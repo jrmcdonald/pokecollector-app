@@ -232,8 +232,15 @@ final class WalkthroughTests: XCTestCase {
     // open over Server and login, the form scrolled to make room for it.
     // Return closes it, as in type().
     if app.keyboards.firstMatch.exists {
+      // Said in the log, with what had focus: what opens it is not known yet.
+      let focused = app.descendants(matching: .any)
+        .matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
+      let what = focused.exists ? "\(focused.elementType.rawValue) '\(focused.label)'" : "nothing"
+      print("CAPTURE\t\(name)\ta keyboard was open; focus on \(what)")
       app.typeText("\n")
-      _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 5)
+      if !app.keyboards.firstMatch.waitForNonExistence(timeout: 5) {
+        print("CAPTURE\t\(name)\tthe keyboard stayed open")
+      }
     }
     let shot = settledScreenshot()
     do {

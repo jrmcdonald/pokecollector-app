@@ -789,3 +789,14 @@ and some of the newer Scarlet & Violet promos. Main sets were complete.
   copy. Both forget after a week, as does expo-image's disk cache.
 - **No walkthrough step.** The fake server's cards all have pictures and it
   refuses writes; the control is covered by screen tests instead.
+
+## 2026-10-03 — No FlashList recycle pool for lists that shrink
+
+The walkthrough once screenshotted a set searched for "char" still showing
+Caterpie and Raticate, what "c" had found. FlashList 2.0.2 sends cells past
+the end of a list that shrank to its recycle pool, still mounted and still
+showing their old items, until it needs them again. `maxItemsInRecyclePool`
+of 0 unmounts unused cells instead, on every list whose items can shrink in
+place: a set, Search, the collection, a binder, the wishlist, Sets and the
+set picker. Cells scrolled off screen are made again rather than reused,
+which these lists of a few hundred items do not notice.

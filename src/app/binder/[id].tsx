@@ -59,6 +59,10 @@ export default function BinderDetail() {
       <Stack.Screen options={{ title: data?.binder.name ?? name ?? '' }} />
       {data ? (
         <FlashList
+          // No recycle pool: FlashList 2.0.2 keeps cells past the end of a list
+          // that shrank, showing their old items (a set searched for "char"
+          // still showed what "c" found). Unused cells now unmount instead.
+          maxItemsInRecyclePool={0}
           data={data.cards}
           // A new list when the text size changes the columns: FlashList
           // cannot change them in place.

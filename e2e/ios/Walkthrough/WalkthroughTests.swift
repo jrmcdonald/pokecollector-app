@@ -56,15 +56,18 @@ final class WalkthroughTests: XCTestCase {
     app.launch()
     signIn()
 
-    // Home, then into the collection and one card. Home is captured on the
-    // way back: it is the first screen to load card images on a freshly
-    // erased simulator, and its screenshot has been taken with the frames
-    // still empty, the images served but not drawn, even after three
-    // unchanged frames. Back from the card, they have long since loaded.
-    // It is still left to settle first, so the image loading's cold start is
-    // spent here rather than on the collection's grid, captured next.
+    // Home, then into the collection and one card. Home is the first screen
+    // to load card images on a freshly erased simulator, and its screenshot
+    // has been taken with the frames still empty, the images served but not
+    // drawn, even after three unchanged frames. So it is left to settle, then
+    // shown again by way of another tab, and captured then. Not on the way
+    // back from the card: after that back, iOS sometimes dims the cards under
+    // the tab bar and sometimes not, so the screenshot changed between runs.
     wait(for: element(startingWith: "Collection value"), "Home")
     _ = settledScreenshot()
+    go(app.tabBars.buttons["More"], to: button(startingWith: "Wishlist"), "More, in passing")
+    go(app.tabBars.buttons["Home"], to: button(startingWith: "Browse your collection"), "Home, again")
+    capture("home")
 
     let entries = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH ' entries'"))
     go(button(startingWith: "Browse your collection"), to: entries.firstMatch, "Collection")
@@ -83,8 +86,7 @@ final class WalkthroughTests: XCTestCase {
     Thread.sleep(forTimeInterval: 3.0)
     capture("card-scrolled")
     back(to: button(startingWith: "Charizard ex"), "Collection, again")
-    back(to: button(startingWith: "Browse your collection"), "Home, again")
-    capture("home")
+    back(to: button(startingWith: "Browse your collection"), "Home, after the card")
 
     let field = app.textFields["Search the catalogue"]
     go(app.tabBars.buttons["Search"], to: field, "Search")

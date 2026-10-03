@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.1.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.0.0...v1.1.0) (2026-10-03)
+
+
+### Features
+
+* add your own photo to a card the catalogue has no picture of ([c73bf0e](https://github.com/jrmcdonald/pokecollector-app/commit/c73bf0e93ed4738d84a194ebf5abffd74b7a9f86))
+* add your own photo to a card the catalogue has no picture of ([08b3da7](https://github.com/jrmcdonald/pokecollector-app/commit/08b3da721acb0753e23fa06d8d54d5ad5edfb504))
+* filter the catalogue search, and search within a set ([1e0f1da](https://github.com/jrmcdonald/pokecollector-app/commit/1e0f1da6c033d7d78b7b736018d676bdf563fcef))
+* filter the catalogue search, and search within a set ([79c3cee](https://github.com/jrmcdonald/pokecollector-app/commit/79c3ceec3871c241a357970e8c1adb2bac91e2f7))
+
+
+### Bug fixes
+
+* give card grids and segmented controls room at the largest text sizes ([5868931](https://github.com/jrmcdonald/pokecollector-app/commit/5868931ad3bc886f381247d7c15d5c1471211e9d))
+* give card grids and segmented controls room at the largest text sizes ([c1e77b6](https://github.com/jrmcdonald/pokecollector-app/commit/c1e77b6419b9c422e63578485428a4db99ff4899))
+* let a filter button take a whole row before cutting its label short ([2992ca2](https://github.com/jrmcdonald/pokecollector-app/commit/2992ca2fdae245b8fcdcaa561a1b521b197e1284))
+* read the text size once per screen for card grids and segments ([67df59c](https://github.com/jrmcdonald/pokecollector-app/commit/67df59c4ba3647f7310df3eec4ef06da19fa2d75))
+* stop shrinking lists showing cards from an earlier search ([bea3af0](https://github.com/jrmcdonald/pokecollector-app/commit/bea3af0c323225bd4b1062129959e1086a5354cd))
+
 ## [1.0.0](https://github.com/jrmcdonald/pokecollector-app/compare/v0.1.0...v1.0.0) (2026-10-02)
 
 

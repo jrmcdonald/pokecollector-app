@@ -96,6 +96,15 @@ final class WalkthroughTests: XCTestCase {
     wait(for: results, "Search results")
     capture("search-results")
 
+    // A card the catalogue has no picture of (TCGdex has none for some
+    // promos): its placeholder, and the offer of a photo of the owner's copy.
+    // Nothing is sent: the camera and the photo picker are iOS's own screens.
+    go(
+      button(startingWith: "Pikachu with Grey Felt Hat"),
+      to: app.buttons["Add a photo of your copy"], "A card with no picture")
+    capture("card-no-picture")
+    back(to: field, "Search results, again")
+
     // A filter on top of the text. Common is the first rarity offered, so it
     // is on screen at every text size. Upstream's match also finds Uncommon;
     // the app keeps the two Common Pikachus only.

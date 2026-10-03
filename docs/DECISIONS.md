@@ -787,8 +787,12 @@ and some of the newer Scarlet & Violet promos. Main sets were complete.
   carries the time it was last changed from this phone, kept in the
   persisted query cache, so a replaced photo is never shown from the old
   copy. Both forget after a week, as does expo-image's disk cache.
-- **No walkthrough step.** The fake server's cards all have pictures and it
-  refuses writes; the control is covered by screen tests instead.
+- **The walkthrough opens a card with no picture.** The fake server's
+  "Pikachu with Grey Felt Hat", a promo, has none, as real promos often
+  lack one: its placeholder shows in the grids, and its screen (with the offer of
+  a photo) is captured and audited at both text sizes. The camera, the photo
+  picker and the upload are not: the simulator has no camera, the picker is
+  iOS's own, and the fake server refuses writes. Screen tests cover those.
 
 ## 2026-10-03 — No FlashList recycle pool for lists that shrink
 

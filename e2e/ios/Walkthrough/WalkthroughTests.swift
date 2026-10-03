@@ -112,9 +112,13 @@ final class WalkthroughTests: XCTestCase {
     go(app.buttons["Common"], to: element(startingWith: "2 cards"), "Search by rarity")
     capture("search-filtered")
 
-    // No camera on the simulator, and the permission is never granted, so
-    // this is the explanation shown before asking.
-    go(app.tabBars.buttons["Scan"], to: element(startingWith: "Camera access"), "Scan")
+    // Scan, reached by Search's camera button, which opens it to look a card
+    // up. No camera on the simulator, and the permission is never granted, so
+    // this is the explanation shown before asking; the look-up itself needs a
+    // photo, so screen tests cover it.
+    go(
+      app.buttons["Look up a card with the camera"],
+      to: element(startingWith: "Camera access"), "Scan, from Search's camera button")
     capture("scan")
 
     // A batch sent earlier and left for later (see the fake server's

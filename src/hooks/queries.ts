@@ -199,6 +199,16 @@ export function useWishlist() {
   });
 }
 
+/** The wishlist only if it is already cached, never fetched for this. */
+export function useCachedWishlist() {
+  const { getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.wishlist,
+    queryFn: () => getWishlist(getClient()),
+    enabled: false,
+  }).data;
+}
+
 export function useSets() {
   const { enabled, getClient, keys } = useKeys();
   return useQuery({

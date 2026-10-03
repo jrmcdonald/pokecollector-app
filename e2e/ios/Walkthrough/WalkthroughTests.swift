@@ -480,21 +480,30 @@ final class WalkthroughTests: XCTestCase {
       focus(field)
       _ = app.keyboards.firstMatch.waitForExistence(timeout: 5)
       clear(field)
+      var typed = true
       if attempt == 1 && !secure && !slowly {
         field.typeText(text)
       } else {
         for character in text {
+          // A field has lost its focus partway through on a slow runner (one
+          // run's password stopped after a few characters), and typing
+          // without focus fails the walkthrough outright: start again.
+          guard hasFocus(field) else {
+            typed = false
+            break
+          }
           field.typeText(String(character))
           Thread.sleep(forTimeInterval: 0.05)
         }
       }
-      if secure || (field.value as? String) == text { break }
+      if typed && (secure || (field.value as? String) == text) { break }
       if attempt == 3 {
         diagnose("Typing into \(field) gave \(field.value ?? "nothing")")
         XCTFail("Could not type into \(field)")
       }
     }
     // Return closes the keyboard, so it cannot cover the next field.
+    if !hasFocus(field) { focus(field) }
     field.typeText("\n")
   }
 

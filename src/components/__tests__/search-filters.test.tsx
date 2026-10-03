@@ -208,6 +208,21 @@ describe('Searching a set', () => {
     expect(mockRequest).toHaveBeenCalledTimes(1);
   });
 
+  it('shows only what a narrower search finds, with nothing left from before', async () => {
+    await render(withQueries(<SetChecklist />));
+    const field = await screen.findByLabelText('Search this set');
+    const tiles = () =>
+      screen.queryAllByRole('button', { name: /^(Bulbasaur|Ivysaur|Venusaur|Charmander)/ });
+
+    // "v" finds Ivysaur and Venusaur ex; "ve", Venusaur ex alone.
+    await userEvent.type(field, 'v');
+    expect(tiles()).toHaveLength(2);
+    await userEvent.type(field, 'e');
+    expect(tiles().map((tile) => tile.props.accessibilityLabel)).toEqual([
+      expect.stringMatching(/^Venusaur ex/),
+    ]);
+  });
+
   it('filters by the set’s own rarities, and says when nothing matches', async () => {
     await render(withQueries(<SetChecklist />));
     mockPick.mockResolvedValueOnce(3); // All, Common, Uncommon, Double rare

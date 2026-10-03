@@ -1,7 +1,6 @@
-import { FlashList } from '@shopify/flash-list';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { CardTile } from '@/components/card-tile';
 import { FilterButton } from '@/components/filter-button';
@@ -60,13 +59,14 @@ export default function SetChecklist() {
     <ThemedView style={styles.fill}>
       <Stack.Screen options={{ title: data?.set.name ?? name ?? '' }} />
       {data ? (
-        <FlashList
-          // No recycle pool: FlashList 2.0.2 keeps cells past the end of a list
-          // that shrank, showing their old items (a set searched for "char"
-          // still showed what "c" found). Unused cells now unmount instead.
-          maxItemsInRecyclePool={0}
+        // React Native's FlatList, not FlashList: FlashList 2.0.2 can leave
+        // cells from before a search narrowed the list on screen, even with no
+        // recycle pool (a set searched for "char" still showed Caterpie and
+        // Raticate, what "c" found). FlatList renders each row from the data
+        // it is given, and a set is a few hundred cards at most.
+        <FlatList
           data={shown}
-          // A new list when the text size changes the columns: FlashList
+          // A new list when the text size changes the columns: FlatList
           // cannot change them in place.
           key={columns}
           numColumns={columns}
@@ -133,15 +133,19 @@ export default function SetChecklist() {
             </View>
           }
           renderItem={({ item: card }) => (
-            <CardTile
-              layout={columns === 1 ? 'row' : 'tile'}
-              card={card}
-              detail={[card.number, formatPrice(card.price_trend ?? card.price_market)]
-                .filter(Boolean)
-                .join(' · ')}
-              quantity={card.owned_quantity ?? 0}
-              missing={!isOwned(card)}
-            />
+            // A fixed share of the row, so a short last row keeps the grid's
+            // column widths instead of stretching.
+            <View style={{ width: `${100 / columns}%` }}>
+              <CardTile
+                layout={columns === 1 ? 'row' : 'tile'}
+                card={card}
+                detail={[card.number, formatPrice(card.price_trend ?? card.price_market)]
+                  .filter(Boolean)
+                  .join(' · ')}
+                quantity={card.owned_quantity ?? 0}
+                missing={!isOwned(card)}
+              />
+            </View>
           )}
           ListEmptyComponent={
             searching ? (

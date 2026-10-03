@@ -758,3 +758,34 @@ on the card, and names broken mid-word ("Char/ma…") in three columns.
   been measured at the passing size and drawn at the real one. A size
   changed in Settings now applies when the screen next opens.
 - At the default size nothing changes, so the approved screenshots stand.
+
+## 2026-10-03 — Your own photo for a card with no picture
+
+TCGdex has no pictures for some products: on the server, every card of the
+McDonald's collections, the trainer kits and the 30th Classic Collection,
+and some of the newer Scarlet & Violet promos. Main sets were complete.
+
+- **The owner's own photo, nothing shared.** A card the catalogue has no
+  picture of gets "Add a photo of your copy" on its screen, taken with the
+  system camera or chosen from the library, and sent with
+  `POST /api/collection/{id}/photo`. Upstream keeps it per account, so
+  nobody else sees it. Upstream's shared alternative, an image link on the
+  catalogue card (`PUT /api/cards/{id}/custom-image`), is left out: it
+  changes the card for every account, and any account can set it.
+- **Other image sources were looked at and not used.** pokemontcg.io covers
+  the McDonald's sets and promos but shuts down on 1 March 2027 (its
+  successor, Scrydex, is paid); Limitless TCG states no terms for using its
+  images; Cardmarket and TCGplayer have no public image API. Upstream's own
+  cross-language fallback (`cross_language_image_fallback`) is on by default
+  and found nothing for these cards.
+- **Only for a card you own,** since upstream attaches the photo to a copy.
+  A card you do not own says so and how to get there.
+- **The photo is prepared as a scan photo is** (`prepareScanPhoto`: about
+  1200 px, JPEG), with expo-image-picker's camera and library, which the app
+  already has with its permissions: no native change.
+- **A changed photo gets a new cache key.** The photo's disk cache key
+  carries the time it was last changed from this phone, kept in the
+  persisted query cache, so a replaced photo is never shown from the old
+  copy. Both forget after a week, as does expo-image's disk cache.
+- **No walkthrough step.** The fake server's cards all have pictures and it
+  refuses writes; the control is covered by screen tests instead.

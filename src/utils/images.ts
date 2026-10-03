@@ -20,6 +20,11 @@ export interface CardImageFields {
 
 export type ImageSize = 'small' | 'large';
 
+/** Whether the catalogue has a picture of the card, its own or a custom one. */
+export function hasCatalogueImage(card: CardImageFields): boolean {
+  return !!(card.images_small || card.images_large || card.custom_image_url);
+}
+
 export function cardImageSource(
   card: CardImageFields,
   size: ImageSize,
@@ -63,17 +68,20 @@ export function avatarImageSource(
  * The owner's own photo of a collection entry, for a card with no catalogue
  * or custom image: the same fallback PokeCollector's web UI uses. It needs
  * the PokeCollector login as well as Access, and costs a request, so it is
- * only ever the last resort, cached on disk per entry.
+ * only ever the last resort, cached on disk per entry and `version`.
  */
 export function collectionPhotoSource(
   itemId: number | null | undefined,
   proxy: { baseUrl: string; headers: Record<string, string>; token: string | null; scope: string },
+  version = 0,
 ): ImageSource | null {
   if (!itemId || !proxy.baseUrl || !proxy.token) return null;
   return {
     uri: `${proxy.baseUrl}/api/collection/${itemId}/photo`,
     headers: { ...proxy.headers, Authorization: `Bearer ${proxy.token}` },
-    cacheKey: `collection-photo-${proxy.scope}-${itemId}`,
+    // The photo can be replaced from the card screen; a new version is a new
+    // key, so the old copy on disk is never shown for the new one.
+    cacheKey: `collection-photo-${proxy.scope}-${itemId}${version ? `-v${version}` : ''}`,
   };
 }
 

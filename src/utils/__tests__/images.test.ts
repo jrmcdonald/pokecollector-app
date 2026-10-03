@@ -2,6 +2,7 @@ import {
   avatarImageSource,
   cardImageSource,
   collectionPhotoSource,
+  hasCatalogueImage,
   scanPhotoSource,
 } from '../images';
 
@@ -72,6 +73,12 @@ describe('collectionPhotoSource', () => {
     });
   });
 
+  it('takes a new cache key once the photo has been changed', () => {
+    expect(collectionPhotoSource(42, withLogin, 1790000000000)?.cacheKey).toBe(
+      'collection-photo-acct1-42-v1790000000000',
+    );
+  });
+
   it('has nothing without an entry or a login', () => {
     expect(collectionPhotoSource(null, withLogin)).toBeNull();
     expect(collectionPhotoSource(42, { ...withLogin, token: null })).toBeNull();
@@ -89,5 +96,14 @@ describe('scanPhotoSource', () => {
 
   it('needs a login', () => {
     expect(scanPhotoSource(4, 9, { ...proxy, token: null, scope: 'acct' })).toBeNull();
+  });
+});
+
+describe('hasCatalogueImage', () => {
+  it('counts the TCGdex pictures and a custom one, not the owner’s photo', () => {
+    expect(hasCatalogueImage({ id: 'a', images_small: 'https://x/low.webp' })).toBe(true);
+    expect(hasCatalogueImage({ id: 'a', images_large: 'https://x/high.webp' })).toBe(true);
+    expect(hasCatalogueImage({ id: 'a', custom_image_url: 'https://x/c.png' })).toBe(true);
+    expect(hasCatalogueImage({ id: 'a', images_small: null, images_large: null })).toBe(false);
   });
 });

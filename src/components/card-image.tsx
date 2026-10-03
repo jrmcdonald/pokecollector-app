@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { usePhotoVersion } from '@/hooks/queries';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useSession } from '@/session/session';
 import { radius, useColors } from '@/theme';
@@ -41,6 +42,7 @@ export function CardImage({ card, size, style, frame = 'plain', photoItemId }: P
   const colors = useColors();
   const reduceMotion = useReduceMotion();
   const { session } = useSession();
+  const photoVersion = usePhotoVersion(card.id);
   const proxy =
     session.status === 'signedIn'
       ? { baseUrl: session.client.activeBaseUrl, headers: session.client.proxyHeaders }
@@ -48,11 +50,11 @@ export function CardImage({ card, size, style, frame = 'plain', photoItemId }: P
   const source =
     cardImageSource(card, size, proxy) ??
     (session.status === 'signedIn'
-      ? collectionPhotoSource(photoItemId, {
-          ...proxy,
-          token: session.client.sessionToken,
-          scope: session.cacheId,
-        })
+      ? collectionPhotoSource(
+          photoItemId,
+          { ...proxy, token: session.client.sessionToken, scope: session.cacheId },
+          photoVersion,
+        )
       : null);
 
   const edge =

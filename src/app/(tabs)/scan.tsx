@@ -1,7 +1,7 @@
 import { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
-import { router, useIsFocused } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -12,12 +12,13 @@ import {
 } from 'react-native-vision-camera';
 
 import { MAX_BATCH_PHOTOS } from '@/api/batch';
-import { searchTermFor } from '@/api/scan';
+import { searchTermFor, soleMatch } from '@/api/scan';
 import type { ScanMatch } from '@/api/schemas';
 import { Button } from '@/components/button';
 import { Icon } from '@/components/icon';
 import { TrayButton, TraySheet, type TrayPhoto } from '@/components/scan/batch-tray';
 import { GuideOverlay } from '@/components/scan/guide-overlay';
+import { LookupResult } from '@/components/scan/lookup-result';
 import { ReviewEntry } from '@/components/scan/review-entry';
 import { ScanCandidates } from '@/components/scan/scan-candidates';
 import { ScanConfirm, type ScanChoice } from '@/components/scan/scan-confirm';
@@ -33,13 +34,13 @@ import type { AutoStatus } from '@/utils/card-detect';
 import { guideRect, type CameraFrame, type Size } from '@/utils/crop';
 import { photosFromLibrary } from '@/utils/library';
 import { prepareScanPhoto } from '@/utils/scan-photo';
+import { loadScanMode, saveScanMode, type ScanMode as Mode } from '@/utils/scan-mode';
 import { showToast } from '@/utils/toast';
-
-type Mode = 'single' | 'batch';
 
 const MODES = [
   { value: 'single', label: 'One card' },
   { value: 'batch', label: 'Batch' },
+  { value: 'lookup', label: 'Look up' },
 ] as const;
 
 /**
@@ -51,6 +52,11 @@ const MODES = [
  * from the library, then send them all as one job and review them together
  * (`/scans/[id]`). Batches not finished wait in the scan inbox, which this
  * tab links to.
+ *
+ * Or a look-up: the same single scan, but the match opens what the card is
+ * worth and whether it is owned, and nothing is added unless asked. For a
+ * card in a shop or a friend's binder. Search's camera button opens this
+ * mode (`?mode=lookup`), and the tab remembers the last mode chosen.
  *
  * With Auto on, the photo takes itself once a card has sat still in the
  * guide for half a second (`useAutoCapture`).
@@ -157,7 +163,12 @@ function Scanner() {
   const [picking, setPicking] = useState(false);
   const [tally, setTally] = useState(0);
   const [selected, setSelected] = useState<ScanMatch | null>(null);
-  const [mode, setMode] = useState<Mode>('single');
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const [mode, setModeState] = useState<Mode>(params.mode === 'lookup' ? 'lookup' : 'single');
+  /** In a look-up, the person asked to see every candidate, not only the sole match. */
+  const [showAll, setShowAll] = useState(false);
+  /** In a look-up, the person chose to add the card after all. */
+  const [adding, setAdding] = useState(false);
   const [tray, setTray] = useState<TrayPhoto[]>([]);
   const [trayOpen, setTrayOpen] = useState(false);
   const { state } = flow;
@@ -171,6 +182,38 @@ function Scanner() {
   }, [view, insets.bottom]);
   const guide = frame?.guide ?? null;
   const batch = mode === 'batch';
+  const lookup = mode === 'lookup';
+
+  function setMode(next: Mode) {
+    setModeState(next);
+    saveScanMode(next);
+  }
+
+  // The last mode chosen, unless a link asked for one first.
+  useEffect(() => {
+    let cancelled = false;
+    loadScanMode().then((saved) => {
+      if (!cancelled && saved) setModeState((current) => (current === 'single' ? saved : current));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Search's camera button opens the tab in look-up mode. Adjusted during
+  // render, as Search does with its q, so there is no frame in the old mode.
+  const [lastParam, setLastParam] = useState(params.mode);
+  if (params.mode !== lastParam) {
+    setLastParam(params.mode);
+    if (params.mode === 'lookup') setModeState('lookup');
+  }
+  // Then the choice is remembered and the parameter dropped, so pressing the
+  // button again (after changing mode) still works.
+  useEffect(() => {
+    if (params.mode !== 'lookup') return;
+    saveScanMode('lookup');
+    router.setParams({ mode: undefined });
+  }, [params.mode]);
   const trayFull = tray.length >= MAX_BATCH_PHOTOS;
   // A batch photo stays on the phone, so batch mode works offline until "Scan".
   const canShoot =
@@ -278,23 +321,39 @@ function Scanner() {
       {
         onSuccess: () => {
           setTally((t) => t + choice.quantity);
-          setSelected(null);
           // Resolved upstream already; nothing to delete.
-          flow.reset({ keepJob: true });
+          backToCamera({ keepJob: true });
         },
       },
     );
   }
 
-  function searchInstead(term: string) {
+  /** Back to the camera, forgetting the choice on screen. */
+  function backToCamera(options?: { keepJob?: boolean }) {
     setSelected(null);
-    flow.reset();
+    setShowAll(false);
+    setAdding(false);
+    flow.reset(options);
+  }
+
+  /** The card's page; the look-up's scan is dropped, as it was only a look. */
+  function openCard(match: ScanMatch) {
+    backToCamera();
+    router.push({ pathname: '/card/[id]', params: { id: match.id } });
+  }
+
+  function searchInstead(term: string) {
+    backToCamera();
     router.navigate({ pathname: '/search', params: { q: term } });
   }
 
   const busy = state.step === 'uploading' || state.step === 'waiting';
   const recognized = 'recognized' in state ? state.recognized : null;
   const term = searchTermFor(recognized);
+  // A look-up skips the picker when only one candidate has the number read.
+  const sole =
+    lookup && state.step === 'results' ? soleMatch(state.candidates, state.recognized) : null;
+  const chosen = selected ?? (showAll ? null : sole);
 
   return (
     <ThemedView style={styles.fill}>
@@ -490,23 +549,41 @@ function Scanner() {
                     accessibilityRole="button"
                     accessibilityLabel="Close and scan another card"
                     hitSlop={spacing.sm}
-                    onPress={() => {
-                      setSelected(null);
-                      flow.reset();
-                    }}
+                    onPress={() => backToCamera()}
                     style={[styles.close, { backgroundColor: colors.surfaceRaised }]}>
                     <Icon name="xmark" size={14} color="textSecondary" weight="bold" />
                   </Pressable>
                 </View>
                 <ScrollView contentContainerStyle={styles.sheetContent} bounces={false}>
                   {state.step === 'results' ? (
-                    selected ? (
+                    chosen && lookup && !adding ? (
+                      <LookupResult
+                        match={chosen}
+                        onScanAnother={() => backToCamera()}
+                        onOpen={() => openCard(chosen)}
+                        onAdd={() => setAdding(true)}
+                        onBack={
+                          state.candidates.length > 1
+                            ? () => {
+                                setSelected(null);
+                                setShowAll(true);
+                              }
+                            : undefined
+                        }
+                      />
+                    ) : chosen ? (
                       <ScanConfirm
-                        match={selected}
+                        match={chosen}
                         busy={add.isPending}
                         disabled={!online}
-                        onAdd={(choice) => confirm(selected, choice)}
-                        onBack={() => setSelected(null)}
+                        onAdd={(choice) => confirm(chosen, choice)}
+                        onBack={() => {
+                          if (lookup) {
+                            setAdding(false);
+                          } else {
+                            setSelected(null);
+                          }
+                        }}
                       />
                     ) : (
                       <>
@@ -528,7 +605,7 @@ function Scanner() {
                             title="Retake"
                             variant="secondary"
                             style={styles.action}
-                            onPress={() => flow.reset()}
+                            onPress={() => backToCamera()}
                           />
                         </View>
                       </>
@@ -549,7 +626,7 @@ function Scanner() {
                           onPress={() => searchInstead(term)}
                         />
                       ) : null}
-                      <Button title="Retake" variant="secondary" onPress={() => flow.reset()} />
+                      <Button title="Retake" variant="secondary" onPress={() => backToCamera()} />
                     </>
                   )}
                 </ScrollView>
@@ -577,8 +654,9 @@ function Scanner() {
 function hintFor(mode: Mode, online: boolean, trayFull: boolean, auto: AutoStatus | null): string {
   if (auto === 'holding' && (mode === 'batch' ? !trayFull : online)) return 'Hold still…';
   if (auto === 'remove' && mode === 'batch' && !trayFull) return 'Got it. Next card';
-  if (mode === 'single') {
-    return online ? 'Fit the card inside the frame' : 'Offline: scanning needs a connection';
+  if (mode !== 'batch') {
+    if (!online) return 'Offline: scanning needs a connection';
+    return mode === 'lookup' ? 'Look up a card. Nothing is added' : 'Fit the card inside the frame';
   }
   if (trayFull) return `${MAX_BATCH_PHOTOS} photos is the most in one batch`;
   return online ? 'One card per photo' : 'Offline: photos wait here until you’re connected';
@@ -604,6 +682,7 @@ const styles = StyleSheet.create({
   top: { position: 'absolute', top: 0, left: 0, right: 0 },
   topRow: {
     flexDirection: 'row',
+    gap: spacing.sm,
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
@@ -624,7 +703,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   hint: { position: 'absolute', left: 0, right: 0, textAlign: 'center', lineHeight: 34 },
-  mode: { width: 208 },
+  mode: { flex: 1, maxWidth: 300 },
   toggles: { flexDirection: 'row', gap: spacing.sm },
   autoPill: {
     minWidth: minTapTarget,

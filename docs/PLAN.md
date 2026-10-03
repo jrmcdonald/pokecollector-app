@@ -531,6 +531,26 @@ The app:
 **Done when:** thirty cards can be photographed in a minute or two, sent as
 one job, and added after a review that is mostly one tap each.
 
+### 8.2 Looking a card up
+
+Scan a card to see what it is worth and whether you own it, without adding
+it: a card in a shop or a friend's binder.
+
+- [x] **A "Look up" mode on the Scan tab,** beside "One card" and "Batch",
+      remembered between visits. Search's camera button opens it.
+- [x] **The match opens a result, not the add step:** the trend price and
+      the others (`GET /api/cards/{id}`, one request), and how many you own,
+      from the cached collection. When only one candidate has the number read
+      off the card, it opens straight after the scan, with "Not this one?"
+      for the rest.
+- [x] **From there:** scan another, add to the wishlist, open the card, or
+      add it to the collection after all, through the same confirm step.
+- [ ] **A tally of this visit's look-ups,** with their prices and a total,
+      for pricing a stack.
+
+**Done when:** a card can be priced in one shutter press and no taps when
+the scan is sure of it, and nothing is added unless asked.
+
 ---
 
 ### 8.2 Design and accessibility review (the plan is paused for this)

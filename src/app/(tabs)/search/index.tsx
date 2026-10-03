@@ -1,11 +1,12 @@
 import { FlashList } from '@shopify/flash-list';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { CardTile } from '@/components/card-tile';
 import { FilterButton } from '@/components/filter-button';
+import { Icon } from '@/components/icon';
 import { SearchField } from '@/components/search-field';
 import { SetPicker } from '@/components/set-picker';
 import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
@@ -14,7 +15,7 @@ import { ThemedView } from '@/components/themed-view';
 import { useCachedCollection, useCardSearch } from '@/hooks/queries';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useCardColumns } from '@/hooks/use-large-text';
-import { spacing, useColors } from '@/theme';
+import { minTapTarget, radius, spacing, useColors } from '@/theme';
 import { pick } from '@/utils/pick';
 import {
   CATEGORIES,
@@ -152,13 +153,28 @@ export default function Search() {
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <View style={styles.header}>
-            <SearchField
-              value={text}
-              onChangeText={setText}
-              placeholder="Card name, or a code like PFL 001"
-              accessibilityLabel="Search the catalogue"
-              autoFocus={false}
-            />
+            <View style={styles.fieldRow}>
+              <SearchField
+                value={text}
+                onChangeText={setText}
+                placeholder="Card name, or a code like PFL 001"
+                accessibilityLabel="Search the catalogue"
+                autoFocus={false}
+                style={styles.field}
+              />
+              {/* Look a card up from a photo of it: Scan, in look-up mode. */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Look up a card with the camera"
+                onPress={() => router.navigate({ pathname: '/scan', params: { mode: 'lookup' } })}
+                style={({ pressed }) => [
+                  styles.camera,
+                  { backgroundColor: colors.surface, borderColor: colors.outline },
+                  pressed && styles.pressed,
+                ]}>
+                <Icon name="camera" size={18} color="text" />
+              </Pressable>
+            </View>
             <View style={styles.buttons}>
               <FilterButton
                 name="Set"
@@ -268,6 +284,17 @@ export default function Search() {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   header: { paddingHorizontal: spacing.sm, paddingBottom: spacing.sm, gap: spacing.sm },
+  fieldRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  field: { flex: 1 },
+  camera: {
+    width: minTapTarget,
+    height: minTapTarget,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pressed: { opacity: 0.7 },
   buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   list: { paddingHorizontal: spacing.sm, paddingBottom: spacing.sm },
   footer: { padding: spacing.lg },

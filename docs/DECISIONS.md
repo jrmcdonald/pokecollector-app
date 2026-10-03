@@ -804,3 +804,31 @@ of 0 unmounts unused cells instead, on every list whose items can shrink in
 place: a set, Search, the collection, a binder, the wishlist, Sets and the
 set picker. Cells scrolled off screen are made again rather than reused,
 which these lists of a few hundred items do not notice.
+
+## 2026-10-03 — Looking a card up by scanning it
+
+`PLAN.md` §8.2: scanning a card to see its value, without adding it.
+
+- **A third mode on the Scan tab, not a screen of its own.** "Look up"
+  reuses the camera, the guide, Auto and the scan flow as they are; only the
+  sheet after the match differs. The tab remembers the last mode in
+  AsyncStorage (`src/utils/scan-mode.ts`), so someone in a shop stays in
+  it. Search has a camera button that opens it (`/scan?mode=lookup`); the
+  parameter is dropped once used, so the button works again after the mode
+  is changed by hand.
+- **No picking when the scan is sure.** When exactly one candidate has the
+  number read off the card (`soleMatch`), its result opens straight away;
+  "Not this one?" shows the rest. Adding keeps its picker, since a wrong add
+  costs more than a wrong look.
+- **The price costs one request.** Scan candidates carry no prices, so the
+  result fetches the card (`GET /api/cards/{id}`), the request the card's page
+  makes, and cached for it. Ownership comes from the cached collection and
+  the wishlist only from its cache, at no cost. A look-up is still about
+  eight requests with the polling, so about seven a minute at most under the
+  shared limit.
+- **A look-up's scan is deleted** when the result is left (scan another,
+  close, open the card), like any abandoned scan, so look-ups do not collect
+  in the web UI's scan inbox. "Add to collection…" goes through the usual
+  confirm step and `resolve-and-add` on the same scan instead.
+- **The price is labelled Cardmarket, in euros,** on the result itself, so it
+  is not read as pounds at a shop counter.

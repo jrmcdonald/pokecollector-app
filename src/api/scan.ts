@@ -40,6 +40,19 @@ export function rankCandidates(
   return [...ranked.filter((r) => r.numberMatches), ...ranked.filter((r) => !r.numberMatches)];
 }
 
+/**
+ * The one candidate whose number is the one read off the card, when exactly
+ * one is: a look-up shows it straight away, with no picking. None when no
+ * number was read or several printings share it.
+ */
+export function soleMatch(
+  candidates: readonly ScanMatch[],
+  recognized: Recognized | null | undefined,
+): ScanMatch | null {
+  const matching = rankCandidates(candidates, recognized).filter((r) => r.numberMatches);
+  return matching.length === 1 ? (matching[0]?.match ?? null) : null;
+}
+
 export const POLL_DELAYS_MS = [1_000, 2_000, 4_000, 8_000] as const;
 /** Longest the app waits between polls, whatever upstream's retry time says. */
 const MAX_DELAY_MS = 30_000;

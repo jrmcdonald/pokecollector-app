@@ -6,6 +6,7 @@ import {
   normaliseNumber,
   rankCandidates,
   searchTermFor,
+  soleMatch,
   waitForScan,
 } from '../scan';
 import { candidatesOf } from '../schemas';
@@ -155,5 +156,30 @@ describe('rankCandidates', () => {
   it("keeps upstream's order when no number was read", () => {
     expect(rankCandidates(candidates, null).map((r) => r.numberMatches)).toEqual([false, false]);
     expect(rankCandidates(candidates, null)[0]?.match.tcg_card_id).toBe('sv05-120');
+  });
+});
+
+describe('soleMatch', () => {
+  const card = (id: string, number: string) => ({
+    id: `${id}_en`,
+    tcg_card_id: id,
+    name: 'Koraidon ex',
+    number,
+  });
+
+  it('is the one candidate whose number was read', () => {
+    const candidates = [card('asc-121', '121'), card('sv05-120', '120/162')];
+    expect(soleMatch(candidates, { number_local: '120' })?.tcg_card_id).toBe('sv05-120');
+  });
+
+  it('is none when several candidates share the number', () => {
+    const candidates = [card('sv05-120', '120'), card('sv06-120', '120')];
+    expect(soleMatch(candidates, { number_local: '120' })).toBeNull();
+  });
+
+  it('is none when no number was read, or none matches it', () => {
+    const candidates = [card('sv05-120', '120')];
+    expect(soleMatch(candidates, null)).toBeNull();
+    expect(soleMatch(candidates, { number_local: '7' })).toBeNull();
   });
 });

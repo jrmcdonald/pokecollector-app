@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.1.0...v1.2.0) (2026-10-03)
+
+
+### Features
+
+* look a card up by scanning it, without adding it ([ef6ced5](https://github.com/jrmcdonald/pokecollector-app/commit/ef6ced5be5d4bce6351d357af389323a654a1f44))
+* look a card up by scanning it, without adding it ([b0129ea](https://github.com/jrmcdonald/pokecollector-app/commit/b0129ea84723efe5f7e4da2cbc29ef7ae89717b2))
+
+
+### Bug fixes
+
+* stop a set's search showing cards from a shorter search ([0165a40](https://github.com/jrmcdonald/pokecollector-app/commit/0165a40c68af09b96f95b710c800e157b441b133))
+
 ## [1.1.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.0.0...v1.1.0) (2026-10-03)
 
 

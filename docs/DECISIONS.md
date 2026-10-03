@@ -830,5 +830,9 @@ which these lists of a few hundred items do not notice.
   close, open the card), like any abandoned scan, so look-ups do not collect
   in the web UI's scan inbox. "Add to collection…" goes through the usual
   confirm step and `resolve-and-add` on the same scan instead.
+- **The walkthrough reaches Scan by Search's camera button,** so the button
+  and the link it opens are tested on the simulator. The look-up result
+  needs a photo, and the simulator has no camera, so screen tests cover it
+  (`lookup-result.test.tsx`), as they do the add flow.
 - **The price is labelled Cardmarket, in euros,** on the result itself, so it
   is not read as pounds at a shop counter.

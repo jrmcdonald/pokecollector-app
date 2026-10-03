@@ -44,6 +44,10 @@ export default function Sets() {
       </View>
       {sets.data ? (
         <FlashList
+          // No recycle pool: FlashList 2.0.2 keeps cells past the end of a list
+          // that shrank, showing their old items (a set searched for "char"
+          // still showed what "c" found). Unused cells now unmount instead.
+          maxItemsInRecyclePool={0}
           data={shown}
           keyExtractor={(set) => set.id}
           keyboardDismissMode="on-drag"

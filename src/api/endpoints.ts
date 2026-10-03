@@ -209,6 +209,34 @@ export function removeBinderEntry(
 }
 
 /**
+ * The owner's own photo of a card, shown when the catalogue has no picture.
+ * Upstream keeps one per card per account, whichever copy it was sent with,
+ * and re-encodes it as a JPEG without its metadata. Up to 12 MB; the app
+ * sends a few hundred KB.
+ */
+export function uploadCollectionPhoto(
+  client: PokeCollectorClient,
+  itemId: number,
+  photo: Blob,
+): Promise<unknown> {
+  const form = new FormData();
+  form.append('file', photo);
+  return client.request(`/api/collection/${itemId}/photo`, {
+    method: 'POST',
+    form,
+    timeoutMs: 60_000,
+  });
+}
+
+/** Removes the owner's photo of the copy's card. The copy stays. */
+export function deleteCollectionPhoto(
+  client: PokeCollectorClient,
+  itemId: number,
+): Promise<unknown> {
+  return client.request(`/api/collection/${itemId}/photo`, { method: 'DELETE' });
+}
+
+/**
  * Uploads photos as one scan job and returns straight away; recognition runs
  * in the background upstream, one item per photo. Each photo is anything
  * FormData can send as a file: in the app, an expo-file-system File. Upstream

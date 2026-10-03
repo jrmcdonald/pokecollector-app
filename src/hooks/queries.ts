@@ -8,6 +8,7 @@
  */
 import {
   onlineManager,
+  QueryClientContext,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -15,7 +16,7 @@ import {
 } from '@tanstack/react-query';
 import { File, Paths } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
-import { useSyncExternalStore } from 'react';
+import { useCallback, useContext, useSyncExternalStore } from 'react';
 
 import { batchPollDelay } from '@/api/batch';
 import { addDeckToCollection, importDecklist } from '@/api/decks';
@@ -26,6 +27,7 @@ import {
   addToCollection,
   addToWishlist,
   createScanJob,
+  deleteCollectionPhoto,
   deleteDeck,
   deleteScanJob,
   dismissScanItem,
@@ -49,6 +51,7 @@ import {
   retryScanItem,
   searchCards,
   updateCollectionItem,
+  uploadCollectionPhoto,
   type NewCollectionItem,
 } from '@/api/endpoints';
 import { ApiError } from '@/api/errors';
@@ -104,6 +107,7 @@ export function useKeys() {
       deck: (id: number) => [cacheId, 'deck', id] as const,
       deckAll: [cacheId, 'deck'] as const,
       printingDetails: [cacheId, 'printing-details'] as const,
+      photoVersions: [cacheId, 'photo-versions'] as const,
       scanJobs: [cacheId, 'scan-jobs'] as const,
       scanJob: (id: number) => [cacheId, 'scan-job', id] as const,
     },
@@ -430,6 +434,72 @@ export function useAddToBinder() {
 }
 
 /** Optimistic, like the wishlist. */
+type PhotoVersions = Record<string, number>;
+
+/**
+ * When this account last changed a card's own photo, or 0: part of the
+ * photo's cache key, so a replaced photo is fetched again rather than shown
+ * from disk. Kept in the query cache (never fetched) and persisted with it.
+ * Both forget after a week (gcTime and the persister's maxAge), as does
+ * expo-image's disk cache, so an old copy is not left to come back.
+ *
+ * Read straight from the cache, not with useQuery: every card image asks,
+ * and a tile rendered outside a QueryClientProvider (a test) gets 0.
+ */
+export function usePhotoVersion(cardId: string): number {
+  const client = useContext(QueryClientContext);
+  const { keys } = useKeys();
+  const [cacheId] = keys.photoVersions;
+  const subscribe = useCallback(
+    (onChange: () => void) => client?.getQueryCache().subscribe(onChange) ?? (() => undefined),
+    [client],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    () => client?.getQueryData<PhotoVersions>([cacheId, 'photo-versions'])?.[cardId] ?? 0,
+  );
+}
+
+/**
+ * Sets or removes the owner's photo of a card, sent with one of its copies.
+ * Upstream keeps one photo per card, so every copy shows it. Refreshes the
+ * lists that show owner photos: the collection, Home and binders.
+ */
+export function useCardPhoto() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  const changed = (cardId: string) => {
+    queryClient.setQueryData<PhotoVersions>(keys.photoVersions, (versions) => ({
+      ...versions,
+      [cardId]: Date.now(),
+    }));
+    return Promise.all(
+      [keys.collection, keys.dashboard, keys.binderAll].map((queryKey) =>
+        queryClient.invalidateQueries({ queryKey }),
+      ),
+    );
+  };
+  const set = useMutation({
+    mutationFn: ({ itemId, photo }: { itemId: number; cardId: string; photo: Blob }) =>
+      uploadCollectionPhoto(getClient(), itemId, photo),
+    onSuccess: (_, { cardId }) => {
+      succeeded();
+      return changed(cardId);
+    },
+    onError: (error) => reportFailure('Could not save the photo', error),
+  });
+  const remove = useMutation({
+    mutationFn: ({ itemId }: { itemId: number; cardId: string }) =>
+      deleteCollectionPhoto(getClient(), itemId),
+    onSuccess: (_, { cardId }) => {
+      succeeded();
+      return changed(cardId);
+    },
+    onError: (error) => reportFailure('Could not remove the photo', error),
+  });
+  return { set, remove };
+}
+
 export function useRemoveFromBinder() {
   const queryClient = useQueryClient();
   const { getClient, keys } = useKeys();

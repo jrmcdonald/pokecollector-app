@@ -93,6 +93,8 @@ type CardInfo = {
   price: number;
   holo?: boolean;
   reverse?: boolean;
+  /** No catalogue picture, as TCGdex has none for some promos. */
+  noImage?: boolean;
 };
 
 /** The 151 subset is small on purpose, so its checklist is short and complete. */
@@ -135,7 +137,14 @@ const CARD_INFO: CardInfo[] = [
   })),
   { set: 'sv1', number: '063', name: 'Pikachu', rarity: 'Common', price: 0.25, reverse: true },
   { set: 'sv1', number: '198', name: 'Miraidon ex', rarity: 'Hyper Rare', price: 64.9, holo: true },
-  { set: 'sv2', number: '254', name: 'Pikachu with Grey Felt Hat', rarity: 'Promo', price: 0 },
+  {
+    set: 'sv2',
+    number: '254',
+    name: 'Pikachu with Grey Felt Hat',
+    rarity: 'Promo',
+    price: 0,
+    noImage: true,
+  },
   { set: 'sv2', number: '231', name: 'Iono', rarity: 'Special Illustration Rare', price: 71.2 },
   {
     set: 'sv4',
@@ -173,8 +182,8 @@ export function buildFixtures(origin: string) {
     rarity: c.rarity,
     supertype: 'Pokémon',
     artist: 'Placeholder Studio',
-    images_small: image(cardId(c), 'small'),
-    images_large: image(cardId(c), 'large'),
+    images_small: c.noImage ? null : image(cardId(c), 'small'),
+    images_large: c.noImage ? null : image(cardId(c), 'large'),
     set_ref: setRef(c.set),
     price_market: c.price || null,
     price_trend: c.price || null,

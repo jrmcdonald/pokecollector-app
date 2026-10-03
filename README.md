@@ -59,6 +59,11 @@ market, low, 30-day average and reverse holo). Change the quantity of each
 copy you own with + and −, change its variant or condition, or add the card to
 the collection, your wishlist or a binder.
 
+Some cards, such as McDonald's promos and trainer kit cards, have no picture
+in the catalogue. For a card like that you own, take a photo of your copy or
+pick one from your library. It shows wherever the card does, and only you see
+it.
+
 ### Sets, binders and the wishlist
 
 <p align="center">
@@ -69,13 +74,14 @@ the collection, your wishlist or a binder.
 
 - **Sets** show how far you've got through each set. Each one opens a
   checklist of every card, where you can show all, only the missing ones, or
-  only the ones you own.
+  only the ones you own, and search by name or number.
 - **Binders** show what's in them, what's missing and what completing them
   would cost.
 - **Wishlist** lists the cards you want with their prices. Swipe left or hold
   a card to remove it.
 - **Search** covers the whole card catalogue, not only your collection, and
-  shows how many of each card you already own.
+  shows how many of each card you already own. Filter it by set, rarity,
+  category and type.
 
 ### Add a prebuilt deck in one go
 

@@ -2,7 +2,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Alert,
+  Linking,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import {
   CONDITIONS,
@@ -28,6 +36,7 @@ import {
   useAddToWishlist,
   useBinders,
   useCard,
+  useCardPhoto,
   useCollection,
   useIsOnline,
   useSetQuantity,
@@ -39,7 +48,9 @@ import { useOwnerLabel } from '@/hooks/use-owner-label';
 import { useSession } from '@/session/session';
 import { radius, spacing, useColors } from '@/theme';
 import { binderKind, bindersOnly, isPlanned } from '@/utils/binders';
+import { CameraDeniedError, takeCardPhoto, type PhotoSource } from '@/utils/card-photo';
 import { entriesForCard } from '@/utils/collection';
+import { hasCatalogueImage } from '@/utils/images';
 import { pick } from '@/utils/pick';
 import { showToast } from '@/utils/toast';
 import { cardValue, formatPrice } from '@/utils/pricing';
@@ -87,6 +98,9 @@ export default function CardDetail() {
             frame={holo ? 'holo' : 'plain'}
             photoItemId={entries.find((e) => e.has_scan_photo)?.id}
           />
+          {hasCatalogueImage(c) ? null : (
+            <OwnPhoto cardId={c.id} entries={entries} disabled={!online} />
+          )}
           <View
             style={styles.heading}
             onLayout={(event) => {
@@ -123,6 +137,92 @@ export default function CardDetail() {
         <GridSkeleton columns={1} rows={1} />
       )}
     </ThemedView>
+  );
+}
+
+/**
+ * For a card the catalogue has no picture of: the owner's own photo of their
+ * copy, taken or chosen here. Upstream keeps one per card per account, so it
+ * goes with any of the copies, and every copy shows it. Only the owner sees
+ * it; the catalogue is unchanged.
+ */
+function OwnPhoto({
+  cardId,
+  entries,
+  disabled,
+}: {
+  cardId: string;
+  entries: CollectionItem[];
+  disabled: boolean;
+}) {
+  const photo = useCardPhoto();
+  const [preparing, setPreparing] = useState(false);
+  const copy = entries[0];
+  if (!copy) {
+    return (
+      <ThemedText variant="caption" color="textSecondary" style={styles.photoNote}>
+        No picture of this card yet. Add a copy to your collection to give it your own photo.
+      </ThemedText>
+    );
+  }
+  const hasPhoto = entries.some((e) => e.has_scan_photo);
+
+  async function add(source: PhotoSource) {
+    if (!copy) return;
+    setPreparing(true);
+    try {
+      const file = await takeCardPhoto(source);
+      if (file) photo.set.mutate({ itemId: copy.id, cardId, photo: file });
+    } catch (error) {
+      if (error instanceof CameraDeniedError) {
+        Alert.alert('Camera access is off', 'Allow it in Settings to photograph your card.', [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ]);
+      } else {
+        showToast({ kind: 'error', title: 'Could not use that photo' });
+      }
+    } finally {
+      setPreparing(false);
+    }
+  }
+
+  async function choose() {
+    const options = ['Take a photo', 'Choose from library', ...(hasPhoto ? ['Remove photo'] : [])];
+    const index = await pick('Your photo of this card', options, {
+      destructive: hasPhoto ? [2] : [],
+    });
+    if (index === 0) await add('camera');
+    else if (index === 1) await add('library');
+    else if (index === 2 && copy) {
+      Alert.alert('Remove your photo?', 'The card shows no picture again.', [
+        { text: 'Keep', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => photo.remove.mutate({ itemId: copy.id, cardId }),
+        },
+      ]);
+    }
+  }
+
+  return (
+    <View style={styles.photo}>
+      <Button
+        title={hasPhoto ? 'Change your photo' : 'Add a photo of your copy'}
+        variant="secondary"
+        busy={preparing || photo.set.isPending || photo.remove.isPending}
+        disabled={disabled}
+        accessibilityHint="The catalogue has no picture of this card. Only you see your photo."
+        onPress={choose}
+      />
+      {hasPhoto ? null : (
+        <ThemedText variant="caption" color="textSecondary" style={styles.photoNote}>
+          No picture of this card in the catalogue. A photo of your copy shows here and in your
+          lists, only for you.
+        </ThemedText>
+      )}
+    </View>
   );
 }
 
@@ -431,6 +531,8 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.lg },
   image: { width: '65%', alignSelf: 'center', borderRadius: radius.md },
   heading: { gap: spacing.sm },
+  photo: { gap: spacing.sm },
+  photoNote: { textAlign: 'center' },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2 },
   tag: { borderRadius: radius.sm, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs },
   panel: { padding: spacing.md, borderRadius: radius.lg - 2, borderWidth: 1, gap: spacing.sm + 4 },

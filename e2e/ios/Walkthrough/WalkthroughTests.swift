@@ -56,9 +56,15 @@ final class WalkthroughTests: XCTestCase {
     app.launch()
     signIn()
 
-    // Home, then into the collection and one card.
+    // Home, then into the collection and one card. Home is captured on the
+    // way back: it is the first screen to load card images on a freshly
+    // erased simulator, and its screenshot has been taken with the frames
+    // still empty, the images served but not drawn, even after three
+    // unchanged frames. Back from the card, they have long since loaded.
+    // It is still left to settle first, so the image loading's cold start is
+    // spent here rather than on the collection's grid, captured next.
     wait(for: element(startingWith: "Collection value"), "Home")
-    capture("home")
+    _ = settledScreenshot()
 
     let entries = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH ' entries'"))
     go(button(startingWith: "Browse your collection"), to: entries.firstMatch, "Collection")
@@ -78,6 +84,7 @@ final class WalkthroughTests: XCTestCase {
     capture("card-scrolled")
     back(to: button(startingWith: "Charizard ex"), "Collection, again")
     back(to: button(startingWith: "Browse your collection"), "Home, again")
+    capture("home")
 
     let field = app.textFields["Search the catalogue"]
     go(app.tabBars.buttons["Search"], to: field, "Search")

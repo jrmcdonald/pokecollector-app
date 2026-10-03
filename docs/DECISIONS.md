@@ -836,3 +836,25 @@ which these lists of a few hundred items do not notice.
   (`lookup-result.test.tsx`), as they do the add flow.
 - **The price is labelled Cardmarket, in euros,** on the result itself, so it
   is not read as pounds at a shop counter.
+
+## 2026-10-03 — A set's checklist is a FlatList
+
+The recycle pool fix above was not enough: a later walkthrough again showed
+a set searched for "char" with Caterpie and Raticate, what "c" had found,
+in place of nothing (the field, which the screen controls, read "char").
+FlashList 2.0.2 can keep cells from before the data shrank on screen, and
+its render stack is too intricate to patch without a simulator to check on;
+2.3.3, past the version Expo pins, has the same clean-up.
+
+- **The set checklist uses React Native's FlatList,** which renders each row
+  from the data it is given, so a narrower search cannot leave old cards
+  behind. A set is a few hundred cards at most, well within what FlatList
+  scrolls smoothly; the collection's 500-plus card grid stays on FlashList.
+  Each tile has a fixed share of its row, as in FlashList, so a short last
+  row keeps the grid's widths.
+- **The walkthrough checks for the leftover:** after "char" it waits for
+  Caterpie to go, as well as Bulbasaur, so a return of the bug fails the step
+  with a diagnosis instead of a changed screenshot.
+- **The other lists that shrink in place** (Search, the collection, a binder,
+  the wishlist, Sets, the set picker) keep FlashList with no recycle pool for
+  now; only the set checklist has been seen to show stale cells since.

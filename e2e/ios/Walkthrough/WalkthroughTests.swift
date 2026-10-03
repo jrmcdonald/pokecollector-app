@@ -159,6 +159,12 @@ final class WalkthroughTests: XCTestCase {
       diagnose("The set search left Bulbasaur in")
       XCTFail("The set search left Bulbasaur in")
     }
+    // Caterpie matches "c" but not "char": still on screen, it was left
+    // over from the narrower search's first letter (see DECISIONS.md).
+    if !button(startingWith: "Caterpie").waitForNonExistence(timeout: 5) {
+      diagnose("The set search left Caterpie in, from \"c\"")
+      XCTFail("The set search left Caterpie in, from \"c\"")
+    }
     capture("set-search")
     back(to: button(startingWith: "151, "), "Sets, again")
     back(to: button(startingWith: "Decks"), "More, again")

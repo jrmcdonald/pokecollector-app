@@ -17,6 +17,15 @@ export function useLargeText(): boolean {
 }
 
 /**
+ * `useLargeText`, kept at the size the screen opened with, for a layout
+ * that rearranges itself on it rather than only restyling: see
+ * `useOpeningFontScale` for what following every change does to one.
+ */
+export function useLargeTextLayout(): boolean {
+  return useOpeningFontScale() >= LARGE;
+}
+
+/**
  * Whether the text is at one of the accessibility sizes, where even a short
  * word ("Missing") outgrows a third of the screen. Controls laid side by side
  * stack then (HIG Typography: Dynamic Type sizes).

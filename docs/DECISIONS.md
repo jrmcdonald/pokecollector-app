@@ -888,7 +888,10 @@ it.
   beside it cannot hold a price there (the walkthrough at the largest size
   showed "€…", and the two days ran together), so from the largest standard
   size up the plot takes the full width, and the days and the range's low
-  and high are lines of text under it that wrap.
+  and high are lines of text under it that wrap. Which layout is fixed at
+  the text size the screen opened with (`useLargeTextLayout`): following the
+  live size, the next walkthrough drew those lines cut in half after the
+  accessibility audit's passing text sizes, as a grid screen once was.
 - **The change is green or red with ▲ or ▼,** so it is never told by colour
   alone, and both colours are in the contrast test as text on a panel.
 - **One request per card, kept six hours.** The price sync adds a day at a

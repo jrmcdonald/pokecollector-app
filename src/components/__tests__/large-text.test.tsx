@@ -128,6 +128,21 @@ describe('PriceChart', () => {
     expect(screen.queryByText(/^Low /, hidden)).toBeNull();
   });
 
+  it('keeps the layout it opened with when the text size changes', async () => {
+    mockFontScale = 3.118;
+    const view = await render(chart);
+    // As Apple's audit does for a moment.
+    mockFontScale = 1;
+    await view.rerender(
+      <PriceChart
+        points={points}
+        summary="Trend price over the past 3 months"
+        onScrub={jest.fn()}
+      />,
+    );
+    expect(screen.getByText(/^1 Jul to 30 Sept?$/, hidden)).toBeOnTheScreen();
+  });
+
   it('puts the days, low and high under the plot once the text is large', async () => {
     mockFontScale = 1.353;
     await render(chart);

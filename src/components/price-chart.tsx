@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { StyleSheet, View, type GestureResponderEvent } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 
-import { useLargeText } from '@/hooks/use-large-text';
+import { useLargeTextLayout } from '@/hooks/use-large-text';
 import { spacing, useColors } from '@/theme';
 import { formatPrice } from '@/utils/pricing';
 import { chartGeometry, formatDay, nearestIndex, type ChartPoint } from '@/utils/price-history';
@@ -40,7 +40,7 @@ export function PriceChart({
   const [width, setWidth] = useState(0);
   const [active, setActive] = useState<number | null>(null);
   const scrubbing = useRef(false);
-  const large = useLargeText();
+  const large = useLargeTextLayout();
 
   const plotWidth = Math.max(width - (large ? 0 : AXIS_WIDTH), 0);
   const geometry = chartGeometry(

@@ -12,6 +12,7 @@ import {
   DeckSchema,
   DecksSchema,
   ImportResultSchema,
+  PriceHistorySchema,
   PrintingDetailTagsSchema,
   ResolveAndAddSchema,
   ScanItemSchema,
@@ -36,6 +37,7 @@ import {
   type Dashboard,
   type Deck,
   type ImportResult,
+  type PricePoint,
   type PrintingDetailTag,
   type SearchResponse,
   type User,
@@ -65,6 +67,13 @@ export function getCollection(client: PokeCollectorClient): Promise<CollectionIt
 
 export function getCard(client: PokeCollectorClient, id: string): Promise<Card> {
   return client.request(`/api/cards/${encodeURIComponent(id)}`, { schema: CardSchema });
+}
+
+/** Every price upstream has recorded for the card, oldest first. */
+export function getPriceHistory(client: PokeCollectorClient, id: string): Promise<PricePoint[]> {
+  return client.request(`/api/cards/${encodeURIComponent(id)}/price-history`, {
+    schema: PriceHistorySchema,
+  });
 }
 
 export interface SearchParams {

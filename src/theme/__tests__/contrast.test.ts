@@ -39,6 +39,10 @@ const PAIRS: [fg: Role, bg: Role[], minimum: number, what: string][] = [
   ['danger', ['surfaceRaised'], AA.nonText, 'the error stripe on a notice'],
   ['success', ['background', 'surface'], AA.nonText, 'the Added check on a batch scan row'],
   ['accent', ['background'], AA.nonText, 'the scan guide, on its shade, once a card is found'],
+  ['success', ['surface'], AA.text, 'a price rise on the price history'],
+  ['danger', ['surface'], AA.text, 'a price fall on the price history'],
+  ['accent', ['surface'], AA.nonText, 'the price history line'],
+  ['textSecondary', ['surface'], AA.nonText, 'the price history scrub line'],
 ];
 
 describe('theme contrast (WCAG 2.2 AA)', () => {

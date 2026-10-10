@@ -82,6 +82,21 @@ export const CardSchema = z.looseObject({
 });
 export type Card = z.infer<typeof CardSchema>;
 
+/**
+ * One day of a card's Cardmarket prices, as upstream's price sync recorded
+ * it (`GET /api/cards/{id}/price-history`, oldest first). Days the sync
+ * did not run are missing, and any price can be null.
+ */
+export const PricePointSchema = z.looseObject({
+  date: z.string(),
+  price_trend: price,
+  price_market: price,
+  price_low: price,
+});
+export type PricePoint = z.infer<typeof PricePointSchema>;
+
+export const PriceHistorySchema = z.array(PricePointSchema);
+
 /** A search result: a catalogue card plus what this account owns of it. */
 export const SearchCardSchema = CardSchema.extend({
   owned: z.boolean().nullish(),

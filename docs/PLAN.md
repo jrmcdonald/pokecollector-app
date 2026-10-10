@@ -168,7 +168,7 @@ follows redirects by default, so without care an expired token looks like a
 | Secrets          | `expo-secure-store`                                                   | iOS Keychain                                                                                    |
 | Haptics          | `expo-haptics`                                                        |                                                                                                 |
 | Connectivity     | `@react-native-community/netinfo`                                     | Drives TanStack Query's `onlineManager`                                                         |
-| Charts (later)   | `react-native-gifted-charts` + `react-native-svg`                     | Chosen now so its native dependency ships in the first dev build                                |
+| Charts           | `react-native-svg`                                                    | Drawn by hand: one line chart did not need gifted-charts (DECISIONS.md)                         |
 | Styling          | `StyleSheet` + a small theme (colors, spacing, type scale), dark only | No UI kit                                                                                       |
 | Lint/format      | ESLint (`eslint-config-expo`) + Prettier                              |                                                                                                 |
 | Tests            | Jest (`jest-expo`) + React Native Testing Library                     | API client and logic first                                                                      |
@@ -366,7 +366,8 @@ a revoked service token.
       collection. Tapping a card opens its detail.
 - [x] **Card detail:** large image, set and number, prices, owned entries with
       a quantity stepper and variant and condition pickers. Buttons for "Add to
-      collection", "Add to wishlist" and "Add to binder". Price history can wait.
+      collection", "Add to wishlist" and "Add to binder". Price history and
+      the decks that list the card came later (§11).
 - [x] **Search (catalogue):** debounced (≥ 400 ms, given the rate limit),
       `page`/`page_size` infinite scroll, an owned badge computed against the
       cached collection rather than an extra request per tile. Filters for set,
@@ -667,7 +668,8 @@ versioned. So:
 ## 11. Later ideas (only if the app gets heavy use)
 
 - Trades and sealed product screens
-- Price history charts and top movers
+- [x] Price history charts on a card's page, and the decks that list the card
+- Top movers
 - A "rip mode" that scans each card as it is flipped onto the table: batch
   mode with Auto on (§8) comes close; what is left is sending each photo as
   it is taken rather than all at the end

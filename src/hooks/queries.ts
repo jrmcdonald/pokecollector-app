@@ -19,7 +19,7 @@ import * as Haptics from 'expo-haptics';
 import { useCallback, useContext, useSyncExternalStore } from 'react';
 
 import { batchPollDelay } from '@/api/batch';
-import { addDeckToCollection, importDecklist } from '@/api/decks';
+import { addDeckToCollection, deckContents, importDecklist, type DeckContents } from '@/api/decks';
 import {
   addCardToPlannedBinder,
   addCollectionItemToBinder,
@@ -38,6 +38,7 @@ import {
   getDashboard,
   getDeck,
   getDecks,
+  getPriceHistory,
   getPrintingDetailTags,
   getScanJob,
   getSetChecklist,
@@ -94,6 +95,7 @@ export function useKeys() {
       dashboard: [cacheId, 'dashboard'] as const,
       collection: [cacheId, 'collection'] as const,
       card: (id: string) => [cacheId, 'card', id] as const,
+      priceHistory: (id: string) => [cacheId, 'price-history', id] as const,
       search: (q: string, filters: object = {}) => [cacheId, 'search', q, filters] as const,
       searchAll: [cacheId, 'search'] as const,
       wishlist: [cacheId, 'wishlist'] as const,
@@ -106,6 +108,7 @@ export function useKeys() {
       decks: [cacheId, 'decks'] as const,
       deck: (id: number) => [cacheId, 'deck', id] as const,
       deckAll: [cacheId, 'deck'] as const,
+      deckContents: [cacheId, 'deck-contents'] as const,
       printingDetails: [cacheId, 'printing-details'] as const,
       photoVersions: [cacheId, 'photo-versions'] as const,
       scanJobs: [cacheId, 'scan-jobs'] as const,
@@ -153,6 +156,18 @@ export function useCard(id: string) {
     enabled: enabled && id.length > 0,
     // Catalogue data changes with the nightly price sync at most.
     staleTime: 60 * 60 * 1000,
+  });
+}
+
+/** Every price upstream has recorded for the card, oldest first. */
+export function usePriceHistory(id: string) {
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.priceHistory(id),
+    queryFn: () => getPriceHistory(getClient(), id),
+    enabled: enabled && id.length > 0,
+    // A new point a day at most, from the nightly price sync.
+    staleTime: 6 * 60 * 60 * 1000,
   });
 }
 
@@ -691,6 +706,29 @@ export function useDeck(id: number) {
   });
 }
 
+/**
+ * Every deck's cards, for a card's page to say which decks list it. Shared
+ * by every card, and read again only for decks changed since (see
+ * `deckContents`); each deck read also fills that deck's own page. Changes
+ * to the collection leave it alone: they change what is owned, not which
+ * cards a deck lists.
+ */
+export function useDeckContents() {
+  const queryClient = useQueryClient();
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.deckContents,
+    queryFn: () =>
+      deckContents(
+        getClient(),
+        queryClient.getQueryData<DeckContents[]>(keys.deckContents),
+        (deck) => queryClient.setQueryData(keys.deck(deck.id), deck),
+      ),
+    enabled,
+    staleTime: 30 * 60 * 1000,
+  });
+}
+
 /** The CSV upstream's import reads, as a file FormData can send. */
 function csvFile(csv: string): File {
   const file = new File(Paths.cache, 'deck-import.csv');
@@ -717,7 +755,7 @@ export function useImportDecklist() {
       }),
     onSuccess: ({ deck }) => queryClient.setQueryData(keys.deck(deck.id), deck),
     onError: (error) => reportFailure('Could not read the deck list', error),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.decks }),
+    onSettled: () => invalidateDecks(queryClient, keys),
   });
 }
 
@@ -737,6 +775,7 @@ export function useAddDeckEntry() {
     }) => addDeckEntry(getClient(), deckId, { card_id: cardId, required_quantity: quantity }),
     onSuccess: (deck) => queryClient.setQueryData(keys.deck(deck.id), deck),
     onError: (error) => reportFailure('Could not add the card to the deck', error),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.deckContents }),
   });
 }
 
@@ -752,7 +791,8 @@ export function useAddDeckToCollection() {
       queryClient.setQueryData(keys.deck(deck.id), deck);
     },
     onError: (error) => reportFailure('Could not add the deck', error),
-    onSettled: invalidate,
+    onSettled: () =>
+      Promise.all([invalidate(), queryClient.invalidateQueries({ queryKey: keys.deckContents })]),
   });
 }
 
@@ -763,6 +803,17 @@ export function useDeleteDeck() {
     mutationFn: (deckId: number) => deleteDeck(getClient(), deckId),
     onSuccess: (_result, deckId) => queryClient.removeQueries({ queryKey: keys.deck(deckId) }),
     onError: (error) => reportFailure('Could not delete the deck', error),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.decks }),
+    onSettled: () => invalidateDecks(queryClient, keys),
   });
+}
+
+/** After a deck is made or deleted: the list, and which decks list which cards. */
+function invalidateDecks(
+  queryClient: ReturnType<typeof useQueryClient>,
+  keys: ReturnType<typeof useKeys>['keys'],
+) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: keys.decks }),
+    queryClient.invalidateQueries({ queryKey: keys.deckContents }),
+  ]);
 }

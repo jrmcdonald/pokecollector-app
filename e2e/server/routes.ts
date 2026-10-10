@@ -117,6 +117,11 @@ export function createRouter(origin: string) {
       const found = fixtures.deck(Number(deck[1]));
       return found ? ok(found) : notFound();
     }
+    const history = path.match(/^\/api\/cards\/([^/]+)\/price-history$/);
+    if (history) {
+      const found = fixtures.priceHistory(decodeURIComponent(history[1] ?? ''));
+      return found ? ok(found) : notFound();
+    }
     const card = path.match(/^\/api\/cards\/([^/]+)$/);
     if (card) {
       const found = fixtures.card(decodeURIComponent(card[1] ?? ''));

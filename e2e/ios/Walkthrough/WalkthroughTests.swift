@@ -80,6 +80,13 @@ final class WalkthroughTests: XCTestCase {
 
     go(button(startingWith: "Charizard ex"), to: app.staticTexts["Charizard ex"].firstMatch, "Card")
     capture("card")
+    // The price history, between the top and the end: its heading (found
+    // by label, whatever element type a heading comes out as) dragged up to
+    // just under the bar, so the panel is whole on screen.
+    bringToTop(
+      app.descendants(matching: .any)
+        .matching(NSPredicate(format: "label == %@", "Price history")).firstMatch)
+    capture("card-price-history")
     scrollToEnd()
     // The scroll indicator stays a moment after the scroll stops, then fades.
     // Holding still, it can pass for a settled screen, so let it go first.
@@ -588,6 +595,22 @@ final class WalkthroughTests: XCTestCase {
       last = now
     }
     wait(for: previous, what)
+  }
+
+  /// Scrolls an element up to just under the navigation bar by dragging it
+  /// there and holding, so it stops where it was dropped: a fling would
+  /// stop somewhere different each run. Below the fold, as at the largest
+  /// text sizes, it is swiped into view first.
+  private func bringToTop(_ element: XCUIElement) {
+    wait(for: element, "\(element)")
+    var swipes = 0
+    while !element.isHittable, swipes < 6 {
+      app.swipeUp(velocity: .slow)
+      swipes += 1
+    }
+    let start = element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+    let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.16))
+    start.press(forDuration: 0.1, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.5)
   }
 
   /// Scrolls until the screen stops moving, so a scrolled screenshot is of

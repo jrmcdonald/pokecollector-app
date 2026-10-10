@@ -18,6 +18,7 @@ import {
   createDeck,
   deleteDeck,
   getDeck,
+  getDecks,
   importDeckCsv,
 } from './endpoints';
 import { ConflictError } from './errors';
@@ -111,4 +112,71 @@ export async function addDeckToCollection(
     if (error instanceof ConflictError) return { added, real: false, deck };
     throw error;
   }
+}
+
+/** One deck's cards, by card id: how many copies the deck lists. */
+export interface DeckContents {
+  id: number;
+  name: string;
+  binder_type?: string | null;
+  color?: string | null;
+  updated_at?: string | null;
+  cards: Record<string, number>;
+}
+
+/**
+ * Every deck's cards, for "which decks is this card in?". Upstream has no
+ * such lookup, and its deck list leaves the cards out, so this reads each
+ * deck. A deck read before, whose `updated_at` has not changed, is taken
+ * from `previous`: upstream moves `updated_at` on every edit of a deck's
+ * cards, so after the first time this is one request plus one per deck
+ * edited since. Decks are read one at a time, to keep within the rate limit.
+ * `onDeck` gets each deck read, so its own page need not read it again.
+ */
+export async function deckContents(
+  client: PokeCollectorClient,
+  previous: readonly DeckContents[] = [],
+  onDeck?: (deck: Deck) => void,
+): Promise<DeckContents[]> {
+  const known = new Map(previous.map((deck) => [deck.id, deck]));
+  const result: DeckContents[] = [];
+  for (const summary of await getDecks(client)) {
+    const before = known.get(summary.id);
+    if (before && summary.updated_at && before.updated_at === summary.updated_at) {
+      result.push({
+        ...before,
+        name: summary.name,
+        binder_type: summary.binder_type,
+        color: summary.color,
+      });
+      continue;
+    }
+    const deck = await getDeck(client, summary.id);
+    onDeck?.(deck);
+    const cards: Record<string, number> = {};
+    for (const entry of deck.entries ?? []) {
+      cards[entry.card_id] = (cards[entry.card_id] ?? 0) + entry.required_quantity;
+    }
+    result.push({
+      id: deck.id,
+      name: deck.name,
+      binder_type: deck.binder_type,
+      color: deck.color,
+      // The list's, as that is what the next read compares against.
+      updated_at: summary.updated_at ?? deck.updated_at,
+      cards,
+    });
+  }
+  return result;
+}
+
+/** The decks that list the card, with how many copies each does. */
+export function decksWithCard(
+  decks: readonly DeckContents[],
+  cardId: string,
+): (DeckContents & { copies: number })[] {
+  return decks.flatMap((deck) => {
+    const copies = deck.cards[cardId] ?? 0;
+    return copies > 0 ? [{ ...deck, copies }] : [];
+  });
 }

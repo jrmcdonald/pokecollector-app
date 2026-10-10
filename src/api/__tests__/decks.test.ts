@@ -1,5 +1,12 @@
 import { PokeCollectorClient } from '../client';
-import { addDeckToCollection, collectionAdds, importDecklist, langOf } from '../decks';
+import {
+  addDeckToCollection,
+  collectionAdds,
+  deckContents,
+  decksWithCard,
+  importDecklist,
+  langOf,
+} from '../decks';
 import type { Deck } from '../schemas';
 import { parseDecklist } from '@/utils/decklist';
 import { CREDENTIALS, fakeFetch, loginOk, type Call } from './fake-server';
@@ -130,5 +137,69 @@ describe('addDeckToCollection', () => {
     });
     const result = await addDeckToCollection(new PokeCollectorClient(CREDENTIALS, fetch), DECK);
     expect(result).toMatchObject({ real: false, added: { failed: 1 } });
+  });
+});
+
+describe('deckContents', () => {
+  const entry = (id: number, cardId: string, required: number) => ({
+    id,
+    card_id: cardId,
+    required_quantity: required,
+  });
+  const LIST = [
+    { id: 3, name: 'Lost Box', binder_type: 'deck', updated_at: '2026-10-01T10:00:00' },
+    { id: 4, name: 'Battle Deck', binder_type: 'physical_deck', updated_at: '2026-10-02T10:00:00' },
+  ];
+  const DETAILS: Record<string, unknown> = {
+    '3': { ...LIST[0], entries: [entry(1, 'a', 2), entry(2, 'b', 1), entry(3, 'a', 1)] },
+    '4': { ...LIST[1], entries: [entry(4, 'b', 4)] },
+  };
+
+  function server(list = LIST) {
+    return fakeFetch(({ url }) => {
+      if (url.endsWith('/login')) return loginOk('t');
+      if (url.endsWith('/api/decks/')) return { status: 200, body: list };
+      const id = /\/api\/decks\/(\d+)$/.exec(url)?.[1] ?? '';
+      return DETAILS[id] ? { status: 200, body: DETAILS[id] } : { status: 404, body: {} };
+    });
+  }
+
+  it('reads every deck the first time, and counts each card', async () => {
+    const { fetch, calls } = server();
+    const read: number[] = [];
+    const decks = await deckContents(new PokeCollectorClient(CREDENTIALS, fetch), [], (deck) =>
+      read.push(deck.id),
+    );
+    expect(calls.slice(1).map((c) => c.url.replace('https://pc.example.com', ''))).toEqual([
+      '/api/decks/',
+      '/api/decks/3',
+      '/api/decks/4',
+    ]);
+    expect(read).toEqual([3, 4]);
+    expect(decks.map((d) => d.cards)).toEqual([{ a: 3, b: 1 }, { b: 4 }]);
+    expect(decksWithCard(decks, 'b').map((d) => [d.name, d.copies])).toEqual([
+      ['Lost Box', 1],
+      ['Battle Deck', 4],
+    ]);
+    expect(decksWithCard(decks, 'c')).toEqual([]);
+  });
+
+  it('reads again only the decks changed since, and drops deleted ones', async () => {
+    const first = server();
+    const before = await deckContents(new PokeCollectorClient(CREDENTIALS, first.fetch));
+
+    const changed = [{ ...LIST[1]!, name: 'Renamed', updated_at: '2026-10-09T10:00:00' }];
+    const { fetch, calls } = server(changed);
+    const after = await deckContents(new PokeCollectorClient(CREDENTIALS, fetch), before);
+    expect(calls.slice(1).map((c) => c.url.replace('https://pc.example.com', ''))).toEqual([
+      '/api/decks/',
+      '/api/decks/4',
+    ]);
+    expect(after.map((d) => d.id)).toEqual([4]);
+
+    const again = server(changed);
+    const same = await deckContents(new PokeCollectorClient(CREDENTIALS, again.fetch), after);
+    expect(again.calls.slice(1)).toHaveLength(1);
+    expect(same[0]?.name).toBe('Renamed');
   });
 });

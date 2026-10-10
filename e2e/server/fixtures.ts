@@ -20,6 +20,7 @@ import type {
   Dashboard,
   Deck,
   DeckEntry,
+  PricePoint,
   PrintingDetailTag,
   ScanItem,
   ScanJob,
@@ -430,6 +431,7 @@ export function buildFixtures(origin: string) {
         deckEntry(2, 'sv2-231_en', 4),
         deckEntry(3, 'sv1-063_en', 4),
         deckEntry(4, 'sv3pt5-004_en', 2),
+        deckEntry(7, 'sv3pt5-006_en', 2),
       ],
     },
     {
@@ -439,13 +441,18 @@ export function buildFixtures(origin: string) {
       format: 'Casual',
       target_size: 60,
       color: '#F2C522',
-      entries: [deckEntry(5, 'sv5-051_en', 1), deckEntry(6, 'sv1-063_en', 2)],
+      entries: [
+        deckEntry(5, 'sv5-051_en', 1),
+        deckEntry(6, 'sv1-063_en', 2),
+        deckEntry(8, 'sv3pt5-006_en', 1),
+      ],
     },
   ].map((deck) => {
     const entries = deck.entries;
     const real = deck.binder_type === 'physical_deck';
     return {
       ...deck,
+      updated_at: `2026-09-${String(20 + deck.id).padStart(2, '0')}T10:00:00`,
       entries: real ? entries.map((e) => ({ ...e, shortage: 0 })) : entries,
       current_card_count: entries.reduce((sum, e) => sum + e.required_quantity, 0),
       missing_copy_count: real ? 0 : entries.reduce((sum, e) => sum + (e.shortage ?? 0), 0),
@@ -454,6 +461,36 @@ export function buildFixtures(origin: string) {
   // The list leaves out each deck's cards, as upstream's does.
   const decks = deckList.map(({ entries: _entries, ...deck }) => deck);
   const deck = (id: number): Deck | null => deckList.find((d) => d.id === id) ?? null;
+
+  // A year and a bit of daily prices for every priced card, ending on a
+  // fixed day so the screenshots never change with the date: a climb that
+  // steepens, with two wobbles on it, scaled to end on today's price. Over
+  // three months it rises about 17%, with a dip in the last month, so the
+  // ranges show both a rise and a fall. A few days the sync missed.
+  const priceHistory = (id: string): PricePoint[] | null => {
+    const found = cards.find((c) => c.id === id);
+    if (!found) return null;
+    const today = found.price_trend ?? 0;
+    if (!today) return [];
+    const days = 400;
+    const end = Date.UTC(2026, 8, 30);
+    const shape = (p: number) =>
+      0.62 + 0.38 * p * p + 0.04 * Math.sin(p * 30) + 0.05 * Math.sin(p * 9);
+    const points: PricePoint[] = [];
+    for (let i = 0; i < days; i++) {
+      if (i % 37 === 5) continue;
+      const price = Math.round(((today * shape(i / (days - 1))) / shape(1)) * 100) / 100;
+      points.push({
+        id: i + 1,
+        card_id: id,
+        date: new Date(end - (days - 1 - i) * 86_400_000).toISOString().slice(0, 10),
+        price_trend: price,
+        price_market: price,
+        price_low: Math.round(price * 70) / 100,
+      });
+    }
+    return points;
+  };
 
   const printingDetailTags: PrintingDetailTag[] = [
     { id: 1, name: 'Stamped', usage_count: 2 },
@@ -570,6 +607,7 @@ export function buildFixtures(origin: string) {
     binderCards,
     decks,
     deck,
+    priceHistory,
     wishlist,
     printingDetailTags,
     search,

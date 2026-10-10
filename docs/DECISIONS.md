@@ -858,3 +858,66 @@ its render stack is too intricate to patch without a simulator to check on;
 - **The other lists that shrink in place** (Search, the collection, a binder,
   the wishlist, Sets, the set picker) keep FlashList with no recycle pool for
   now; only the set checklist has been seen to show stale cells since.
+
+## 2026-10-10 — Price history, and the decks a card is in
+
+Two additions to a card's page: its price over time, and the decks that list
+it.
+
+- **The chart is drawn with `react-native-svg`,** already in the dev client
+  for the scan guide, rather than `react-native-gifted-charts`, which the plan
+  named. One line, three grid lines and a dot are a page of code, and need no
+  new library, no native change and no rebuild.
+- **It plots the trend price,** as the rest of the page leads with, or the
+  market price on a day with no trend. Zeros are "no price", as everywhere
+  else, and are left out rather than drawn as a crash to nothing.
+- **One line, one colour, no legend.** The panel's heading names it. The
+  price axis is not from zero, since the movement is the point; the top and
+  bottom prices are labelled beside it, the first and last days below.
+- **Ranges are 1M, 3M, 1Y and All,** offered only when the history reaches
+  past the range before, so no two show the same line. Three months is the
+  default. Ranges count back from the latest price, not from today, so a
+  card whose prices stopped syncing still shows its line, dated.
+- **Dragging across shows the price on a day,** as the iOS Stocks app does,
+  with a selection tap at each day. A vertical drag that starts on the chart
+  still scrolls the page until a drag across has made it a scrub. To
+  VoiceOver the chart is one adjustable element: its label is the summary
+  (range, first and last price, change, low and high), and swiping up or
+  down moves through the days, about a dozen steps end to end.
+- **At the large text sizes the axis moves under the plot.** A column
+  beside it cannot hold a price there (the walkthrough at the largest size
+  showed "€…", and the two days ran together), so from the largest standard
+  size up the plot takes the full width, and the days and the range's low
+  and high are lines of text under it that wrap. Which layout is fixed at
+  the text size the screen opened with (`useLargeTextLayout`): following the
+  live size, the next walkthrough drew those lines cut in half after the
+  accessibility audit's passing text sizes, as a grid screen once was.
+- **The change is green or red with ▲ or ▼,** so it is never told by colour
+  alone, and both colours are in the contrast test as text on a panel.
+- **One request per card, kept six hours.** The price sync adds a day at a
+  time. Pull to refresh on the card's page fetches it again.
+
+- **Which decks list a card needs every deck's cards.** Upstream has no
+  lookup by card, and its deck list leaves the cards out. The app keeps one
+  index of every deck's cards (`deckContents`), shared by every card's page:
+  the list, then each deck. Upstream moves a deck's `updated_at` on every
+  edit through the deck endpoints, so a deck whose `updated_at` is unchanged
+  is taken from the index rather than read again. After the first time, a
+  refresh is one request plus one per deck changed since. Decks are read one
+  at a time, to stay inside the shared rate limit.
+- **It is kept half an hour,** and made stale by the app's own deck changes
+  (import, delete, adding a card, adding to the collection). Changes to the
+  collection leave it alone: they change what is owned, not what a deck
+  lists. Each deck it reads also fills that deck's own page.
+- **The binder endpoints do not move `updated_at`.** A deck edited through
+  them (the CSV import, or the web UI's binder views) keeps its old cards in
+  the index until something else changes it. The app's own import makes a
+  new deck, which is always read; the rest is rare enough to accept.
+- **Only the card itself, not other prints of it.** A deck that lists another
+  printing of the same Pokémon is not shown. Matching by name would also
+  match unrelated cards (every "Pikachu").
+- **Shown only when the card is in a deck.** Nothing while the decks load and
+  nothing on an error: it is extra, so it never holds the page up. Each deck
+  opens its page.
+- **The walkthrough's card is in two decks,** with a year of made-up prices,
+  so the card screenshots show both.

@@ -22,9 +22,11 @@ import {
   type Variant,
 } from '@/api/schemas';
 import { Button } from '@/components/button';
+import { CardDecks } from '@/components/card-decks';
 import { CardImage, frameForVariant } from '@/components/card-image';
 import { Chips } from '@/components/chips';
 import { Icon } from '@/components/icon';
+import { PriceHistory } from '@/components/price-history';
 import { PrintingDetailsPicker } from '@/components/printing-details-picker';
 import { QuantityStepper } from '@/components/quantity-stepper';
 import { ErrorState, GridSkeleton } from '@/components/states';
@@ -38,7 +40,9 @@ import {
   useCard,
   useCardPhoto,
   useCollection,
+  useDeckContents,
   useIsOnline,
+  usePriceHistory,
   useSetQuantity,
   useUpdateCopy,
 } from '@/hooks/queries';
@@ -61,7 +65,11 @@ export default function CardDetail() {
   const colors = useColors();
   const card = useCard(id);
   const collection = useCollection();
-  const pull = usePullToRefresh(() => Promise.all([card.refetch(), collection.refetch()]));
+  const history = usePriceHistory(id);
+  const decks = useDeckContents();
+  const pull = usePullToRefresh(() =>
+    Promise.all([card.refetch(), collection.refetch(), history.refetch(), decks.refetch()]),
+  );
   const online = useIsOnline();
   const entries = entriesForCard(collection.data, id);
   const setName = useSetName(id, entries);
@@ -120,6 +128,7 @@ export default function CardDetail() {
           </View>
 
           <Prices card={c} />
+          <PriceHistory cardId={c.id} />
 
           {!online ? (
             <ThemedText variant="caption" color="textSecondary">
@@ -128,6 +137,7 @@ export default function CardDetail() {
           ) : null}
 
           <Owned entries={entries} disabled={!online} />
+          <CardDecks cardId={c.id} />
           <AddCopies card={c} disabled={!online} />
           <AddToBinder card={c} entries={entries} disabled={!online} />
         </ScrollView>

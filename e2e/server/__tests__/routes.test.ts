@@ -25,7 +25,12 @@ import {
 import { batchProgress } from '../../../src/api/batch';
 import { candidatesOf } from '../../../src/api/schemas';
 import { bindersOnly } from '../../../src/utils/binders';
-import { availableRanges, priceSeries } from '../../../src/utils/price-history';
+import {
+  availableRanges,
+  pointsInRange,
+  priceSeries,
+  summarize,
+} from '../../../src/utils/price-history';
 import { PASSWORD, USERNAME } from '../fixtures.ts';
 import { createRouter, TOKEN, type Reply } from '../routes.ts';
 
@@ -140,6 +145,9 @@ describe('fake PokeCollector', () => {
     expect(availableRanges(series)).toEqual(['1m', '3m', '1y', 'all']);
     const card = CardSchema.parse(json(get('/api/cards/sv3pt5-006_en')));
     expect(series[series.length - 1]?.price).toBe(card.price_trend);
+    // The screenshots' story: up over three months, down over the last one.
+    expect(summarize(pointsInRange(series, '3m'))?.change).toBeGreaterThan(0);
+    expect(summarize(pointsInRange(series, '1m'))?.change).toBeLessThan(0);
     expect(get('/api/cards/nope/price-history').status).toBe(404);
 
     const decks = DecksSchema.parse(json(get('/api/decks/')));

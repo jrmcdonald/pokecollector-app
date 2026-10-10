@@ -463,8 +463,10 @@ export function buildFixtures(origin: string) {
   const deck = (id: number): Deck | null => deckList.find((d) => d.id === id) ?? null;
 
   // A year and a bit of daily prices for every priced card, ending on a
-  // fixed day so the screenshots never change with the date: a climb to
-  // today's price with a gentle wobble, and a few days the sync missed.
+  // fixed day so the screenshots never change with the date: a climb that
+  // steepens, with two wobbles on it, scaled to end on today's price. Over
+  // three months it rises about 17%, with a dip in the last month, so the
+  // ranges show both a rise and a fall. A few days the sync missed.
   const priceHistory = (id: string): PricePoint[] | null => {
     const found = cards.find((c) => c.id === id);
     if (!found) return null;
@@ -472,12 +474,12 @@ export function buildFixtures(origin: string) {
     if (!today) return [];
     const days = 400;
     const end = Date.UTC(2026, 8, 30);
+    const shape = (p: number) =>
+      0.62 + 0.38 * p * p + 0.04 * Math.sin(p * 30) + 0.05 * Math.sin(p * 9);
     const points: PricePoint[] = [];
     for (let i = 0; i < days; i++) {
       if (i % 37 === 5) continue;
-      const progress = i / (days - 1);
-      const wobble = i === days - 1 ? 0 : Math.sin(i / 9) * 0.04 + Math.sin(i / 41) * 0.06;
-      const price = Math.round(today * (0.7 + 0.3 * progress + wobble) * 100) / 100;
+      const price = Math.round(((today * shape(i / (days - 1))) / shape(1)) * 100) / 100;
       points.push({
         id: i + 1,
         card_id: id,

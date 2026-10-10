@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.3.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.2.0...v1.3.0) (2026-10-10)
+
+
+### Features
+
+* edit decks: copies, cards, name, and deleting ([26e21ac](https://github.com/jrmcdonald/pokecollector-app/commit/26e21acf62a83c47ce0f34273f724db5ef004ad3))
+* find wishlist cards on eBay, Cardmarket and TCGplayer ([50bbeb3](https://github.com/jrmcdonald/pokecollector-app/commit/50bbeb3c31f69951ee2246612c470af812831ed7))
+* price history chart and a card's decks on its page ([ab06ef6](https://github.com/jrmcdonald/pokecollector-app/commit/ab06ef65113d6ce3de0fa55dc9352a56c5ac3df6))
+* price history chart and a card's decks on its page ([ae09ea2](https://github.com/jrmcdonald/pokecollector-app/commit/ae09ea22c6aa7dff5233c883b43ab48847674e30))
+
+
+### Bug fixes
+
+* keep the price chart's large-text layout steady through text size changes ([8c2eb82](https://github.com/jrmcdonald/pokecollector-app/commit/8c2eb82eded315236d5f8208ff4358a8d1ff4aa5))
+* price chart labels at large text, and its end dot ([7274dae](https://github.com/jrmcdonald/pokecollector-app/commit/7274daef20d0b3b312518ece04956ad94f616cc7))
+
 ## [1.2.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.1.0...v1.2.0) (2026-10-03)
 
 

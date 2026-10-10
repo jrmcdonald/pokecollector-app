@@ -407,6 +407,48 @@ export function addDeckEntry(
   });
 }
 
+/** Renames a deck. Upstream moves `updated_at`, as for every deck edit. */
+export function renameDeck(
+  client: PokeCollectorClient,
+  deckId: number,
+  name: string,
+): Promise<Deck> {
+  return client.request(`/api/decks/${deckId}`, {
+    method: 'PATCH',
+    json: { name },
+    schema: DeckSchema,
+  });
+}
+
+/**
+ * Sets how many copies a deck lists of a card (1–99). A Real Deck reserves
+ * the extra copies, and upstream refuses (409) if not enough are spare.
+ */
+export function updateDeckEntry(
+  client: PokeCollectorClient,
+  deckId: number,
+  entryId: number,
+  quantity: number,
+): Promise<Deck> {
+  return client.request(`/api/decks/${deckId}/entries/${entryId}`, {
+    method: 'PATCH',
+    json: { required_quantity: quantity },
+    schema: DeckSchema,
+  });
+}
+
+/** Takes a card out of a deck; a Real Deck releases its copies. */
+export function removeDeckEntry(
+  client: PokeCollectorClient,
+  deckId: number,
+  entryId: number,
+): Promise<Deck> {
+  return client.request(`/api/decks/${deckId}/entries/${entryId}`, {
+    method: 'DELETE',
+    schema: DeckSchema,
+  });
+}
+
 /**
  * Makes a planned deck a Real Deck, reserving an owned copy for every card.
  * Upstream refuses (409) unless every copy is owned and not in another deck.

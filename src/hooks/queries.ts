@@ -47,15 +47,18 @@ import {
   listScanJobs,
   removeBinderEntry,
   removeFromCollection,
+  removeDeckEntry,
   removeFromWishlist,
+  renameDeck,
   resolveAndAddScan,
   retryScanItem,
   searchCards,
   updateCollectionItem,
+  updateDeckEntry,
   uploadCollectionPhoto,
   type NewCollectionItem,
 } from '@/api/endpoints';
-import { ApiError } from '@/api/errors';
+import { ApiError, ConflictError } from '@/api/errors';
 import type {
   BinderCards,
   CollectionItem,
@@ -67,6 +70,7 @@ import type {
 import { useSession } from '@/session/session';
 import { forgetBatchPhotos, keepBatchPhotos, pruneBatchPhotos } from '@/utils/batch-photos';
 import type { DeckLine } from '@/utils/decklist';
+import { withEntryQuantity } from '@/utils/decks';
 import {
   NO_SEARCH_FILTER,
   hasFilter,
@@ -759,7 +763,7 @@ export function useImportDecklist() {
   });
 }
 
-/** Adds a card the import could not find, once the user has found it. */
+/** Adds a card to a deck: one the import could not find, or one added while editing. */
 export function useAddDeckEntry() {
   const queryClient = useQueryClient();
   const { getClient, keys } = useKeys();
@@ -774,8 +778,67 @@ export function useAddDeckEntry() {
       quantity: number;
     }) => addDeckEntry(getClient(), deckId, { card_id: cardId, required_quantity: quantity }),
     onSuccess: (deck) => queryClient.setQueryData(keys.deck(deck.id), deck),
-    onError: (error) => reportFailure('Could not add the card to the deck', error),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.deckContents }),
+    onError: (error) =>
+      error instanceof ConflictError
+        ? showToast({
+            kind: 'error',
+            title: 'No spare copy',
+            message:
+              'A Real Deck needs an owned copy of the card that is not already in another deck.',
+          })
+        : reportFailure('Could not add the card to the deck', error),
+    onSettled: () => invalidateDecks(queryClient, keys),
+  });
+}
+
+/**
+ * Sets how many copies a deck lists of one card; 0 takes the card out.
+ * Optimistic, and one at a time per deck, so quick changes land in order.
+ */
+export function useSetDeckEntryQuantity(deckId: number) {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  return useMutation({
+    scope: { id: `deck-${deckId}` },
+    mutationFn: ({ entryId, quantity }: { entryId: number; quantity: number }) =>
+      quantity > 0
+        ? updateDeckEntry(getClient(), deckId, entryId, quantity)
+        : removeDeckEntry(getClient(), deckId, entryId),
+    onMutate: async ({ entryId, quantity }) => {
+      await queryClient.cancelQueries({ queryKey: keys.deck(deckId) });
+      const previous = queryClient.getQueryData<Deck>(keys.deck(deckId));
+      if (previous) {
+        queryClient.setQueryData(keys.deck(deckId), withEntryQuantity(previous, entryId, quantity));
+      }
+      return { previous };
+    },
+    onSuccess: (deck) => queryClient.setQueryData(keys.deck(deck.id), deck),
+    onError: (error, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(keys.deck(deckId), context.previous);
+      if (error instanceof ConflictError) {
+        showToast({
+          kind: 'error',
+          title: 'Not enough spare copies',
+          message:
+            'A Real Deck needs an owned copy for each card that is not already in another deck.',
+        });
+      } else {
+        reportFailure('Could not change the deck', error);
+      }
+    },
+    onSettled: () => invalidateDecks(queryClient, keys),
+  });
+}
+
+export function useRenameDeck() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: ({ deckId, name }: { deckId: number; name: string }) =>
+      renameDeck(getClient(), deckId, name),
+    onSuccess: (deck) => queryClient.setQueryData(keys.deck(deck.id), deck),
+    onError: (error) => reportFailure('Could not rename the deck', error),
+    onSettled: () => invalidateDecks(queryClient, keys),
   });
 }
 
@@ -807,7 +870,7 @@ export function useDeleteDeck() {
   });
 }
 
-/** After a deck is made or deleted: the list, and which decks list which cards. */
+/** After a deck is made, changed or deleted: the list, and which decks list which cards. */
 function invalidateDecks(
   queryClient: ReturnType<typeof useQueryClient>,
   keys: ReturnType<typeof useKeys>['keys'],

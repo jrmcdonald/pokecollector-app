@@ -32,3 +32,33 @@ export function entryCode(entry: DeckEntry): string {
 export function entryMissing(deck: Pick<Deck, 'binder_type'>, entry: DeckEntry): number {
   return isRealDeck(deck) ? 0 : Math.max(entry.shortage ?? 0, 0);
 }
+
+/**
+ * The deck as it will be once an entry lists `quantity` copies, or without
+ * the entry at 0: what the page shows while upstream saves it. Fewer copies
+ * mean fewer missing; more may or may not, which upstream's answer settles.
+ */
+export function withEntryQuantity(deck: Deck, entryId: number, quantity: number): Deck {
+  const entry = deck.entries?.find((e) => e.id === entryId);
+  if (!entry) return deck;
+  const change = quantity - entry.required_quantity;
+  const shortage = entry.shortage ?? 0;
+  const lessMissing = change < 0 ? Math.min(shortage, -change) : 0;
+  return {
+    ...deck,
+    current_card_count:
+      deck.current_card_count == null ? deck.current_card_count : deck.current_card_count + change,
+    missing_copy_count:
+      deck.missing_copy_count == null
+        ? deck.missing_copy_count
+        : Math.max(deck.missing_copy_count - lessMissing, 0),
+    entries:
+      quantity > 0
+        ? deck.entries?.map((e) =>
+            e.id === entryId
+              ? { ...e, required_quantity: quantity, shortage: shortage - lessMissing }
+              : e,
+          )
+        : deck.entries?.filter((e) => e.id !== entryId),
+  };
+}

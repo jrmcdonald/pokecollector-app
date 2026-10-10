@@ -191,6 +191,11 @@ final class WalkthroughTests: XCTestCase {
     capture("decks")
     go(button(startingWith: "Lost Box"), to: button(startingWith: "Roaring Moon ex"), "Deck")
     capture("deck")
+    // Editing: a stepper for each card's copies. Nothing is changed, so the
+    // fake server needs no edit routes.
+    go(app.navigationBars.buttons["Edit this deck"], to: app.buttons["Add a card"], "Edit the deck")
+    capture("deck-edit")
+    go(app.navigationBars.buttons["Done editing"], to: app.navigationBars.buttons["Edit this deck"], "Done editing")
     back(to: button(startingWith: "Lost Box"), "Decks, again")
     go(app.navigationBars.buttons["Add a prebuilt deck"], to: app.textFields["Deck name"], "Add a prebuilt deck")
     capture("deck-import")

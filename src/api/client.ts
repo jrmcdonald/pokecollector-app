@@ -69,7 +69,7 @@ export interface ResponseLike {
 }
 
 export interface RequestOptions<T> {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   query?: Record<string, string | number | boolean | undefined | null>;
   json?: unknown;
   form?: FormData;

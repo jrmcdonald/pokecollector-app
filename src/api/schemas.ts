@@ -47,6 +47,8 @@ export const SetRefSchema = z.looseObject({
   name: z.string(),
   abbreviation: z.string().nullish(),
   lang: z.string().nullish(),
+  /** The set size printed on its cards, the "198" of "057/198". */
+  printed_total: z.number().nullish(),
 });
 export type SetRef = z.infer<typeof SetRefSchema>;
 
@@ -79,6 +81,11 @@ export const CardSchema = z.looseObject({
   variants_reverse: z.boolean().nullish(),
   variants_holo: z.boolean().nullish(),
   variants_first_edition: z.boolean().nullish(),
+  /**
+   * TCGdex's Cardmarket product ids, each `{ product_id, variant, foil }`.
+   * Unchecked rows: `cardmarketUrl` reads what it can and skips the rest.
+   */
+  cardmarket_products: z.array(z.unknown()).nullish(),
 });
 export type Card = z.infer<typeof CardSchema>;
 

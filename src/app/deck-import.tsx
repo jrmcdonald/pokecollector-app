@@ -1,12 +1,12 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, Stack } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { Deck } from '@/api/schemas';
 import { Button } from '@/components/button';
-import { CardSearchPane } from '@/components/card-search-pane';
+import { CardPickerSheet } from '@/components/card-picker-sheet';
 import { DeckEntryRow } from '@/components/deck-entry-row';
 import { ListRow } from '@/components/list-row';
 import { ErrorState, ListSkeleton } from '@/components/states';
@@ -23,7 +23,7 @@ import {
 } from '@/hooks/queries';
 import { useOwnerLabel } from '@/hooks/use-owner-label';
 import { usePrefetchCardImages } from '@/hooks/use-prefetch-card-images';
-import { minTapTarget, spacing, useColors } from '@/theme';
+import { spacing, useColors } from '@/theme';
 import { lineCode, parseDecklist, type DeckLine } from '@/utils/decklist';
 import { showToast } from '@/utils/toast';
 
@@ -313,47 +313,24 @@ function FindSheet({
   onClose(): void;
   onDone(line: DeckLine): void;
 }) {
-  const colors = useColors();
   const addEntry = useAddDeckEntry();
   return (
-    <Modal
+    <CardPickerSheet
       visible={line !== null}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}>
-      <ThemedView style={styles.fill}>
-        {line ? (
-          <SafeAreaView edges={['bottom']} style={styles.fill}>
-            <View style={[styles.sheetHeader, { borderBottomColor: colors.border }]}>
-              <ThemedText variant="heading" accessibilityRole="header" style={styles.fill}>
-                {line.name}
-              </ThemedText>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-                onPress={onClose}
-                style={styles.close}>
-                <ThemedText variant="label" style={{ color: colors.accent }}>
-                  Close
-                </ThemedText>
-              </Pressable>
-            </View>
-            <CardSearchPane
-              key={line.line}
-              initial={line.name}
-              cancelTitle="Leave this card out"
-              onCancel={() => onDone(line)}
-              onPick={(card) =>
-                addEntry.mutate(
-                  { deckId, cardId: card.id, quantity: Math.min(line.quantity, 99) },
-                  { onSuccess: () => onDone(line) },
-                )
-              }
-            />
-          </SafeAreaView>
-        ) : null}
-      </ThemedView>
-    </Modal>
+      title={line?.name ?? ''}
+      initial={line?.name}
+      searchKey={line?.line}
+      cancelTitle="Leave this card out"
+      onCancel={() => line && onDone(line)}
+      onClose={onClose}
+      onPick={(card) =>
+        line &&
+        addEntry.mutate(
+          { deckId, cardId: card.id, quantity: Math.min(line.quantity, 99) },
+          { onSuccess: () => onDone(line) },
+        )
+      }
+    />
   );
 }
 
@@ -367,18 +344,4 @@ const styles = StyleSheet.create({
   sectionTitle: { paddingHorizontal: spacing.md },
   sectionNote: { paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
   confirm: { padding: spacing.md, gap: spacing.sm },
-  sheetHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: spacing.md,
-    paddingVertical: spacing.xs,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  close: {
-    minWidth: 64,
-    minHeight: minTapTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-  },
 });

@@ -921,3 +921,48 @@ it.
   opens its page.
 - **The walkthrough's card is in two decks,** with a year of made-up prices,
   so the card screenshots show both.
+
+## 2026-10-10 — Editing decks, and finding wishlist cards for sale
+
+Decks can now be edited from the app, which the prebuilt decks entry left to
+the web UI; and a wishlist card can be looked up on eBay, Cardmarket and
+TCGplayer.
+
+- **Edit is a mode of the deck's page,** behind Edit in the header, as in
+  iOS lists. Each card gets a stepper for its copies, 0 to 99; 0 takes the
+  card out. Above the cards are "Add a card", which opens the catalogue
+  search in a sheet (the import's "Not found" sheet, now `CardPickerSheet`),
+  and Rename, a system prompt. Delete deck is at the foot, behind a
+  confirmation. Format and target size are left to the web UI: nothing in
+  the app reads them.
+- **The stepper sits beside the row, not inside it,** so VoiceOver reaches
+  its buttons; the row itself still opens the card.
+- **A run of taps is one request.** The copies are saved once they have
+  stayed put for 0.6 s, or when editing ends, so 4 → 1 costs one request,
+  not three. The page changes at once and goes back if upstream refuses.
+  Changes to one deck go one at a time (a mutation scope), so they land in
+  order.
+- **A Real Deck is edited the same way.** Upstream reserves a spare owned
+  copy for each copy added, and refuses (409) when there is none; the app
+  then says a Real Deck needs a copy that is not in another deck, and puts
+  the number back. Fewer copies, or a card taken out, leave the copies in the
+  collection.
+- **Every deck edit marks the deck list and the deck index stale,** as the
+  import does. The deck endpoints move `updated_at`, so the index reads only
+  the deck that changed.
+- **The marketplaces are links, not integrations.** They open in the
+  marketplace's app if it is installed (eBay's links are universal links), or
+  Safari. No request to the server or to the marketplaces, no API keys, and
+  they work offline.
+- **eBay searches the phone's own region's site** (ebay.co.uk for a phone set
+  to the UK), for local prices and postage, and ebay.com elsewhere. The query
+  is "Pokemon", the name and the number as printed ("Pikachu ex 057/198"),
+  which is how listings are titled; a card with no set size names the set
+  instead. TCGplayer gets the same query without "Pokemon".
+- **Cardmarket opens the card's own product page** when TCGdex gave upstream
+  its product id (`cardmarket_products`), as upstream's web UI does, preferring
+  the ordinary print over a first edition or special foil; otherwise it
+  searches by name, set code and number.
+- **They are in the wishlist's hold sheet,** with Remove, and in VoiceOver's
+  Actions rotor. A line under the total says so, since holding is otherwise
+  hidden.

@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { StyleSheet, View, type GestureResponderEvent } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 
+import { useLargeText } from '@/hooks/use-large-text';
 import { spacing, useColors } from '@/theme';
 import { formatPrice } from '@/utils/pricing';
 import { chartGeometry, formatDay, nearestIndex, type ChartPoint } from '@/utils/price-history';
@@ -10,14 +11,17 @@ import { chartGeometry, formatDay, nearestIndex, type ChartPoint } from '@/utils
 import { ThemedText } from './themed-text';
 
 const PLOT_HEIGHT = 150;
-/** Room above and below the line for its stroke and the end dot. */
+/** Room around the line for its stroke and the end dot. */
 const INSET = 6;
 /** The price labels' column, right of the plot. */
 const AXIS_WIDTH = 64;
 
 /**
  * A card's price as a line over time: one series, so no legend; the panel's
- * heading names it. Dragging across shows the price on each day, through
+ * heading names it. The axis prices sit in a column beside the plot and the
+ * first and last days under it; once the text is large, the column cannot
+ * hold a price, so the plot takes the width and the days and the range's
+ * low and high are lines of text under it, free to wrap. Dragging across shows the price on each day, through
  * `onScrub`, as the iOS Stocks app does; letting go shows the latest again.
  * To VoiceOver it is one adjustable element: its label summarises the line,
  * and swiping up or down steps through the days.
@@ -36,9 +40,15 @@ export function PriceChart({
   const [width, setWidth] = useState(0);
   const [active, setActive] = useState<number | null>(null);
   const scrubbing = useRef(false);
+  const large = useLargeText();
 
-  const plotWidth = Math.max(width - AXIS_WIDTH, 0);
-  const geometry = chartGeometry(points, plotWidth, PLOT_HEIGHT - INSET * 2);
+  const plotWidth = Math.max(width - (large ? 0 : AXIS_WIDTH), 0);
+  const geometry = chartGeometry(
+    points,
+    Math.max(plotWidth - INSET * 2, 0),
+    PLOT_HEIGHT - INSET * 2,
+  );
+  const xs = geometry.xs.map((x) => x + INSET);
   const yOf = (i: number) => (geometry.ys[i] ?? 0) + INSET;
   const last = points.length - 1;
   const shown = active ?? last;
@@ -53,7 +63,7 @@ export function PriceChart({
     onScrub(index);
   };
   const touch = (event: GestureResponderEvent) =>
-    select(nearestIndex(geometry.xs, event.nativeEvent.locationX));
+    select(nearestIndex(xs, event.nativeEvent.locationX));
   const release = () => {
     scrubbing.current = false;
     select(null);
@@ -109,7 +119,7 @@ export function PriceChart({
               ))}
               <Path
                 d={geometry.path}
-                transform={`translate(0, ${INSET})`}
+                transform={`translate(${INSET}, ${INSET})`}
                 fill="none"
                 stroke={colors.accent}
                 strokeWidth={2}
@@ -118,8 +128,8 @@ export function PriceChart({
               />
               {active !== null ? (
                 <Line
-                  x1={geometry.xs[active] ?? 0}
-                  x2={geometry.xs[active] ?? 0}
+                  x1={xs[active] ?? 0}
+                  x2={xs[active] ?? 0}
                   y1={0}
                   y2={PLOT_HEIGHT}
                   stroke={colors.textSecondary}
@@ -128,7 +138,7 @@ export function PriceChart({
               ) : null}
               {points.length > 0 ? (
                 <Circle
-                  cx={geometry.xs[shown] ?? 0}
+                  cx={xs[shown] ?? 0}
                   cy={yOf(shown)}
                   r={4}
                   fill={colors.accent}
@@ -139,19 +149,34 @@ export function PriceChart({
             </Svg>
           ) : null}
         </View>
+        {large ? null : (
+          <View
+            style={styles.axis}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants">
+            <ThemedText variant="figureSmall" color="textSecondary" numberOfLines={1}>
+              {formatPrice(geometry.top)}
+            </ThemedText>
+            <ThemedText variant="figureSmall" color="textSecondary" numberOfLines={1}>
+              {formatPrice(geometry.bottom)}
+            </ThemedText>
+          </View>
+        )}
+      </View>
+      {points.length === 0 ? null : large ? (
         <View
-          style={styles.axis}
+          style={styles.below}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants">
-          <ThemedText variant="figureSmall" color="textSecondary" numberOfLines={1}>
-            {formatPrice(geometry.top)}
+          <ThemedText variant="caption" color="textSecondary">
+            {formatDay(points[0]!, withYear)} to {formatDay(points[last]!, withYear)}
           </ThemedText>
-          <ThemedText variant="figureSmall" color="textSecondary" numberOfLines={1}>
-            {formatPrice(geometry.bottom)}
+          <ThemedText variant="caption" color="textSecondary">
+            Low {formatPrice(Math.min(...points.map((p) => p.price)))}, high{' '}
+            {formatPrice(Math.max(...points.map((p) => p.price)))}
           </ThemedText>
         </View>
-      </View>
-      {points.length > 0 ? (
+      ) : (
         <View
           style={[styles.dates, { width: plotWidth }]}
           accessibilityElementsHidden
@@ -163,7 +188,7 @@ export function PriceChart({
             {formatDay(points[last]!, withYear)}
           </ThemedText>
         </View>
-      ) : null}
+      )}
     </View>
   );
 }
@@ -177,5 +202,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingLeft: spacing.xs,
   },
-  dates: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.xs },
+  // Inset as the line is, so each day sits under its end of it.
+  dates: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+    paddingHorizontal: INSET,
+  },
+  below: { marginTop: spacing.xs, gap: 2 },
 });

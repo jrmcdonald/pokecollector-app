@@ -8,6 +8,7 @@ import { render, renderHook, screen } from '@testing-library/react-native';
 import { useCardColumns } from '@/hooks/use-large-text';
 
 import { CardTile } from '../card-tile';
+import { PriceChart } from '../price-chart';
 import { Segmented } from '../segmented';
 
 let mockFontScale = 1;
@@ -102,5 +103,36 @@ describe('CardTile as a row', () => {
   it('cuts nothing short', async () => {
     await render(<CardTile card={card} detail="005 · €0.30" layout="row" />);
     expect(screen.getByText('Charmeleon').props.numberOfLines).toBeUndefined();
+  });
+});
+
+describe('PriceChart', () => {
+  const day = (date: string, price: number) => ({
+    date,
+    time: Date.parse(`${date}T00:00:00Z`),
+    price,
+  });
+  const points = [day('2026-07-01', 20.13), day('2026-08-15', 24.7), day('2026-09-30', 23.5)];
+  const chart = (
+    <PriceChart points={points} summary="Trend price over the past 3 months" onScrub={jest.fn()} />
+  );
+
+  // The labels are hidden from VoiceOver, which reads the chart's summary.
+  // Node's ICU says "Sept" where iOS says "Sep".
+  const hidden = { includeHiddenElements: true };
+
+  it('labels the axis beside the plot at the usual sizes', async () => {
+    await render(chart);
+    expect(screen.getByText('1 Jul', hidden)).toBeOnTheScreen();
+    expect(screen.getByText(/^30 Sept?$/, hidden)).toBeOnTheScreen();
+    expect(screen.queryByText(/^Low /, hidden)).toBeNull();
+  });
+
+  it('puts the days, low and high under the plot once the text is large', async () => {
+    mockFontScale = 1.353;
+    await render(chart);
+    expect(screen.getByText(/^1 Jul to 30 Sept?$/, hidden)).toBeOnTheScreen();
+    const range = screen.getByText('Low €20.13, high €24.70', hidden);
+    expect(range.props.numberOfLines).toBeUndefined();
   });
 });

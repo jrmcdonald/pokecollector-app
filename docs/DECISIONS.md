@@ -884,6 +884,11 @@ it.
   VoiceOver the chart is one adjustable element: its label is the summary
   (range, first and last price, change, low and high), and swiping up or
   down moves through the days, about a dozen steps end to end.
+- **At the large text sizes the axis moves under the plot.** A column
+  beside it cannot hold a price there (the walkthrough at the largest size
+  showed "€…", and the two days ran together), so from the largest standard
+  size up the plot takes the full width, and the days and the range's low
+  and high are lines of text under it that wrap.
 - **The change is green or red with ▲ or ▼,** so it is never told by colour
   alone, and both colours are in the contrast test as text on a panel.
 - **One request per card, kept six hours.** The price sync adds a day at a

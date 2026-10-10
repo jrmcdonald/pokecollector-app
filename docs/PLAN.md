@@ -669,6 +669,8 @@ versioned. So:
 
 - Trades and sealed product screens
 - [x] Price history charts on a card's page, and the decks that list the card
+- [x] Editing decks (copies, cards, name; deleting), and finding wishlist
+      cards on eBay, Cardmarket and TCGplayer
 - Top movers
 - A "rip mode" that scans each card as it is flipped onto the table: batch
   mode with Auto on (§8) comes close; what is left is sending each photo as

@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import type { WishlistItem } from '@/api/schemas';
@@ -12,8 +12,10 @@ import { ThemedView } from '@/components/themed-view';
 import { useIsOnline, useRemoveFromWishlist, useWishlist } from '@/hooks/queries';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { minTapTarget, spacing, useColors } from '@/theme';
+import { marketplaces } from '@/utils/marketplaces';
 import { pick } from '@/utils/pick';
 import { cardValue, formatPrice, formatTotal } from '@/utils/pricing';
+import { showToast } from '@/utils/toast';
 import { wishlistCost } from '@/utils/wishlist';
 
 export default function Wishlist() {
@@ -44,27 +46,32 @@ export default function Wishlist() {
           }
           ListHeaderComponent={
             items.length > 0 ? (
-              <View
-                style={styles.header}
-                accessible
-                accessibilityLabel={
-                  allUnpriced
-                    ? 'No prices yet'
-                    : `To buy everything: ${formatTotal(cost.total)}${cost.unpriced ? `, plus ${cost.unpriced} without a price` : ''}`
-                }>
-                <ThemedText variant="overline" color="textSecondary">
-                  To buy everything
-                </ThemedText>
-                <ThemedText variant="figure">
-                  {allUnpriced ? '–' : formatTotal(cost.total)}
-                </ThemedText>
-                {cost.unpriced ? (
-                  <ThemedText variant="caption" color="textSecondary">
-                    {allUnpriced
-                      ? 'None of these cards has a price yet.'
-                      : `Plus ${cost.unpriced === 1 ? '1 card' : `${cost.unpriced} cards`} with no price yet.`}
+              <View style={styles.header}>
+                <View
+                  style={styles.total}
+                  accessible
+                  accessibilityLabel={
+                    allUnpriced
+                      ? 'No prices yet'
+                      : `To buy everything: ${formatTotal(cost.total)}${cost.unpriced ? `, plus ${cost.unpriced} without a price` : ''}`
+                  }>
+                  <ThemedText variant="overline" color="textSecondary">
+                    To buy everything
                   </ThemedText>
-                ) : null}
+                  <ThemedText variant="figure">
+                    {allUnpriced ? '–' : formatTotal(cost.total)}
+                  </ThemedText>
+                  {cost.unpriced ? (
+                    <ThemedText variant="caption" color="textSecondary">
+                      {allUnpriced
+                        ? 'None of these cards has a price yet.'
+                        : `Plus ${cost.unpriced === 1 ? '1 card' : `${cost.unpriced} cards`} with no price yet.`}
+                    </ThemedText>
+                  ) : null}
+                </View>
+                <ThemedText variant="caption" color="textSecondary">
+                  Hold a card to find it on eBay, Cardmarket or TCGplayer.
+                </ThemedText>
               </View>
             ) : null
           }
@@ -87,9 +94,10 @@ export default function Wishlist() {
 }
 
 /**
- * A wishlist card. Tap opens it; holding it offers Remove, as does a swipe
- * left, and VoiceOver has the same Remove action, so no gesture is the only
- * way (WCAG 2.5.1).
+ * A wishlist card. Tap opens it; holding it offers to find it for sale, and
+ * Remove, as does a swipe left for Remove. VoiceOver has the same actions,
+ * so no gesture is the only way (WCAG 2.5.1). The marketplaces are links,
+ * so they work offline too; Remove needs the server.
  */
 function WishlistRow({ item }: { item: WishlistItem }) {
   const colors = useColors();
@@ -98,10 +106,25 @@ function WishlistRow({ item }: { item: WishlistItem }) {
   const card = item.card ?? { id: item.card_id, name: item.card_id };
   const set = item.card?.set_ref?.name;
   const price = cardValue(item.card);
+  const shops = marketplaces(card);
+  const actions = [
+    ...shops.map((shop, index) => ({
+      name: `shop-${index}`,
+      label: shop.label,
+      onAction: () => open(shop.url),
+    })),
+    ...(online
+      ? [{ name: 'delete', label: 'Remove from wishlist', onAction: () => remove.mutate(item) }]
+      : []),
+  ];
 
-  async function offerRemove() {
-    const index = await pick(card.name, ['Remove from wishlist'], { destructive: [0] });
-    if (index === 0) remove.mutate(item);
+  async function offerActions() {
+    const index = await pick(
+      card.name,
+      actions.map((action) => action.label),
+      { destructive: online ? [actions.length - 1] : [] },
+    );
+    if (index !== null) actions[index]?.onAction();
   }
 
   return (
@@ -120,12 +143,15 @@ function WishlistRow({ item }: { item: WishlistItem }) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${card.name}, ${price > 0 ? formatPrice(price) : 'no price yet'}${item.quantity > 1 ? `, ${item.quantity} wanted` : ''}`}
-        accessibilityActions={online ? [{ name: 'delete', label: 'Remove' }] : []}
-        onAccessibilityAction={(event) => {
-          if (event.nativeEvent.actionName === 'delete') remove.mutate(item);
-        }}
+        accessibilityActions={actions.map(({ name, label }) => ({
+          name,
+          label: name === 'delete' ? 'Remove' : label,
+        }))}
+        onAccessibilityAction={(event) =>
+          actions.find((action) => action.name === event.nativeEvent.actionName)?.onAction()
+        }
         onPress={() => router.push({ pathname: '/card/[id]', params: { id: item.card_id } })}
-        onLongPress={online ? offerRemove : undefined}
+        onLongPress={offerActions}
         style={({ pressed }) => [
           styles.row,
           { backgroundColor: pressed ? colors.surface : colors.background },
@@ -155,9 +181,17 @@ function WishlistRow({ item }: { item: WishlistItem }) {
   );
 }
 
+/** Opens a marketplace in its app if installed (eBay's links are universal links), or Safari. */
+function open(url: string) {
+  Linking.openURL(url).catch(() =>
+    showToast({ kind: 'error', title: 'Could not open the link', message: url }),
+  );
+}
+
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  header: { padding: spacing.md, gap: 2 },
+  header: { padding: spacing.md, gap: spacing.sm },
+  total: { gap: 2 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

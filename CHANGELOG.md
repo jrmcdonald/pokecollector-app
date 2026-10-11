@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.3.0...v1.4.0) (2026-10-11)
+
+
+### Features
+
+* find any card for sale from its page and from a look-up ([26f83aa](https://github.com/jrmcdonald/pokecollector-app/commit/26f83aa7470914cf1a0788bb1424d2e8f62e633f))
+* find any card for sale from its page and from a look-up ([d81e35d](https://github.com/jrmcdonald/pokecollector-app/commit/d81e35deb05a8e71ed87a0bc7cdcc5439851134a))
+* sealed products: log, value, open, sell and delete them ([390b1bd](https://github.com/jrmcdonald/pokecollector-app/commit/390b1bd2f50d343d893501e9d23487ea70c7b69b))
+* sealed products: log, value, open, sell and delete them ([7dda775](https://github.com/jrmcdonald/pokecollector-app/commit/7dda775fbe4ef5fe42d472f8be4471dbf8b690e0))
+
+
+### Bug fixes
+
+* sign a product's profit or loss on the phone, and read it with its value ([ad38768](https://github.com/jrmcdonald/pokecollector-app/commit/ad38768e53000476e7042ddb8711655880b5e258))
+
 ## [1.3.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.2.0...v1.3.0) (2026-10-10)
 
 

@@ -45,7 +45,7 @@ export function deviceRegion(): string | null {
   return region;
 }
 
-type MarketCard = Pick<Card, 'name' | 'number' | 'set_ref' | 'cardmarket_products'>;
+export type MarketCard = Pick<Card, 'name' | 'number' | 'set_ref' | 'cardmarket_products'>;
 
 /** "PFL", the set's code, as the card's own corner prints it and sellers write it. */
 function setCode(card: MarketCard): string | undefined {

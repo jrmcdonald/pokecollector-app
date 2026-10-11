@@ -966,3 +966,22 @@ TCGplayer.
 - **They are in the wishlist's hold sheet,** with Remove, and in VoiceOver's
   Actions rotor. A line under the total says so, since holding is otherwise
   hidden.
+
+## 2026-10-11 — Finding any card for sale, from its page
+
+The marketplace links started on the wishlist, but nothing about them is
+about the wishlist: a card searched for, one being priced, a spare one being
+sold, all want them. They are now on every card's page and on the scan
+look-up's result too.
+
+- **"Find for sale" is a button,** under the price history on the card's page
+  and under the wishlist and open buttons on a look-up's result, opening the
+  same three choices in an action sheet (`FindForSale`). A button needs no
+  hint to be found, as the wishlist's hold sheet does. The hold sheet stays,
+  as a shortcut.
+- **The set comes from what is already cached.** The card endpoint names only
+  the set's id, and the queries want its size ("057/198") and code. The set
+  is taken from an owned copy, an earlier search, then the sets list, in that
+  order, and never fetched (`useSetRef`). With none of them, the search is
+  the name and the number, and Cardmarket still opens the card's own page
+  when its product id is known.

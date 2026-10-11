@@ -82,9 +82,10 @@ decides, because it needs no login. See `PLAN.md` §2.0.
 
 - **`cardmarket_products`** on a card is `unknown[]` in the spec. Upstream
   fills it from TCGdex as `{ product_id, variant, foil }` rows: Cardmarket's
-  own product ids. The wishlist's "Find on Cardmarket" opens
-  `cardmarket.com/en/Pokemon/Products?idProduct=<id>` with the ordinary
-  print's id, as upstream's web UI does, and searches when there is none.
+  own product ids. "Find on Cardmarket" (the wishlist, a card's page, a
+  look-up) opens `cardmarket.com/en/Pokemon/Products?idProduct=<id>` with
+  the ordinary print's id, as upstream's web UI does, and searches when there
+  is none.
 - **Variants and conditions.** Variants are `Normal`, `Holo`, `Reverse Holo`,
   `First Edition`; conditions `Mint`, `NM`, `LP`, `MP`, `HP`. The app parses
   both as plain strings so a new value from upstream cannot hide an entry.

@@ -1,18 +1,26 @@
 /**
- * The card page's price history and the decks the card is in, found the way
- * VoiceOver finds them: by role and accessible name.
+ * The card page's price history, the decks the card is in, and finding it
+ * for sale, found the way VoiceOver finds them: by role and accessible name.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, userEvent } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
+import { Linking } from 'react-native';
+
+import type { Card, CardSet, CollectionItem } from '@/api/schemas';
+import { useSetRef } from '@/hooks/use-set-ref';
 
 import { CardDecks } from '../card-decks';
+import { FindForSale } from '../find-for-sale';
 import { PriceHistory } from '../price-history';
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
   router: { push: (...args: unknown[]) => mockPush(...args) },
 }));
+
+const mockPick = jest.fn();
+jest.mock('@/utils/pick', () => ({ pick: (...args: unknown[]) => mockPick(...args) }));
 
 const mockRequest = jest.fn();
 jest.mock('@/session/session', () => ({
@@ -37,6 +45,7 @@ let queryClient: QueryClient;
 beforeEach(() => {
   mockRequest.mockReset();
   mockPush.mockReset();
+  mockPick.mockReset();
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
@@ -161,5 +170,72 @@ describe('CardDecks', () => {
     await render(withQueries(<CardDecks cardId="nowhere" />));
     expect(screen.toJSON()).toBeNull();
     expect(mockRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe('FindForSale', () => {
+  // The card endpoint's card: a set id, but no set name, code or size.
+  const CHARIZARD: Card = { id: 'sv3pt5-006_en', name: 'Charizard ex', number: '006' };
+  const MEW: CardSet = {
+    id: 'sv3pt5_en',
+    name: '151',
+    abbreviation: 'MEW',
+    printed_total: 165,
+  };
+
+  /** As the card page uses it. */
+  function Harness({ card }: { card: Card }) {
+    const setRef = useSetRef(card.id, card.set_id);
+    return <FindForSale card={setRef ? { ...card, set_ref: setRef } : card} />;
+  }
+
+  let openURL: jest.SpyInstance;
+  beforeEach(() => {
+    openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    mockRequest.mockRejectedValue(new Error('Offline in tests'));
+  });
+  afterEach(() => openURL.mockRestore());
+
+  it("searches with the set's size from the cached sets, at no request", async () => {
+    queryClient.setQueryData(['acct', 'collection'], []);
+    queryClient.setQueryData(['acct', 'sets'], [MEW]);
+    mockPick.mockResolvedValue(2);
+    await render(withQueries(<Harness card={{ ...CHARIZARD, set_id: 'sv3pt5_en' }} />));
+    await userEvent.press(screen.getByRole('button', { name: 'Find for sale' }));
+    expect(mockPick).toHaveBeenCalledWith('Charizard ex', [
+      'Find on eBay',
+      'Find on Cardmarket',
+      'Find on TCGplayer',
+    ]);
+    expect(openURL).toHaveBeenCalledWith(
+      'https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=Charizard%20ex%20006%2F165',
+    );
+    // The page's own collection query may refresh; the sets list is never fetched.
+    expect(mockRequest.mock.calls.filter(([path]) => String(path).includes('sets'))).toEqual([]);
+  });
+
+  it('takes the set from an owned copy first', async () => {
+    const owned: CollectionItem = {
+      id: 1,
+      card_id: CHARIZARD.id,
+      quantity: 1,
+      condition: 'NM',
+      card: { ...CHARIZARD, set_ref: { id: 'sv3pt5_en', name: '151', printed_total: 165 } },
+    };
+    queryClient.setQueryData(['acct', 'collection'], [owned]);
+    mockPick.mockResolvedValue(0);
+    await render(withQueries(<Harness card={CHARIZARD} />));
+    await userEvent.press(screen.getByRole('button', { name: 'Find for sale' }));
+    expect(openURL).toHaveBeenCalledWith(
+      expect.stringMatching(/_nkw=Pokemon%20Charizard%20ex%20006%2F165$/),
+    );
+  });
+
+  it('opens nothing when cancelled', async () => {
+    queryClient.setQueryData(['acct', 'collection'], []);
+    mockPick.mockResolvedValue(null);
+    await render(withQueries(<Harness card={CHARIZARD} />));
+    await userEvent.press(screen.getByRole('button', { name: 'Find for sale' }));
+    expect(openURL).not.toHaveBeenCalled();
   });
 });

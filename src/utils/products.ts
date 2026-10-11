@@ -92,15 +92,17 @@ export function pnlColor(pnl: number): 'success' | 'danger' | 'text' {
 }
 
 const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' });
-const signedMoney = new Intl.NumberFormat('en-GB', {
-  style: 'currency',
-  currency: 'EUR',
-  signDisplay: 'exceptZero',
-});
-const signedPercent = new Intl.NumberFormat('en-GB', {
-  maximumFractionDigits: 1,
-  signDisplay: 'exceptZero',
-});
+const percent = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 1 });
+
+/**
+ * "+", "−" or nothing, for a figure as it will be shown. Written out rather
+ * than Intl's `signDisplay`, which Hermes ignores: on the phone a gain would
+ * show no sign at all.
+ */
+function sign(shown: string, value: number): string {
+  if (/^0(\.0+)?$/.test(shown)) return '';
+  return value > 0 ? '+' : '−';
+}
 
 /** "€59.99"; zero shows as "€0.00", as an amount paid can be nothing. */
 export function formatMoney(value: number): string {
@@ -109,12 +111,14 @@ export function formatMoney(value: number): string {
 
 /** "+€12.40", "−€3.00", "€0.00". */
 export function formatSignedMoney(value: number): string {
-  return signedMoney.format(Math.round(value * 100) / 100).replace('-', '−');
+  const shown = Math.abs(value).toFixed(2);
+  return `${sign(shown, value)}${money.format(Number(shown))}`;
 }
 
 /** "+12.5%", "−4%", "0%". */
 export function formatSignedPercent(value: number): string {
-  return `${signedPercent.format(value).replace('-', '−')}%`;
+  const shown = percent.format(Math.abs(value));
+  return `${sign(shown, value)}${shown}%`;
 }
 
 /** "+€12.40 (+26.1%)", or the amount alone when there is no percentage. */

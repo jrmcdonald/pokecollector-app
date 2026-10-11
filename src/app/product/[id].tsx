@@ -91,21 +91,28 @@ function Value({ product }: { product: Product }) {
   const sold = product.lifecycle_status === 'sold';
   return (
     <ThemedView background="surface" style={[styles.panel, { borderColor: colors.border }]}>
-      <View accessible accessibilityLabel={`Value: ${formatMoney(value)}`}>
+      {/* One element: a line of its own would be too small a target (and the
+          walkthrough's audit says so). */}
+      <View
+        accessible
+        accessibilityLabel={
+          pnl
+            ? `Value: ${formatMoney(value)}, profit or loss: ${pnl}`
+            : `Value: ${formatMoney(value)}`
+        }
+        style={styles.figures}>
         <ThemedText variant="overline" color="textSecondary">
           Value
         </ThemedText>
         <ThemedText variant="figure" style={styles.value}>
           {formatMoney(value)}
         </ThemedText>
-      </View>
-      {pnl ? (
-        <View accessible accessibilityLabel={`Profit or loss: ${pnl}`}>
+        {pnl ? (
           <ThemedText variant="figureSmall" color={pnlColor(product.pnl ?? 0)}>
             {pnl}
           </ThemedText>
-        </View>
-      ) : null}
+        ) : null}
+      </View>
       <View style={[styles.tiles, largeText && styles.stacked]}>
         <StatTile label="Paid" value={formatMoney(product.purchase_price)} />
         <StatTile label="Bought" value={formatDate(product.purchase_date)} />
@@ -272,6 +279,7 @@ const styles = StyleSheet.create({
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2 },
   tag: { borderRadius: radius.sm, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs },
   panel: { padding: spacing.md, borderRadius: radius.lg - 2, borderWidth: 1, gap: spacing.sm + 4 },
+  figures: { gap: 2 },
   value: { fontSize: 30, lineHeight: 36 },
   tiles: { flexDirection: 'row', gap: spacing.sm },
   stacked: { flexDirection: 'column' },

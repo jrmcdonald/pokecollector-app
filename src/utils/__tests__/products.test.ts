@@ -59,8 +59,13 @@ describe('formatting', () => {
     expect(formatSignedMoney(12.4)).toBe('+€12.40');
     expect(formatSignedMoney(-3)).toBe('−€3.00');
     expect(formatSignedMoney(0)).toBe('€0.00');
+    // Rounds to nothing: no sign on a figure that shows as zero.
+    expect(formatSignedMoney(0.004)).toBe('€0.00');
+    expect(formatSignedMoney(-0.004)).toBe('€0.00');
+    expect(formatSignedMoney(1234.5)).toBe('+€1,234.50');
     expect(formatPnl(30, 30)).toBe('+€30.00 (+30%)');
     expect(formatPnl(-10, -5.26)).toBe('−€10.00 (−5.3%)');
+    expect(formatPnl(0, 0)).toBe('€0.00 (0%)');
   });
 });
 

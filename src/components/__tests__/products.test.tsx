@@ -130,8 +130,9 @@ describe('ProductDetail', () => {
   it('reads its value, where it comes from, and what it cost', async () => {
     mockParams = { id: '7' };
     await render(withQueries(<ProductDetail />));
-    expect(screen.getByLabelText('Value: €190.00')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Profit or loss: +€30.00 (+18.8%)')).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText('Value: €190.00, profit or loss: +€30.00 (+18.8%)'),
+    ).toBeOnTheScreen();
     expect(screen.getByLabelText('Paid: €160.00')).toBeOnTheScreen();
     expect(screen.getByText('The value you entered. In euros.')).toBeOnTheScreen();
   });

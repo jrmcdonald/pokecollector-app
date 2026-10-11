@@ -444,3 +444,86 @@ export const BulkAddResultSchema = z.looseObject({
   errors: z.array(z.string()).nullish(),
 });
 export type BulkAddResult = z.infer<typeof BulkAddResultSchema>;
+
+// ---------------------------------------------------------------------------
+// Sealed products. Upstream 1.51.0's `api/products.py`, typed in the spec as
+// ProductPurchaseResponse; the types list is untyped. Amounts are euros, as
+// upstream stores them (its web UI converts on entry).
+// ---------------------------------------------------------------------------
+
+/** What upstream offers at `GET /api/products/types`; used until that has loaded. */
+export const PRODUCT_TYPES = [
+  'Booster Pack',
+  'Booster Box',
+  'Elite Trainer Box',
+  'Tin',
+  'Bundle',
+  'Collection Box',
+  'Blister',
+  'Other',
+] as const;
+
+/**
+ * `review` is an old product whose state upstream cannot tell (a sale date
+ * with no price). Kept a string, so a new state upstream adds reads as
+ * unknown rather than failing the whole list.
+ */
+export const PRODUCT_STATUSES = ['sealed', 'opened', 'sold', 'review'] as const;
+export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
+
+/** A card pulled from a product: a link to an owned copy, and what became of it. */
+export const ProductCardSchema = z.looseObject({
+  id: z.number(),
+  product_id: z.number(),
+  card_id: z.string().nullish(),
+  collection_item_id: z.number().nullish(),
+  initial_quantity: z.number(),
+  active_quantity: z.number(),
+  sold_quantity: z.number(),
+  variant: z.string().nullish(),
+  condition: z.string().nullish(),
+  live_value: z.number().nullish(),
+  realized_gains: z.number().nullish(),
+  card: CardSchema.nullish(),
+});
+export type ProductCard = z.infer<typeof ProductCardSchema>;
+
+export const ProductSchema = z.looseObject({
+  id: z.number(),
+  product_name: z.string(),
+  product_type: z.string().nullish(),
+  purchase_price: z.number(),
+  purchase_date: z.string(),
+  lifecycle_status: z.string(),
+  /** Typed in while sealed; null means "what I paid". */
+  current_value: z.number().nullish(),
+  sold_price: z.number().nullish(),
+  sold_date: z.string().nullish(),
+  /** Several bought together share one; upstream clears it when one is edited apart. */
+  batch_id: z.string().nullish(),
+  cardmarket_url: z.string().nullish(),
+  image_url: z.string().nullish(),
+  notes: z.string().nullish(),
+  created_at: z.string().nullish(),
+  /** The value upstream counts: see `value_source` for where it comes from. */
+  computed_current_value: z.number().nullish(),
+  /**
+   * `manual_current`, `purchase_cost_fallback`, `manual_sold`,
+   * `linked_cards` (pulls plus sales), `opened_unlinked` or `needs_review`
+   * (no value yet), or `none`.
+   */
+  value_source: z.string().nullish(),
+  pnl: z.number().nullish(),
+  pnl_percent: z.number().nullish(),
+  linked_live_value: z.number().nullish(),
+  realized_gains: z.number().nullish(),
+  linked_cards_count: z.number().nullish(),
+  active_linked_cards_count: z.number().nullish(),
+  sold_linked_cards_count: z.number().nullish(),
+  product_cards: z.array(ProductCardSchema).nullish(),
+});
+export type Product = z.infer<typeof ProductSchema>;
+
+export const ProductsSchema = z.array(ProductSchema);
+
+export const ProductTypesSchema = z.array(z.string());

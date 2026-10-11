@@ -14,6 +14,9 @@ import {
   ImportResultSchema,
   PriceHistorySchema,
   PrintingDetailTagsSchema,
+  ProductSchema,
+  ProductsSchema,
+  ProductTypesSchema,
   ResolveAndAddSchema,
   ScanItemSchema,
   ScanJobListSchema,
@@ -39,6 +42,8 @@ import {
   type ImportResult,
   type PricePoint,
   type PrintingDetailTag,
+  type Product,
+  type Schemas,
   type SearchResponse,
   type User,
   type Variant,
@@ -462,4 +467,63 @@ export function convertDeckToReal(client: PokeCollectorClient, deckId: number): 
 
 export function deleteDeck(client: PokeCollectorClient, deckId: number): Promise<unknown> {
   return client.request(`/api/decks/${deckId}`, { method: 'DELETE' });
+}
+
+/**
+ * Every sealed product, with its pulls and history: enough for the list, the
+ * totals and each product's page, so nothing else is fetched for them.
+ */
+export function getProducts(client: PokeCollectorClient): Promise<Product[]> {
+  return client.request('/api/products/', { schema: ProductsSchema });
+}
+
+/** The product types upstream offers ("Booster Box", "Tin"…). */
+export function getProductTypes(client: PokeCollectorClient): Promise<string[]> {
+  return client.request('/api/products/types', { schema: ProductTypesSchema });
+}
+
+export type NewProduct = Schemas['ProductPurchaseCreate'];
+
+/**
+ * Logs a purchase. Several identical ones are one request to `batch`, which
+ * makes a product for each, sharing a `batch_id`.
+ */
+export function createProducts(
+  client: PokeCollectorClient,
+  product: NewProduct,
+  quantity: number,
+): Promise<Product[]> {
+  if (quantity <= 1) {
+    return client
+      .request('/api/products/', { method: 'POST', json: product, schema: ProductSchema })
+      .then((created) => [created]);
+  }
+  return client.request('/api/products/batch', {
+    method: 'POST',
+    json: { ...product, quantity },
+    schema: ProductsSchema,
+  });
+}
+
+export type ProductChanges = Schemas['ProductPurchaseUpdate'];
+
+/**
+ * Changes a product. Upstream refuses (409) to mark a product with pulls or
+ * history sealed, or to sell one sealed that has them.
+ */
+export function updateProduct(
+  client: PokeCollectorClient,
+  productId: number,
+  changes: ProductChanges,
+): Promise<Product> {
+  return client.request(`/api/products/${productId}`, {
+    method: 'PUT',
+    json: changes,
+    schema: ProductSchema,
+  });
+}
+
+/** Upstream refuses (409) once a product has pulls or sales, so their history is kept. */
+export function deleteProduct(client: PokeCollectorClient, productId: number): Promise<unknown> {
+  return client.request(`/api/products/${productId}`, { method: 'DELETE' });
 }

@@ -14,6 +14,9 @@ import {
   DecksSchema,
   PriceHistorySchema,
   PrintingDetailTagsSchema,
+  PRODUCT_TYPES,
+  ProductsSchema,
+  ProductTypesSchema,
   ScanJobListSchema,
   ScanJobSchema,
   SearchResponseSchema,
@@ -137,6 +140,20 @@ describe('fake PokeCollector', () => {
     expect(planned?.entries?.some((e) => (e.shortage ?? 0) > 0)).toBe(true);
     expect(real?.missing_copy_count).toBe(0);
     expect(get('/api/decks/999').status).toBe(404);
+  });
+
+  it('has a sealed product in each state, with pulls on the opened one', () => {
+    const products = ProductsSchema.parse(json(get('/api/products/')));
+    expect(new Set(products.map((p) => p.lifecycle_status))).toEqual(
+      new Set(['sealed', 'opened', 'sold']),
+    );
+    const collection = CollectionSchema.parse(json(get('/api/collection/')));
+    const pulls = products.flatMap((p) => p.product_cards ?? []);
+    expect(pulls.length).toBeGreaterThan(0);
+    for (const pull of pulls) {
+      expect(collection.some((item) => item.id === pull.collection_item_id)).toBe(true);
+    }
+    expect(ProductTypesSchema.parse(json(get('/api/products/types')))).toEqual([...PRODUCT_TYPES]);
   });
 
   it("has a year of price history ending on today's price, and decks for the card screen", () => {

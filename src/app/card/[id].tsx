@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -18,13 +17,13 @@ import {
   type Card,
   type CollectionItem,
   type Condition,
-  type SearchResponse,
   type Variant,
 } from '@/api/schemas';
 import { Button } from '@/components/button';
 import { CardDecks } from '@/components/card-decks';
 import { CardImage, frameForVariant } from '@/components/card-image';
 import { Chips } from '@/components/chips';
+import { FindForSale } from '@/components/find-for-sale';
 import { Icon } from '@/components/icon';
 import { PriceHistory } from '@/components/price-history';
 import { PrintingDetailsPicker } from '@/components/printing-details-picker';
@@ -49,7 +48,7 @@ import {
 import { useLargeText } from '@/hooks/use-large-text';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useOwnerLabel } from '@/hooks/use-owner-label';
-import { useSession } from '@/session/session';
+import { useSetRef } from '@/hooks/use-set-ref';
 import { radius, spacing, useColors } from '@/theme';
 import { binderKind, bindersOnly, isPlanned } from '@/utils/binders';
 import { CameraDeniedError, takeCardPhoto, type PhotoSource } from '@/utils/card-photo';
@@ -72,7 +71,7 @@ export default function CardDetail() {
   );
   const online = useIsOnline();
   const entries = entriesForCard(collection.data, id);
-  const setName = useSetName(id, entries);
+  const setRef = useSetRef(id, card.data?.set_id);
 
   // The name is the large heading under the card; the bar shows it only once
   // that heading has scrolled out of view, so it is never on screen twice.
@@ -117,7 +116,7 @@ export default function CardDetail() {
             }}>
             <ThemedText variant="title">{c.name}</ThemedText>
             <View style={styles.tags}>
-              {[setName ?? c.set_id?.toUpperCase(), c.number, c.rarity]
+              {[setRef?.name ?? c.set_id?.toUpperCase(), c.number, c.rarity]
                 .filter((t): t is string => !!t)
                 .map((tag, i) => (
                   <ThemedView key={`${i}-${tag}`} background="surfaceRaised" style={styles.tag}>
@@ -129,6 +128,7 @@ export default function CardDetail() {
 
           <Prices card={c} />
           <PriceHistory cardId={c.id} />
+          <FindForSale card={setRef ? { ...c, set_ref: setRef } : c} />
 
           {!online ? (
             <ThemedText variant="caption" color="textSecondary">
@@ -234,28 +234,6 @@ function OwnPhoto({
       )}
     </View>
   );
-}
-
-/**
- * The card endpoint has no set name, only an id. The collection or an
- * earlier search usually has it already, so look there before settling for
- * the id.
- */
-function useSetName(cardId: string, entries: CollectionItem[]): string | null {
-  const queryClient = useQueryClient();
-  const { session } = useSession();
-  const fromCollection = entries.find((e) => e.card?.set_ref?.name)?.card?.set_ref?.name;
-  if (fromCollection) return fromCollection;
-  if (session.status !== 'signedIn') return null;
-  for (const [, data] of queryClient.getQueriesData<{ pages: SearchResponse[] }>({
-    queryKey: [session.cacheId, 'search'],
-  })) {
-    for (const page of data?.pages ?? []) {
-      const hit = page.data.find((result) => result.id === cardId);
-      if (hit?.set_ref?.name) return hit.set_ref.name;
-    }
-  }
-  return null;
 }
 
 function Prices({ card }: { card: Card }) {

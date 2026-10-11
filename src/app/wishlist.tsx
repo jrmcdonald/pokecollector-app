@@ -1,11 +1,12 @@
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { Linking, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import type { WishlistItem } from '@/api/schemas';
 import { CardImage } from '@/components/card-image';
+import { openMarketplace } from '@/components/find-for-sale';
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -15,7 +16,6 @@ import { minTapTarget, spacing, useColors } from '@/theme';
 import { marketplaces } from '@/utils/marketplaces';
 import { pick } from '@/utils/pick';
 import { cardValue, formatPrice, formatTotal } from '@/utils/pricing';
-import { showToast } from '@/utils/toast';
 import { wishlistCost } from '@/utils/wishlist';
 
 export default function Wishlist() {
@@ -111,7 +111,7 @@ function WishlistRow({ item }: { item: WishlistItem }) {
     ...shops.map((shop, index) => ({
       name: `shop-${index}`,
       label: shop.label,
-      onAction: () => open(shop.url),
+      onAction: () => openMarketplace(shop.url),
     })),
     ...(online
       ? [{ name: 'delete', label: 'Remove from wishlist', onAction: () => remove.mutate(item) }]
@@ -178,13 +178,6 @@ function WishlistRow({ item }: { item: WishlistItem }) {
         </View>
       </Pressable>
     </Swipeable>
-  );
-}
-
-/** Opens a marketplace in its app if installed (eBay's links are universal links), or Safari. */
-function open(url: string) {
-  Linking.openURL(url).catch(() =>
-    showToast({ kind: 'error', title: 'Could not open the link', message: url }),
   );
 }
 

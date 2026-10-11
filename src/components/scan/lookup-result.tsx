@@ -2,6 +2,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import type { CollectionItem, ScanMatch } from '@/api/schemas';
 import { Button } from '@/components/button';
+import { FindForSale } from '@/components/find-for-sale';
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -14,6 +15,7 @@ import {
 } from '@/hooks/queries';
 import { useLargeText } from '@/hooks/use-large-text';
 import { useOwnerLabel } from '@/hooks/use-owner-label';
+import { useSetRef } from '@/hooks/use-set-ref';
 import { radius, spacing, useColors } from '@/theme';
 import { entriesForCard } from '@/utils/collection';
 import { cardValue, formatPrice } from '@/utils/pricing';
@@ -24,7 +26,8 @@ import { MatchSummary } from './scan-confirm';
  * A scanned card looked up, not added: what it is worth and whether it is
  * already owned, for a card in a shop or a friend's binder. The price costs
  * one request (scan candidates carry none), cached for the card's page; what
- * is owned comes from the collection the app already keeps.
+ * is owned comes from the collection the app already keeps. Finding it for
+ * sale is links, so it costs nothing either.
  */
 export function LookupResult({
   match,
@@ -46,6 +49,10 @@ export function LookupResult({
   const addToWishlist = useAddToWishlist();
   const wishlisted =
     addToWishlist.isSuccess || (wishlist ?? []).some((item) => item.card_id === match.id);
+  // The price's own request; until it is back, the scan's name and number.
+  const fetched = useCard(match.id).data;
+  const card = fetched ?? { name: match.name, number: match.number };
+  const setRef = useSetRef(match.id, fetched?.set_id);
 
   return (
     <View style={styles.container}>
@@ -69,6 +76,7 @@ export function LookupResult({
           onPress={onOpen}
         />
       </View>
+      <FindForSale card={setRef ? { ...card, set_ref: setRef } : card} />
       <Button title="Add to collection…" variant="secondary" disabled={!online} onPress={onAdd} />
       {onBack ? <Button title="Not this one?" variant="secondary" onPress={onBack} /> : null}
     </View>

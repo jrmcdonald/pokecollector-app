@@ -5,10 +5,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, userEvent } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
+import { Linking } from 'react-native';
 
 import type { Card, CollectionItem, ScanMatch, WishlistItem } from '@/api/schemas';
 
 import { LookupResult } from '../scan/lookup-result';
+
+const mockPick = jest.fn();
+jest.mock('@/utils/pick', () => ({ pick: (...args: unknown[]) => mockPick(...args) }));
 
 const mockRequest = jest.fn();
 jest.mock('@/session/session', () => ({
@@ -139,5 +143,20 @@ describe('LookupResult', () => {
     queryClient.setQueryData(['acct', 'wishlist'], [wished]);
     await renderResult();
     expect(screen.getByRole('button', { name: 'On your wishlist' })).toBeDisabled();
+  });
+
+  it("finds it for sale, on the card's own Cardmarket page", async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    mockPick.mockResolvedValue(1);
+    queryClient.setQueryData(['acct', 'card', 'sv1-025_en'], {
+      ...card,
+      cardmarket_products: [{ variant: 'normal', product_id: 222 }],
+    });
+    await renderResult();
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Find for sale' }));
+    expect(openURL).toHaveBeenCalledWith(
+      'https://www.cardmarket.com/en/Pokemon/Products?idProduct=222',
+    );
+    openURL.mockRestore();
   });
 });

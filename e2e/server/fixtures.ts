@@ -22,6 +22,7 @@ import type {
   DeckEntry,
   PricePoint,
   PrintingDetailTag,
+  Product,
   ScanItem,
   ScanJob,
   ScanMatch,
@@ -596,9 +597,120 @@ export function buildFixtures(origin: string) {
   const scanJob = (id: number): ScanJob | null =>
     id === scanJobSummary.id ? { ...scanJobSummary, items: scanItems } : null;
 
+  // Sealed products, one in each state upstream reports: a box worth more
+  // than it cost, packs with no value entered, a tin opened with its pulls
+  // linked, and a sold ETB. Values as upstream works them out.
+  const owned = (id: string, variant: string) =>
+    collection.find((i) => i.card_id === id && i.variant === variant)?.id;
+  const products: Product[] = [
+    {
+      id: 1,
+      product_name: 'Surging Sparks Booster Box',
+      product_type: 'Booster Box',
+      purchase_price: 159.99,
+      purchase_date: '2026-09-30',
+      lifecycle_status: 'sealed',
+      current_value: 189.5,
+      computed_current_value: 189.5,
+      value_source: 'manual_current',
+      pnl: 29.51,
+      pnl_percent: 18.44,
+      cardmarket_url:
+        'https://www.cardmarket.com/en/Pokemon/Products/Booster-Boxes/Surging-Sparks-Booster-Box',
+      notes: 'From the local game store, on release day.',
+    },
+    {
+      id: 2,
+      product_name: 'Stellar Crown Booster Pack',
+      product_type: 'Booster Pack',
+      purchase_price: 4.5,
+      purchase_date: '2026-09-21',
+      lifecycle_status: 'sealed',
+      computed_current_value: 4.5,
+      value_source: 'purchase_cost_fallback',
+      pnl: 0,
+      pnl_percent: 0,
+      batch_id: 'b-stellar',
+    },
+    {
+      id: 3,
+      product_name: 'Charizard ex Tin',
+      product_type: 'Tin',
+      purchase_price: 24.99,
+      purchase_date: '2026-09-12',
+      lifecycle_status: 'opened',
+      computed_current_value: 41.3,
+      value_source: 'linked_cards',
+      pnl: 16.31,
+      pnl_percent: 65.27,
+      linked_live_value: 41.3,
+      realized_gains: 0,
+      linked_cards_count: 2,
+      active_linked_cards_count: 2,
+      sold_linked_cards_count: 0,
+      product_cards: [
+        {
+          id: 1,
+          product_id: 3,
+          card_id: 'sv3pt5-006_en',
+          collection_item_id: owned('sv3pt5-006_en', 'Holo'),
+          initial_quantity: 1,
+          active_quantity: 1,
+          sold_quantity: 0,
+          variant: 'Holo',
+          condition: 'NM',
+          live_value: 38.1,
+          realized_gains: 0,
+          card: card('sv3pt5-006_en'),
+        },
+        {
+          id: 2,
+          product_id: 3,
+          card_id: 'sv1-063_en',
+          collection_item_id: owned('sv1-063_en', 'Normal'),
+          initial_quantity: 1,
+          active_quantity: 1,
+          sold_quantity: 0,
+          variant: 'Normal',
+          condition: 'NM',
+          live_value: 3.2,
+          realized_gains: 0,
+          card: card('sv1-063_en'),
+        },
+      ],
+    },
+    {
+      id: 4,
+      product_name: 'Paldean Fates Elite Trainer Box',
+      product_type: 'Elite Trainer Box',
+      purchase_price: 54.99,
+      purchase_date: '2026-08-02',
+      lifecycle_status: 'sold',
+      sold_price: 72,
+      sold_date: '2026-09-15',
+      computed_current_value: 72,
+      value_source: 'manual_sold',
+      pnl: 17.01,
+      pnl_percent: 30.93,
+    },
+  ];
+  // Two packs bought together: the second shares the first's batch.
+  products.push({ ...products[1]!, id: 5 });
+
   return {
     cards,
     card: (id: string) => cards.find((c) => c.id === id) ?? null,
+    products,
+    productTypes: [
+      'Booster Pack',
+      'Booster Box',
+      'Elite Trainer Box',
+      'Tin',
+      'Bundle',
+      'Collection Box',
+      'Blister',
+      'Other',
+    ],
     collection,
     dashboard,
     sets,

@@ -42,6 +42,9 @@ const PAIRS: [fg: Role, bg: Role[], minimum: number, what: string][] = [
   ['success', ['surface'], AA.text, 'a price rise on the price history'],
   ['danger', ['surface'], AA.text, 'a price fall on the price history'],
   ['accent', ['surface'], AA.nonText, 'the price history line'],
+  ['success', ['background'], AA.text, 'a gain on a sealed product row'],
+  ['danger', ['background'], AA.text, 'a loss on a sealed product row, and a field error'],
+  ['danger', ['surface'], AA.nonText, 'the edge of a text field with an error'],
   ['textSecondary', ['surface'], AA.nonText, 'the price history scrub line'],
 ];
 

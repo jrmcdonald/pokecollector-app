@@ -648,6 +648,52 @@ the collection and creates a Real Deck of them, in a handful of requests.
       fixed `releases/latest/download/` address, so SideStore installs the app
       and offers each new release as an update, with no AltServer.
 
+### 9.2 Sealed products
+
+Upstream tracks sealed products as purchases, not as a catalogue: each is a
+name, a type, what was paid and when, typed in by hand (`api/products.py`).
+There is no catalogue of products to search and no market price for one.
+
+A product is **sealed**, **opened** or **sold** (and **review** for an old
+one whose state upstream cannot tell). Its value is what you typed while
+sealed, the sale price once sold, and once opened, the cards pulled from it
+(linked from the collection) at their current prices, plus any that were
+sold. That makes the product's profit or loss "what the box gave me against
+what it cost", which is what linking pulls is for.
+
+**Stage 1: the purchases.**
+
+- [x] **More → Sealed products:** invested, value and profit or loss at the
+      top, then every product, newest first, with its type, status and
+      profit or loss. All from one request, `GET /api/products/`, which
+      includes each product's cards and history; the totals are worked out
+      from it as upstream's summary does, rather than a second request.
+- [x] **A product's page:** what was paid and when, its value and where the
+      value comes from, and its status. "Needs review" asks whether it was
+      opened or is still sealed.
+- [x] **Add a product:** name, type, price, date, how many (several
+      identical ones are one request, `POST /api/products/batch`), status,
+      and optionally its current value, Cardmarket page and notes.
+- [x] **Edit it, mark it opened, record a sale of the sealed product, or
+      delete it.** Upstream refuses to delete a product with linked cards or
+      sales.
+- [x] The simulator walkthrough covers the list and a product's page.
+
+**Stage 2: what came out of it.**
+
+- [ ] **Link pulls from the collection** on an opened product's page: pick
+      owned copies (with how many), sent together as one request
+      (`POST /api/products/{id}/cards/bulk`). Unlink one that was a mistake.
+- [ ] **"Mark opened" goes on to scanning:** a batch scan whose added cards
+      are linked to the product when it is done.
+- [ ] **Sell a pulled card** from the product, which takes it out of the
+      collection and keeps it in the product's history.
+- [ ] **Find a product for sale:** its Cardmarket page if it has one,
+      otherwise eBay searched by its name.
+
+**Done when:** a booster box can be added when bought, opened by scanning
+what came out of it, and shows what the pulls are worth against its price.
+
 ## 10. Keeping up with upstream
 
 The addon's upstream version moves with Renovate, and the API is not
@@ -667,7 +713,8 @@ versioned. So:
 
 ## 11. Later ideas (only if the app gets heavy use)
 
-- Trades and sealed product screens
+- Trades screens
+- [x] Sealed products, stage 1 (§9.2)
 - [x] Price history charts on a card's page, and the decks that list the card
 - [x] Editing decks (copies, cards, name; deleting), and finding wishlist
       cards on eBay, Cardmarket and TCGplayer

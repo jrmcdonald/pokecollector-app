@@ -80,6 +80,9 @@ function RootStack() {
         <Stack.Screen name="binder/[id]" options={{ title: '' }} />
         <Stack.Screen name="decks" options={{ title: 'Decks' }} />
         <Stack.Screen name="deck/[id]" options={{ title: '' }} />
+        <Stack.Screen name="products" options={{ title: 'Sealed products' }} />
+        <Stack.Screen name="product/[id]" options={{ title: '' }} />
+        <Stack.Screen name="product-edit" options={{ title: 'Add a product' }} />
         {/* A push, not a modal: a card opened from the review would otherwise be
             presented as a sheet of its own, with no back button. */}
         <Stack.Screen name="deck-import" options={{ title: 'Add a prebuilt deck' }} />

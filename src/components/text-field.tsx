@@ -4,15 +4,21 @@ import { minTapTarget, radius, spacing, type as typeScale, useColors } from '@/t
 
 import { ThemedText } from './themed-text';
 
-type Props = TextInputProps & { label: string; hint?: string };
+type Props = TextInputProps & {
+  label: string;
+  hint?: string;
+  /** What is wrong with the value, in place of the hint; VoiceOver reads it with the field. */
+  error?: string;
+};
 
-export function TextField({ label, hint, style, ...rest }: Props) {
+export function TextField({ label, hint, error, style, ...rest }: Props) {
   const colors = useColors();
   return (
     <View style={styles.container}>
       <ThemedText variant="label">{label}</ThemedText>
       <TextInput
         accessibilityLabel={label}
+        accessibilityHint={error}
         placeholderTextColor={colors.textSecondary}
         autoCapitalize="none"
         autoCorrect={false}
@@ -23,12 +29,24 @@ export function TextField({ label, hint, style, ...rest }: Props) {
         style={[
           styles.input,
           typeScale.body,
-          { color: colors.text, backgroundColor: colors.surface, borderColor: colors.outline },
+          {
+            color: colors.text,
+            backgroundColor: colors.surface,
+            borderColor: error ? colors.danger : colors.outline,
+          },
           style,
         ]}
         {...rest}
       />
-      {hint ? (
+      {error ? (
+        <ThemedText
+          variant="caption"
+          color="danger"
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden>
+          {error}
+        </ThemedText>
+      ) : hint ? (
         <ThemedText variant="caption" color="textSecondary">
           {hint}
         </ThemedText>

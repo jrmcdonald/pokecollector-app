@@ -985,3 +985,42 @@ look-up's result too.
   order, and never fetched (`useSetRef`). With none of them, the search is
   the name and the number, and Cardmarket still opens the card's own page
   when its product id is known.
+
+## 2026-10-11 — Sealed products, stage 1: the purchases
+
+Upstream tracks sealed products as purchases typed in by hand (see API.md):
+no catalogue, no market price. The first stage lists them, shows each one,
+and adds, edits, opens, sells and deletes them. Linking what came out of an
+opened one, which is what gives it a value, is stage 2 (PLAN.md §9.2); the
+web UI does it meanwhile, and the app shows the result.
+
+- **One request for everything.** `GET /api/products/` returns every product
+  with its pulls and history, so the list, each product's page and the
+  totals all come from it. The totals are summed as upstream's summary sums
+  them (a product with no value counts as what was paid), rather than a
+  second request to `/api/products/summary`. A product's page reads the
+  list, not `GET /api/products/{id}`.
+- **Changes to the collection mark products stale,** as they do everything
+  else that shows owned cards: a product's pulls are collection copies.
+- **The form follows upstream's rules rather than meeting them as a 409.**
+  A product with pulls or history is opened, and offers no status or sale; an
+  opened one cannot be sold sealed, so the sale fields are only there for a
+  sealed one; a sold one switched to opened has its sale cleared. Clearing a
+  sale says "sealed" outright, or upstream would put the product in review.
+  One in review is settled on its page ("It was opened" or "Still sealed"),
+  not by the form. The checks are a tested function (`readProductForm`).
+- **Several identical ones are one request** to `POST /api/products/batch`,
+  each its own product, as the web UI makes them. The list shows each one;
+  grouping a batch can come later if long lists make it worth it.
+- **Amounts are in euros,** as upstream stores them and as every price in the
+  app is. The web UI converts from its display currency on entry; the app
+  has no currency setting to convert from.
+- **Dates are typed, YYYY-MM-DD,** defaulting to today. A native date picker
+  would be a new native dependency, and so a new dev client, for one field;
+  the format is checked, and so is "not in the future".
+- **Text fields can now show an error** in place of their hint, with a red
+  edge, and VoiceOver reads it as the field's hint.
+- **No product pictures yet.** Upstream serves a typed-in image address
+  through `/api/images/product/{id}`; the app would have to load it through
+  Cloudflare Access with the session's headers, as it does card photos.
+  Left until a product's page has more to show.

@@ -200,6 +200,19 @@ final class WalkthroughTests: XCTestCase {
     go(app.navigationBars.buttons["Add a prebuilt deck"], to: app.textFields["Deck name"], "Add a prebuilt deck")
     capture("deck-import")
     back(to: button(startingWith: "Lost Box"), "Decks, again")
+    back(to: button(startingWith: "Sealed products"), "More, again")
+
+    // Sealed products: the totals and one in each state, an opened tin with
+    // its pulls, and the add form (saving writes, which the fake server
+    // refuses).
+    go(button(startingWith: "Sealed products"), to: button(startingWith: "Charizard ex Tin"), "Sealed products")
+    capture("products")
+    go(button(startingWith: "Charizard ex Tin"), to: element(startingWith: "Worth now"), "Product")
+    capture("product")
+    back(to: button(startingWith: "Charizard ex Tin"), "Sealed products, again")
+    go(app.navigationBars.buttons["Add a product"], to: app.textFields["Name"], "Add a product")
+    capture("product-edit")
+    back(to: button(startingWith: "Charizard ex Tin"), "Sealed products, again")
     back(to: button(startingWith: "Settings"), "More, again")
 
     go(button(startingWith: "Settings"), to: button(startingWith: "Server and login"), "Settings")

@@ -26,9 +26,11 @@ import {
   addDeckEntry,
   addToCollection,
   addToWishlist,
+  createProducts,
   createScanJob,
   deleteCollectionPhoto,
   deleteDeck,
+  deleteProduct,
   deleteScanJob,
   dismissScanItem,
   getBinderCards,
@@ -40,6 +42,8 @@ import {
   getDecks,
   getPriceHistory,
   getPrintingDetailTags,
+  getProducts,
+  getProductTypes,
   getScanJob,
   getSetChecklist,
   getSets,
@@ -55,14 +59,18 @@ import {
   searchCards,
   updateCollectionItem,
   updateDeckEntry,
+  updateProduct,
   uploadCollectionPhoto,
   type NewCollectionItem,
+  type NewProduct,
+  type ProductChanges,
 } from '@/api/endpoints';
 import { ApiError, ConflictError } from '@/api/errors';
 import type {
   BinderCards,
   CollectionItem,
   Deck,
+  Product,
   ScanItem,
   ScanJob,
   WishlistItem,
@@ -117,6 +125,8 @@ export function useKeys() {
       photoVersions: [cacheId, 'photo-versions'] as const,
       scanJobs: [cacheId, 'scan-jobs'] as const,
       scanJob: (id: number) => [cacheId, 'scan-job', id] as const,
+      products: [cacheId, 'products'] as const,
+      productTypes: [cacheId, 'product-types'] as const,
     },
   };
 }
@@ -288,6 +298,7 @@ export function useInvalidateOwnership() {
         keys.decks,
         keys.deckAll,
         keys.printingDetails,
+        keys.products,
       ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
     );
 }
@@ -879,4 +890,80 @@ function invalidateDecks(
     queryClient.invalidateQueries({ queryKey: keys.decks }),
     queryClient.invalidateQueries({ queryKey: keys.deckContents }),
   ]);
+}
+
+/**
+ * Every sealed product, with its pulls and history. One request feeds the
+ * list, the totals and each product's page.
+ */
+export function useProducts() {
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.products,
+    queryFn: () => getProducts(getClient()),
+    enabled,
+  });
+}
+
+/** One product, from the list; nothing is fetched for it alone. */
+export function useProduct(id: number) {
+  const products = useProducts();
+  return { ...products, data: products.data?.find((product) => product.id === id) };
+}
+
+/** Upstream's product types. A fixed list in practice, so read once a day. */
+export function useProductTypes() {
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.productTypes,
+    queryFn: () => getProductTypes(getClient()),
+    enabled,
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+}
+
+export function useAddProducts() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: ({ product, quantity }: { product: NewProduct; quantity: number }) =>
+      createProducts(getClient(), product, quantity),
+    onSuccess: (created) => {
+      succeeded();
+      queryClient.setQueryData<Product[]>(keys.products, (old) => [...(old ?? []), ...created]);
+    },
+    onError: (error) => reportFailure('Could not add the product', error),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.products }),
+  });
+}
+
+export function useUpdateProduct() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: ({ productId, changes }: { productId: number; changes: ProductChanges }) =>
+      updateProduct(getClient(), productId, changes),
+    onSuccess: (updated) => {
+      succeeded();
+      queryClient.setQueryData<Product[]>(keys.products, (old) =>
+        old?.map((product) => (product.id === updated.id ? updated : product)),
+      );
+    },
+    onError: (error) => reportFailure('Could not save the product', error),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.products }),
+  });
+}
+
+export function useDeleteProduct() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: (productId: number) => deleteProduct(getClient(), productId),
+    onSuccess: (_result, productId) =>
+      queryClient.setQueryData<Product[]>(keys.products, (old) =>
+        old?.filter((product) => product.id !== productId),
+      ),
+    onError: (error) => reportFailure('Could not delete the product', error),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.products }),
+  });
 }

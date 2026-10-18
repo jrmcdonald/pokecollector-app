@@ -1,5 +1,5 @@
 /**
- * The card page's price history, the decks the card is in, and finding it
+ * The card page's price history, the decks and binders the card is in, and finding it
  * for sale, found the way VoiceOver finds them: by role and accessible name.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -10,7 +10,7 @@ import { Linking } from 'react-native';
 import type { Card, CardSet, CollectionItem } from '@/api/schemas';
 import { useSetRef } from '@/hooks/use-set-ref';
 
-import { CardDecks } from '../card-decks';
+import { CardBinders, CardDecks } from '../card-lists';
 import { FindForSale } from '../find-for-sale';
 import { PriceHistory } from '../price-history';
 
@@ -170,6 +170,51 @@ describe('CardDecks', () => {
     await render(withQueries(<CardDecks cardId="nowhere" />));
     expect(screen.toJSON()).toBeNull();
     expect(mockRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe('CardBinders', () => {
+  beforeEach(() => {
+    mockRequest.mockImplementation(async (path: string) => {
+      if (path === '/api/binders/')
+        return [
+          { id: 1, name: '151 master set', binder_type: 'wishlist', card_count: 2 },
+          { id: 2, name: 'Trade binder', binder_type: 'collection', card_count: 1 },
+          // Decks share the endpoint, and are not read as binders.
+          { id: 3, name: 'Lost Box', binder_type: 'deck', card_count: 60 },
+        ];
+      if (path === '/api/binders/1/cards')
+        return {
+          binder: { id: 1, name: '151 master set', binder_type: 'wishlist' },
+          cards: [
+            { id: 'sv3pt5-006_en', binder_card_id: 7, name: 'Charmander', required_quantity: 2 },
+          ],
+        };
+      if (path === '/api/binders/2/cards')
+        return {
+          binder: { id: 2, name: 'Trade binder', binder_type: 'collection' },
+          cards: [{ id: 'other', binder_card_id: 8, name: 'Other', required_quantity: 1 }],
+        };
+      throw new Error(`Unexpected ${path}`);
+    });
+  });
+
+  it('lists the binders the card is in, and opens one', async () => {
+    await render(withQueries(<CardBinders cardId="sv3pt5-006_en" />));
+    expect(await screen.findByRole('header', { name: 'In 1 binder' })).toBeTruthy();
+    await userEvent.press(
+      screen.getByRole('button', { name: '151 master set, Planned · 2 copies' }),
+    );
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/binder/[id]',
+      params: { id: '1', name: '151 master set' },
+    });
+    expect(screen.queryByRole('button', { name: /Trade binder/ })).toBeNull();
+    expect(mockRequest).not.toHaveBeenCalledWith('/api/binders/3/cards', expect.anything());
+    // Each binder read also fills its own page.
+    expect(queryClient.getQueryData(['acct', 'binder', 2])).toMatchObject({
+      binder: { name: 'Trade binder' },
+    });
   });
 });
 

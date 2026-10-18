@@ -20,7 +20,7 @@ import {
   type Variant,
 } from '@/api/schemas';
 import { Button } from '@/components/button';
-import { CardDecks } from '@/components/card-decks';
+import { CardBinders, CardDecks } from '@/components/card-lists';
 import { CardImage, frameForVariant } from '@/components/card-image';
 import { Chips } from '@/components/chips';
 import { FindForSale } from '@/components/find-for-sale';
@@ -32,9 +32,9 @@ import { ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
-  useAddToBinder,
   useAddToCollection,
   useAddToWishlist,
+  useBinderContents,
   useBinders,
   useCard,
   useCardPhoto,
@@ -45,12 +45,13 @@ import {
   useSetQuantity,
   useUpdateCopy,
 } from '@/hooks/queries';
+import { useAddCardToBinder } from '@/hooks/use-add-card-to-binder';
 import { useLargeText } from '@/hooks/use-large-text';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useOwnerLabel } from '@/hooks/use-owner-label';
 import { useSetRef } from '@/hooks/use-set-ref';
 import { radius, spacing, useColors } from '@/theme';
-import { binderKind, bindersOnly, isPlanned } from '@/utils/binders';
+import { binderKind, bindersOnly } from '@/utils/binders';
 import { CameraDeniedError, takeCardPhoto, type PhotoSource } from '@/utils/card-photo';
 import { entriesForCard } from '@/utils/collection';
 import { hasCatalogueImage } from '@/utils/images';
@@ -66,8 +67,15 @@ export default function CardDetail() {
   const collection = useCollection();
   const history = usePriceHistory(id);
   const decks = useDeckContents();
+  const binders = useBinderContents();
   const pull = usePullToRefresh(() =>
-    Promise.all([card.refetch(), collection.refetch(), history.refetch(), decks.refetch()]),
+    Promise.all([
+      card.refetch(),
+      collection.refetch(),
+      history.refetch(),
+      decks.refetch(),
+      binders.refetch(),
+    ]),
   );
   const online = useIsOnline();
   const entries = entriesForCard(collection.data, id);
@@ -137,6 +145,7 @@ export default function CardDetail() {
           ) : null}
 
           <Owned entries={entries} disabled={!online} />
+          <CardBinders cardId={c.id} />
           <CardDecks cardId={c.id} />
           <AddCopies card={c} disabled={!online} />
           <AddToBinder card={c} entries={entries} disabled={!online} />
@@ -455,10 +464,7 @@ function AddCopies({ card, disabled }: { card: Card; disabled: boolean }) {
   );
 }
 
-/**
- * Picks a binder, then, for a collection binder, which owned copy goes in:
- * those hold exact collection entries, so a card not owned cannot go in one.
- */
+/** Picks a binder, then puts the card in it (see `useAddCardToBinder`). */
 function AddToBinder({
   card,
   entries,
@@ -469,7 +475,7 @@ function AddToBinder({
   disabled: boolean;
 }) {
   const binders = useBinders();
-  const add = useAddToBinder();
+  const add = useAddCardToBinder();
   const list = binders.data ? bindersOnly(binders.data) : [];
   if (binders.data && list.length === 0) return null;
 
@@ -479,28 +485,7 @@ function AddToBinder({
       list.map((b) => `${b.name} (${binderKind(b).toLowerCase()})`),
     );
     const binder = binderIndex === null ? undefined : list[binderIndex];
-    if (!binder) return;
-    if (isPlanned(binder)) {
-      add.mutate({ binderId: binder.id, cardId: card.id });
-      return;
-    }
-    if (entries.length === 0) {
-      showToast({
-        kind: 'info',
-        title: 'Not in your collection',
-        message: `“${binder.name}” holds cards you own. Add a copy first, or use a planned binder.`,
-      });
-      return;
-    }
-    let entry = entries[0];
-    if (entries.length > 1) {
-      const entryIndex = await pick(
-        'Which copy?',
-        entries.map((e) => `${e.variant ?? 'Normal'}, ${e.condition} (×${e.quantity})`),
-      );
-      entry = entryIndex === null ? undefined : entries[entryIndex];
-    }
-    if (entry) add.mutate({ binderId: binder.id, collectionItemId: entry.id });
+    if (binder) await add.addCard(binder, card.id, entries);
   }
 
   return (

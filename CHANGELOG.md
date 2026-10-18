@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.4.0...v1.5.0) (2026-10-18)
+
+
+### Features
+
+* show a card's binders, edit binders, and fold printing details away ([d719671](https://github.com/jrmcdonald/pokecollector-app/commit/d7196710e74c9322b92423a663eb11340aab9fd1))
+* show a card's binders, edit binders, and fold printing details away ([3b7c9e1](https://github.com/jrmcdonald/pokecollector-app/commit/3b7c9e1b703762be48981b22fbb9330bcd596143))
+
+
+### Bug fixes
+
+* keep camera photos upright when the phone is tilted over a card ([dc74a89](https://github.com/jrmcdonald/pokecollector-app/commit/dc74a895d4c36b4a5efaa7082d863d10603f2dd2))
+
 ## [1.4.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.3.0...v1.4.0) (2026-10-11)
 
 

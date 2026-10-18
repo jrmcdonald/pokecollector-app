@@ -5,7 +5,6 @@
 
 ### Features
 
-* show a card's binders, edit binders, and fold printing details away ([d719671](https://github.com/jrmcdonald/pokecollector-app/commit/d7196710e74c9322b92423a663eb11340aab9fd1))
 * show a card's binders, edit binders, and fold printing details away ([3b7c9e1](https://github.com/jrmcdonald/pokecollector-app/commit/3b7c9e1b703762be48981b22fbb9330bcd596143))
 
 

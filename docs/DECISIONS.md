@@ -1065,3 +1065,14 @@ start folded away, since most copies have none.
   ("None", or "Stamped, Staff"), with a chevron, in "Add copies", editing a
   copy and the scan's copy details. Tapping it opens the chips. It is a
   button with its expanded state, so VoiceOver says both.
+
+## 2026-10-18 — Camera photos follow the screen, not the phone
+
+- **The camera's output orientation comes from the interface.**
+  VisionCamera tags photos with the phone's physical orientation by default.
+  Held tilted down over a card on a table, the phone can read as landscape
+  while the app, locked to portrait, still shows a portrait preview and
+  guide; the photo came out sideways, and the guide's portrait crop cut a
+  strip across the card. With `orientationSource="interface"` the photo is
+  always portrait, like what the screen shows. Auto-capture's frames already
+  coped with either (`guideInFrame`).

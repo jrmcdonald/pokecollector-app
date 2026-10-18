@@ -19,6 +19,7 @@ import * as Haptics from 'expo-haptics';
 import { useCallback, useContext, useSyncExternalStore } from 'react';
 
 import { batchPollDelay } from '@/api/batch';
+import { binderContents, type BinderContents } from '@/api/binders';
 import { addDeckToCollection, deckContents, importDecklist, type DeckContents } from '@/api/decks';
 import {
   addCardToPlannedBinder,
@@ -28,6 +29,7 @@ import {
   addToWishlist,
   createProducts,
   createScanJob,
+  deleteBinder,
   deleteCollectionPhoto,
   deleteDeck,
   deleteProduct,
@@ -57,10 +59,13 @@ import {
   resolveAndAddScan,
   retryScanItem,
   searchCards,
+  updateBinder,
+  updateBinderEntry,
   updateCollectionItem,
   updateDeckEntry,
   updateProduct,
   uploadCollectionPhoto,
+  type BinderChanges,
   type NewCollectionItem,
   type NewProduct,
   type ProductChanges,
@@ -76,6 +81,7 @@ import type {
   WishlistItem,
 } from '@/api/schemas';
 import { useSession } from '@/session/session';
+import { bindersOnly } from '@/utils/binders';
 import { forgetBatchPhotos, keepBatchPhotos, pruneBatchPhotos } from '@/utils/batch-photos';
 import type { DeckLine } from '@/utils/decklist';
 import { withEntryQuantity } from '@/utils/decks';
@@ -117,6 +123,7 @@ export function useKeys() {
       binders: [cacheId, 'binders'] as const,
       binder: (id: number) => [cacheId, 'binder', id] as const,
       binderAll: [cacheId, 'binder'] as const,
+      binderContents: [cacheId, 'binder-contents'] as const,
       decks: [cacheId, 'decks'] as const,
       deck: (id: number) => [cacheId, 'deck', id] as const,
       deckAll: [cacheId, 'deck'] as const,
@@ -279,6 +286,55 @@ export function useBinderCards(id: number) {
 }
 
 /**
+ * Every binder's cards, for a card's page to say which binders hold it.
+ * Shared by every card, and read again only for binders whose counts have
+ * changed since (see `binderContents`); each binder read also fills that
+ * binder's own page. The binder list it reads is the Binders screen's.
+ */
+export function useBinderContents() {
+  const queryClient = useQueryClient();
+  const { enabled, getClient, keys } = useKeys();
+  return useQuery({
+    queryKey: keys.binderContents,
+    queryFn: async () => {
+      const list = await queryClient.fetchQuery({
+        queryKey: keys.binders,
+        queryFn: () => getBinders(getClient()),
+        // Its counts say which binders changed, so it is read every time.
+        staleTime: 0,
+      });
+      return binderContents(
+        getClient(),
+        bindersOnly(list),
+        queryClient.getQueryData<BinderContents[]>(keys.binderContents),
+        (id, cards) => queryClient.setQueryData(keys.binder(id), cards),
+      );
+    },
+    enabled,
+    staleTime: 30 * 60 * 1000,
+  });
+}
+
+/**
+ * After the app changes a binder's cards: the list, the binder's page, and
+ * the binder index, which reads this binder again whatever its counts say.
+ */
+function invalidateBinder(
+  queryClient: ReturnType<typeof useQueryClient>,
+  keys: ReturnType<typeof useKeys>['keys'],
+  binderId: number,
+) {
+  queryClient.setQueryData<BinderContents[]>(keys.binderContents, (index) =>
+    index?.filter((binder) => binder.id !== binderId),
+  );
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: keys.binders }),
+    queryClient.invalidateQueries({ queryKey: keys.binder(binderId) }),
+    queryClient.invalidateQueries({ queryKey: keys.binderContents }),
+  ]);
+}
+
+/**
  * Refetches what a change to the collection affects. Only screens on show
  * refetch straight away; the rest are marked stale and refetch when opened.
  */
@@ -295,6 +351,7 @@ export function useInvalidateOwnership() {
         keys.checklistAll,
         keys.binders,
         keys.binderAll,
+        keys.binderContents,
         keys.decks,
         keys.deckAll,
         keys.printingDetails,
@@ -465,11 +522,7 @@ export function useAddToBinder() {
         : addCardToPlannedBinder(getClient(), addition.binderId, addition.cardId),
     onSuccess: succeeded,
     onError: (error) => reportFailure('Could not add it to the binder', error),
-    onSettled: (_data, _error, addition) =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: keys.binders }),
-        queryClient.invalidateQueries({ queryKey: keys.binder(addition.binderId) }),
-      ]),
+    onSettled: (_data, _error, addition) => invalidateBinder(queryClient, keys, addition.binderId),
   });
 }
 
@@ -560,11 +613,87 @@ export function useRemoveFromBinder() {
       if (context?.previous) queryClient.setQueryData(keys.binder(binderId), context.previous);
       reportFailure('Could not remove it from the binder', error);
     },
-    onSettled: (_data, _error, { binderId }) =>
+    onSettled: (_data, _error, { binderId }) => invalidateBinder(queryClient, keys, binderId),
+  });
+}
+
+/**
+ * Sets how many copies a binder entry holds; 0 takes it out. Optimistic, and
+ * one at a time per binder, so quick changes land in order.
+ */
+export function useSetBinderEntryQuantity(binderId: number) {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  return useMutation({
+    scope: { id: `binder-${binderId}` },
+    mutationFn: ({ binderCardId, quantity }: { binderCardId: number; quantity: number }) =>
+      quantity > 0
+        ? updateBinderEntry(getClient(), binderId, binderCardId, quantity)
+        : removeBinderEntry(getClient(), binderId, binderCardId),
+    onMutate: async ({ binderCardId, quantity }) => {
+      await queryClient.cancelQueries({ queryKey: keys.binder(binderId) });
+      const previous = queryClient.getQueryData<BinderCards>(keys.binder(binderId));
+      queryClient.setQueryData<BinderCards>(keys.binder(binderId), (data) =>
+        data
+          ? {
+              ...data,
+              cards: data.cards.flatMap((c) =>
+                c.binder_card_id !== binderCardId
+                  ? [c]
+                  : quantity > 0
+                    ? [{ ...c, required_quantity: quantity }]
+                    : [],
+              ),
+            }
+          : data,
+      );
+      return { previous };
+    },
+    onError: (error, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(keys.binder(binderId), context.previous);
+      if (error instanceof ConflictError) {
+        showToast({
+          kind: 'error',
+          title: 'Not enough spare copies',
+          message: 'A binder holds owned copies that are not already in another binder.',
+        });
+      } else {
+        reportFailure('Could not change the binder', error);
+      }
+    },
+    onSettled: () => invalidateBinder(queryClient, keys, binderId),
+  });
+}
+
+/** Renames a binder or changes its colour. */
+export function useUpdateBinder() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: ({ binderId, changes }: { binderId: number; changes: BinderChanges }) =>
+      updateBinder(getClient(), binderId, changes),
+    onSuccess: (binder) =>
+      queryClient.setQueryData<BinderCards>(keys.binder(binder.id), (data) =>
+        data ? { ...data, binder: { ...data.binder, ...binder } } : data,
+      ),
+    onError: (error) => reportFailure('Could not change the binder', error),
+    onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: keys.binders }),
-        queryClient.invalidateQueries({ queryKey: keys.binder(binderId) }),
+        queryClient.invalidateQueries({ queryKey: keys.binderContents }),
       ]),
+  });
+}
+
+export function useDeleteBinder() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: (binderId: number) => deleteBinder(getClient(), binderId),
+    onSuccess: (_result, binderId) =>
+      queryClient.removeQueries({ queryKey: keys.binder(binderId) }),
+    onError: (error) => reportFailure('Could not delete the binder', error),
+    onSettled: (_data, _error, binderId) => invalidateBinder(queryClient, keys, binderId),
   });
 }
 

@@ -375,6 +375,12 @@ function Scanner() {
             isActive={focused}
             outputs={outputs}
             resizeMode="cover"
+            // Photos follow the screen, which is locked to portrait, as the
+            // preview and the guide do. VisionCamera's default follows the
+            // phone itself, which reads as landscape when it is tilted down
+            // at a card on a table: the photo came out sideways and the
+            // guide's crop cut a strip across it.
+            orientationSource="interface"
             torchMode={torch && focused ? 'on' : 'off'}
             onStarted={() => setReady(true)}
             onStopped={() => setReady(false)}

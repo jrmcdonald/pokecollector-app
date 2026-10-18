@@ -2,6 +2,7 @@ import type { PokeCollectorClient } from './client';
 import {
   AuthModeSchema,
   BinderCardsSchema,
+  BinderSchema,
   BindersSchema,
   BulkAddResultSchema,
   CardSchema,
@@ -220,6 +221,44 @@ export function removeBinderEntry(
   binderCardId: number,
 ): Promise<unknown> {
   return client.request(`/api/binders/${binderId}/entries/${binderCardId}`, { method: 'DELETE' });
+}
+
+/**
+ * Sets how many copies a binder entry holds (1–99). A collection binder's
+ * entry is one exact owned copy, and upstream refuses (409) more than are
+ * owned and not in another binder.
+ */
+export function updateBinderEntry(
+  client: PokeCollectorClient,
+  binderId: number,
+  binderCardId: number,
+  quantity: number,
+): Promise<unknown> {
+  return client.request(`/api/binders/${binderId}/entries/${binderCardId}`, {
+    method: 'PUT',
+    json: { required_quantity: quantity },
+  });
+}
+
+/** The app changes a binder's name and colour; nothing in it reads the rest. */
+export type BinderChanges = Pick<Schemas['BinderUpdate'], 'name' | 'color'>;
+
+/** Upstream moves `updated_at`, which it does not for changes to a binder's cards. */
+export function updateBinder(
+  client: PokeCollectorClient,
+  binderId: number,
+  changes: BinderChanges,
+): Promise<Binder> {
+  return client.request(`/api/binders/${binderId}`, {
+    method: 'PUT',
+    json: changes,
+    schema: BinderSchema,
+  });
+}
+
+/** Deletes a binder. The copies in a collection binder stay in the collection. */
+export function deleteBinder(client: PokeCollectorClient, binderId: number): Promise<unknown> {
+  return client.request(`/api/binders/${binderId}`, { method: 'DELETE' });
 }
 
 /**

@@ -259,6 +259,7 @@ export const BinderSchema = z.looseObject({
   binder_type: z.string().nullish(),
   card_count: z.number().nullish(),
   unique_card_count: z.number().nullish(),
+  updated_at: z.string().nullish(),
 });
 export type Binder = z.infer<typeof BinderSchema>;
 

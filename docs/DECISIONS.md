@@ -1024,3 +1024,55 @@ web UI does it meanwhile, and the app shows the result.
   through `/api/images/product/{id}`; the app would have to load it through
   Cloudflare Access with the session's headers, as it does card photos.
   Left until a product's page has more to show.
+
+## 2026-10-18 — The binders a card is in, editing binders, and printing details folded away
+
+A card's page now says which binders hold it, as it does for decks; a
+binder can be edited from its page, as a deck can; and the printing details
+start folded away, since most copies have none.
+
+- **Which binders hold a card is an index, like the decks'.** Upstream has
+  no lookup by card, so the app reads every binder's cards
+  (`binderContents`), shared by every card's page and kept half an hour.
+  Upstream does not move a binder's `updated_at` when its cards change, so a
+  binder is read again when its `card_count`, `unique_card_count` or
+  `updated_at` (which a rename moves) in the binder list has changed. A swap that keeps both counts, made in the web
+  UI, is missed until something else changes; the app's own binder changes
+  drop that binder from the index, so it is always read again. After the
+  first time, a refresh is the binder list plus one request per binder
+  changed since. Each binder read also fills that binder's own page.
+- **The panel is the decks' panel,** one component for both (`card-lists`):
+  each binder's colour, its kind and copies, opening its page. Binders come
+  before decks: they have a tab, decks are under More. Nothing while they
+  load or on an error.
+- **Edit is a mode of the binder's page,** behind Edit in the header, as for
+  decks. The tiles become rows with a stepper for each entry's copies, 0 to
+  99, saved after 0.6 s; 0 takes the entry out (the copy stays in the
+  collection). The stepper row is now one component, `EditableCardRow`,
+  shared with decks. Above the cards are Add a card, Rename and Colour;
+  Delete binder is at the foot, behind a confirmation.
+- **A collection binder takes owned copies only.** Add a card searches the
+  catalogue, then asks which owned copy goes in when there are several, as
+  "Add to binder" on a card's page does (now one hook,
+  `useAddCardToBinder`); a card not owned says so. More copies of an entry
+  than are owned and spare is a 409, and the number goes back.
+- **The colours are the web UI's eight,** named in an action sheet, with the
+  current one marked. A colour set elsewhere is kept until another is
+  chosen. Description, type and public sharing are left to the web UI:
+  nothing in the app reads the description, and upstream will not change a
+  binder's type once it has cards.
+- **Printing details fold away under one row** that names what is chosen
+  ("None", or "Stamped, Staff"), with a chevron, in "Add copies", editing a
+  copy and the scan's copy details. Tapping it opens the chips. It is a
+  button with its expanded state, so VoiceOver says both.
+
+## 2026-10-18 — Camera photos follow the screen, not the phone
+
+- **The camera's output orientation comes from the interface.**
+  VisionCamera tags photos with the phone's physical orientation by default.
+  Held tilted down over a card on a table, the phone can read as landscape
+  while the app, locked to portrait, still shows a portrait preview and
+  guide; the photo came out sideways, and the guide's portrait crop cut a
+  strip across the card. With `orientationSource="interface"` the photo is
+  always portrait, like what the screen shows. Auto-capture's frames already
+  coped with either (`guideInFrame`).

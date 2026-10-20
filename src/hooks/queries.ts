@@ -226,23 +226,18 @@ export function usePrintingDetailTags() {
   });
 }
 
-export function useWishlist() {
+/**
+ * The wishlist, with its cards and prices. `staleTime` for a screen that only
+ * needs to know what is on it; `enabled: false` to only observe.
+ */
+export function useWishlist(options: { staleTime?: number; enabled?: boolean } = {}) {
   const { enabled, getClient, keys } = useKeys();
   return useQuery({
     queryKey: keys.wishlist,
     queryFn: () => getWishlist(getClient()),
-    enabled,
+    enabled: enabled && options.enabled !== false,
+    staleTime: options.staleTime,
   });
-}
-
-/** The wishlist only if it is already cached, never fetched for this. */
-export function useCachedWishlist() {
-  const { getClient, keys } = useKeys();
-  return useQuery({
-    queryKey: keys.wishlist,
-    queryFn: () => getWishlist(getClient()),
-    enabled: false,
-  }).data;
 }
 
 export function useSets() {
@@ -467,7 +462,14 @@ export function useAddToWishlist() {
   const { getClient, keys } = useKeys();
   return useMutation({
     mutationFn: (cardId: string) => addToWishlist(getClient(), cardId),
-    onSuccess: succeeded,
+    // The new entry goes into a cached wishlist at once, so it can be removed
+    // again before the wishlist is read back.
+    onSuccess: (item) => {
+      succeeded();
+      queryClient.setQueryData<WishlistItem[]>(keys.wishlist, (items) =>
+        items ? [...items.filter((entry) => entry.id !== item.id), item] : items,
+      );
+    },
     onError: (error) => reportFailure('Could not add to the wishlist', error),
     onSettled: () =>
       Promise.all([

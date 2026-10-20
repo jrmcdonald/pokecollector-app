@@ -6,13 +6,8 @@ import { FindForSale } from '@/components/find-for-sale';
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import {
-  useAddToWishlist,
-  useCachedWishlist,
-  useCard,
-  useCollection,
-  useIsOnline,
-} from '@/hooks/queries';
+import { WishlistButton } from '@/components/wishlist-button';
+import { useCard, useCollection, useIsOnline } from '@/hooks/queries';
 import { useLargeText } from '@/hooks/use-large-text';
 import { useOwnerLabel } from '@/hooks/use-owner-label';
 import { useSetRef } from '@/hooks/use-set-ref';
@@ -45,10 +40,6 @@ export function LookupResult({
 }) {
   const online = useIsOnline();
   const largeText = useLargeText();
-  const wishlist = useCachedWishlist();
-  const addToWishlist = useAddToWishlist();
-  const wishlisted =
-    addToWishlist.isSuccess || (wishlist ?? []).some((item) => item.card_id === match.id);
   // The price's own request; until it is back, the scan's name and number.
   const fetched = useCard(match.id).data;
   const card = fetched ?? { name: match.name, number: match.number };
@@ -61,13 +52,12 @@ export function LookupResult({
       <Ownership cardId={match.id} />
       <Button title="Scan another" onPress={onScanAnother} />
       <View style={[styles.row, largeText && styles.stacked]}>
-        <Button
-          title={wishlisted ? 'On your wishlist' : 'Add to wishlist'}
-          variant="secondary"
+        <WishlistButton
+          cardId={match.id}
+          disabled={!online}
+          // A look-up costs no request for the wishlist.
+          cachedOnly
           style={!largeText && styles.half}
-          busy={addToWishlist.isPending}
-          disabled={!online || wishlisted}
-          onPress={() => addToWishlist.mutate(match.id)}
         />
         <Button
           title="Open the card"

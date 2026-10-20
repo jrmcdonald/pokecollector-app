@@ -1076,3 +1076,21 @@ start folded away, since most copies have none.
   strip across the card. With `orientationSource="interface"` the photo is
   always portrait, like what the screen shows. Auto-capture's frames already
   coped with either (`guideInFrame`).
+
+## 2026-10-20 — The wishlist button takes a card off again
+
+- **One button that says what it will do:** "Add to wishlist" until the card
+  is on the wishlist, then "Remove from wishlist". A disabled "On your
+  wishlist" said where the card was but left no way back short of finding
+  it in the wishlist; a button labelled with its action says both, since
+  "Remove" only shows for a card that is on it. One `WishlistButton`, on a
+  card's page and a look-up's result.
+- **No confirmation.** Removing is optimistic and undone by adding again,
+  which costs one tap, as in the wishlist's swipe.
+- **The card's page reads the wishlist** to know, one request kept half an
+  hour, shared with the Wishlist screen and every card. A look-up still
+  reads it only from the cache, so it costs no request; a card added there
+  without the wishlist cached says "On your wishlist" and cannot be taken
+  off from the result.
+- **An added card goes straight into a cached wishlist** from upstream's
+  reply, so it can be taken off again before the wishlist is read back.

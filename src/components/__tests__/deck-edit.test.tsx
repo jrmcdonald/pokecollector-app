@@ -1,11 +1,13 @@
 /**
- * Editing a deck, and finding a wishlist card for sale, found the way
+ * Editing a deck, and the wishlist as a list or a grid, found the way
  * VoiceOver finds them: by role and accessible name.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, userEvent, waitFor } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 import { Alert, Linking } from 'react-native';
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { Deck, WishlistItem } from '@/api/schemas';
 import DeckDetail from '@/app/deck/[id]';
@@ -47,6 +49,9 @@ jest.mock('@shopify/flash-list', () => {
 
 const mockPick = jest.fn();
 jest.mock('@/utils/pick', () => ({ pick: (...args: unknown[]) => mockPick(...args) }));
+jest.mock('@react-native-async-storage/async-storage', () =>
+  jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
 
 const mockRequest = jest.fn();
 jest.mock('@/session/session', () => ({
@@ -267,5 +272,25 @@ describe('Wishlist', () => {
       'Find on TCGplayer',
       'Remove',
     ]);
+  });
+
+  it('shows the cards as a grid, and remembers it', async () => {
+    await AsyncStorage.clear();
+    await render(withQueries(<Wishlist />));
+    await userEvent.press(await screen.findByRole('button', { name: 'Show as grid' }));
+    const tile = await screen.findByRole('button', { name: 'Pikachu ex, No price' });
+    expect(tile.props.accessibilityActions.map((a: { label: string }) => a.label)).toEqual([
+      'Find on eBay',
+      'Find on Cardmarket',
+      'Find on TCGplayer',
+      'Remove from wishlist',
+    ]);
+    expect(await AsyncStorage.getItem('pokecollector.wishlist-layout')).toBe('grid');
+
+    // Opened again, it is still a grid; back to the list from there.
+    screen.unmount();
+    await render(withQueries(<Wishlist />));
+    await userEvent.press(await screen.findByRole('button', { name: 'Show as list' }));
+    expect(await AsyncStorage.getItem('pokecollector.wishlist-layout')).toBe('list');
   });
 });

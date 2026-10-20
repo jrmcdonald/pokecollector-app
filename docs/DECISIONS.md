@@ -1076,3 +1076,17 @@ start folded away, since most copies have none.
   strip across the card. With `orientationSource="interface"` the photo is
   always portrait, like what the screen shows. Auto-capture's frames already
   coped with either (`guideInFrame`).
+
+## 2026-10-20 — The wishlist as a grid
+
+- **A list or a grid, switched in the header** with the collection's button
+  ("Show as grid", "Show as list"). The grid is the collection's: `CardTile`
+  in `useCardColumns` columns, one column of rows at the accessibility text
+  sizes. Each tile has its price, or "No price", and how many are wanted
+  when more than one.
+- **The grid has no swipe.** Holding a tile offers the same actions as a
+  row (find it for sale, Remove), as does VoiceOver's Actions rotor; the
+  header's hint says so in the grid.
+- **The choice is remembered,** in AsyncStorage like the Scan tab's mode.
+  The collection's toggle is not, yet; the wishlist opens as a list until
+  the grid is chosen.

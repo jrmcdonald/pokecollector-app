@@ -1,42 +1,86 @@
 import { FlashList } from '@shopify/flash-list';
-import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { router, Stack } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import type { WishlistItem } from '@/api/schemas';
 import { CardImage } from '@/components/card-image';
+import { CardTile } from '@/components/card-tile';
 import { openMarketplace } from '@/components/find-for-sale';
-import { EmptyState, ErrorState, ListSkeleton } from '@/components/states';
+import { EmptyState, ErrorState, GridSkeleton, ListSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useIsOnline, useRemoveFromWishlist, useWishlist } from '@/hooks/queries';
+import { useCardColumns } from '@/hooks/use-large-text';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { minTapTarget, spacing, useColors } from '@/theme';
 import { marketplaces } from '@/utils/marketplaces';
 import { pick } from '@/utils/pick';
 import { cardValue, formatPrice, formatTotal } from '@/utils/pricing';
 import { wishlistCost } from '@/utils/wishlist';
+import {
+  loadWishlistLayout,
+  saveWishlistLayout,
+  type WishlistLayout,
+} from '@/utils/wishlist-layout';
 
+/** More → Wishlist: a list with prices, or a grid of the cards, and what buying them all costs. */
 export default function Wishlist() {
   const colors = useColors();
+  const columns = useCardColumns();
   const wishlist = useWishlist();
   const pull = usePullToRefresh(() => wishlist.refetch());
   const items = wishlist.data;
   const cost = useMemo(() => wishlistCost(items ?? []), [items]);
   const allUnpriced = cost.count > 0 && cost.unpriced === cost.count;
+  const [layout, setLayout] = useState<WishlistLayout>('list');
+  const grid = layout === 'grid';
+
+  useEffect(() => {
+    let active = true;
+    loadWishlistLayout().then((saved) => {
+      if (active && saved) setLayout(saved);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const toggleLayout = () => {
+    const next = grid ? 'list' : 'grid';
+    setLayout(next);
+    saveWishlistLayout(next);
+  };
 
   return (
     <ThemedView style={styles.fill}>
+      <Stack.Screen
+        options={{
+          // A native bar button, as on the collection.
+          unstable_headerRightItems: () => [
+            {
+              type: 'button',
+              label: grid ? 'List' : 'Grid',
+              accessibilityLabel: grid ? 'Show as list' : 'Show as grid',
+              icon: { type: 'sfSymbol', name: grid ? 'list.bullet' : 'square.grid.3x3' },
+              onPress: toggleLayout,
+            },
+          ],
+        }}
+      />
       {items ? (
         <FlashList
           // No recycle pool: FlashList 2.0.2 keeps cells past the end of a list
           // that shrank, showing their old items (a set searched for "char"
           // still showed what "c" found). Unused cells now unmount instead.
           maxItemsInRecyclePool={0}
+          key={`${layout}-${columns}`}
           data={items}
+          numColumns={grid ? columns : 1}
           keyExtractor={(item) => String(item.id)}
           contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={grid ? styles.grid : undefined}
           refreshControl={
             <RefreshControl
               refreshing={pull.refreshing}
@@ -70,12 +114,20 @@ export default function Wishlist() {
                   ) : null}
                 </View>
                 <ThemedText variant="caption" color="textSecondary">
-                  Hold a card to find it on eBay, Cardmarket or TCGplayer.
+                  {grid
+                    ? 'Hold a card to find it on eBay, Cardmarket or TCGplayer, or to remove it.'
+                    : 'Hold a card to find it on eBay, Cardmarket or TCGplayer.'}
                 </ThemedText>
               </View>
             ) : null
           }
-          renderItem={({ item }) => <WishlistRow item={item} />}
+          renderItem={({ item }) =>
+            grid ? (
+              <WishlistTile item={item} layout={columns === 1 ? 'row' : 'tile'} />
+            ) : (
+              <WishlistRow item={item} />
+            )
+          }
           ListEmptyComponent={
             <EmptyState
               title="Your wishlist is empty"
@@ -86,10 +138,65 @@ export default function Wishlist() {
         />
       ) : wishlist.error ? (
         <ErrorState error={wishlist.error} onRetry={() => wishlist.refetch()} />
+      ) : grid ? (
+        <GridSkeleton />
       ) : (
         <ListSkeleton />
       )}
     </ThemedView>
+  );
+}
+
+/** What can be done with a wishlist card besides opening it: find it for sale, or remove it. */
+function useWishlistActions(item: WishlistItem) {
+  const online = useIsOnline();
+  const remove = useRemoveFromWishlist();
+  const card = item.card ?? { id: item.card_id, name: item.card_id };
+  const shops = marketplaces(card);
+  return {
+    card,
+    online,
+    remove: () => remove.mutate(item),
+    actions: [
+      ...shops.map((shop, index) => ({
+        name: `shop-${index}`,
+        label: shop.label,
+        onAction: () => openMarketplace(shop.url),
+      })),
+      ...(online
+        ? [
+            {
+              name: 'delete',
+              label: 'Remove from wishlist',
+              destructive: true,
+              onAction: () => remove.mutate(item),
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
+/**
+ * A wishlist card in the grid: its picture, price and how many are wanted.
+ * Holding it offers the same actions as a row, as does VoiceOver's Actions
+ * rotor; a grid has no swipe.
+ */
+function WishlistTile({ item, layout }: { item: WishlistItem; layout: 'tile' | 'row' }) {
+  const { card, actions } = useWishlistActions(item);
+  const price = cardValue(item.card);
+  return (
+    <CardTile
+      layout={layout}
+      card={card}
+      detail={[
+        price > 0 ? formatPrice(price) : 'No price',
+        item.quantity > 1 ? `${item.quantity} wanted` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+      actions={actions}
+    />
   );
 }
 
@@ -101,22 +208,9 @@ export default function Wishlist() {
  */
 function WishlistRow({ item }: { item: WishlistItem }) {
   const colors = useColors();
-  const online = useIsOnline();
-  const remove = useRemoveFromWishlist();
-  const card = item.card ?? { id: item.card_id, name: item.card_id };
+  const { card, online, remove, actions } = useWishlistActions(item);
   const set = item.card?.set_ref?.name;
   const price = cardValue(item.card);
-  const shops = marketplaces(card);
-  const actions = [
-    ...shops.map((shop, index) => ({
-      name: `shop-${index}`,
-      label: shop.label,
-      onAction: () => openMarketplace(shop.url),
-    })),
-    ...(online
-      ? [{ name: 'delete', label: 'Remove from wishlist', onAction: () => remove.mutate(item) }]
-      : []),
-  ];
 
   async function offerActions() {
     const index = await pick(
@@ -139,7 +233,7 @@ function WishlistRow({ item }: { item: WishlistItem }) {
           </ThemedText>
         </View>
       )}
-      onSwipeableOpen={() => remove.mutate(item)}>
+      onSwipeableOpen={remove}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${card.name}, ${price > 0 ? formatPrice(price) : 'no price yet'}${item.quantity > 1 ? `, ${item.quantity} wanted` : ''}`}
@@ -183,6 +277,7 @@ function WishlistRow({ item }: { item: WishlistItem }) {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  grid: { padding: spacing.sm },
   header: { padding: spacing.md, gap: spacing.sm },
   total: { gap: 2 },
   row: {

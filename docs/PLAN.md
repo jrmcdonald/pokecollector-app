@@ -516,7 +516,8 @@ The app:
 - [x] **Review list:** every photo in order, using the phone's own thumbnail
       (fetching each photo back from the server would cost a request each),
       with the best candidate preselected. Tap to pick another candidate, set
-      variant, condition and quantity, or search instead.
+      variant, condition and quantity, or search instead. Swipe, or the
+      arrows, to the next or previous photo without closing it.
 - [x] **Add in a paced queue.** Confirming is still one `resolve-and-add` per
       card, so "Add all" sends them one after another and backs off on a 429,
       showing how many are left, rather than firing 30 at once.

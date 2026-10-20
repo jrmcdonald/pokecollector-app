@@ -31,12 +31,13 @@ import { useOwnerLabel } from '@/hooks/use-owner-label';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { spacing, useColors } from '@/theme';
 import { forgetBatchPhotos } from '@/utils/batch-photos';
-import { progressLine } from '@/utils/batch-review';
+import { canReview, photoAfter, progressLine } from '@/utils/batch-review';
 
 /**
  * A batch's review: every photo in order, with the best candidate chosen,
  * while upstream is still reading the rest. Tap a photo to change its card
- * or how it goes in; "Add all" adds the ready ones one after another.
+ * or how it goes in, and swipe on to the next; "Add all" adds the ready ones
+ * one after another.
  */
 export default function ScanReview() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -63,7 +64,12 @@ export default function ScanReview() {
   const progress = useMemo(() => (job.data ? batchProgress(job.data) : null), [job.data]);
   const addable = useMemo(() => addableItems(items, choices), [items, choices]);
   const choiceFor = (item: ScanItem) => choices[item.id] ?? defaultChoice(item);
-  const open = items.find((item) => item.id === openId) ?? null;
+  // What the sheet swipes through. The open photo stays while it is open,
+  // even if it is handled elsewhere meanwhile, so it never vanishes mid-look.
+  const reviewable = useMemo(
+    () => items.filter((item) => item.id === openId || (canReview(item) && !skipped.has(item.id))),
+    [items, openId, skipped],
+  );
   const allDone = !!progress && progress.total > 0 && progress.handled === progress.total;
 
   // Every photo handled: the phone's copies are no use any more.
@@ -169,21 +175,24 @@ export default function ScanReview() {
 
       <BatchItemSheet
         jobId={jobId}
-        item={open}
-        choice={open ? choiceFor(open) : null}
-        onChange={(choice) => open && setChoices((old) => ({ ...old, [open.id]: choice }))}
+        items={reviewable}
+        openId={openId}
+        choiceFor={choiceFor}
+        onChange={(item, choice) => setChoices((old) => ({ ...old, [item.id]: choice }))}
+        onOpen={(item) => setOpenId(item.id)}
         onClose={() => setOpenId(null)}
         busy={dismiss.isPending || retry.isPending}
         online={online}
+        // Skipping or reading a photo again moves on to the next one.
         onSkip={(item) => {
-          setOpenId(null);
+          setOpenId(photoAfter(reviewable, item.id));
           dismiss.mutate(
             { jobId, itemId: item.id },
             { onSuccess: () => setSkipped((old) => new Set(old).add(item.id)) },
           );
         }}
         onRetry={(item) => {
-          setOpenId(null);
+          setOpenId(photoAfter(reviewable, item.id));
           // New candidates are coming; the old choice would not be one of them.
           setChoices(({ [item.id]: _dropped, ...rest }) => rest);
           retry.mutate({ jobId, itemId: item.id });

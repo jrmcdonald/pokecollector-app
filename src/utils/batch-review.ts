@@ -42,6 +42,22 @@ export function photoName(item: Pick<ScanItem, 'position'>): string {
   return `Photo ${(item.position ?? 0) + 1}`;
 }
 
+/** Whether a photo can be opened: read, and not yet added or skipped. */
+export function canReview(item: ScanItem): boolean {
+  const state = itemState(item);
+  return state !== 'handled' && state !== 'reading';
+}
+
+/**
+ * The photo to show once `id` leaves the review (skipped, or read again):
+ * the next one, else the one before, else none.
+ */
+export function photoAfter(items: readonly Pick<ScanItem, 'id'>[], id: number): number | null {
+  const index = items.findIndex((item) => item.id === id);
+  if (index < 0) return null;
+  return (items[index + 1] ?? items[index - 1])?.id ?? null;
+}
+
 export type RowOutcome = 'added' | 'skipped' | undefined;
 
 /** A row's two lines. `outcome` is what this screen did with the photo, if anything. */

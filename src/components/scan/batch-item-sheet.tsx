@@ -1,5 +1,16 @@
-import { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { itemState, type BatchChoice } from '@/api/batch';
@@ -11,6 +22,8 @@ import { CardSearchPane } from '@/components/card-search-pane';
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useAccessibilityText } from '@/hooks/use-large-text';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { spacing, useColors } from '@/theme';
 import { photoName, pickCard } from '@/utils/batch-review';
 
@@ -18,67 +31,209 @@ import { CopyDetailsFields } from './copy-details';
 import { ScanCandidates } from './scan-candidates';
 import { ScanPhoto } from './scan-photo';
 
+interface SheetProps {
+  jobId: number;
+  /** The photos that can be looked through, in order, the open one among them. */
+  items: readonly ScanItem[];
+  /** The photo to show; the sheet is hidden while this is null. */
+  openId: number | null;
+  choiceFor(item: ScanItem): BatchChoice;
+  onChange(item: ScanItem, choice: BatchChoice): void;
+  /** Swiped, or stepped, to another photo. */
+  onOpen(item: ScanItem): void;
+  onClose(): void;
+  onSkip(item: ScanItem): void;
+  onRetry(item: ScanItem): void;
+  /** A skip or retry is in flight. */
+  busy: boolean;
+  online: boolean;
+}
+
 /**
- * One photo of a batch, opened: the photo beside the chosen card, the other
- * candidates, a search for when none is right, and how the card goes in.
+ * The batch's photos, opened one at a time: the photo beside the chosen
+ * card, the other candidates, a search for when none is right, and how the
+ * card goes in. Swipe, or the arrows, for the next or previous photo.
  * Changes apply as they are made; the batch's "Add all" adds them.
  */
-export function BatchItemSheet({
+export function BatchItemSheet(props: SheetProps) {
+  const open = props.items.find((item) => item.id === props.openId) ?? null;
+  return (
+    <Modal
+      visible={open !== null}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={props.onClose}>
+      <ThemedView style={styles.fill}>{open ? <Pager {...props} open={open} /> : null}</ThemedView>
+    </Modal>
+  );
+}
+
+function Pager({
   jobId,
-  item,
-  choice,
+  items,
+  open,
+  choiceFor,
   onChange,
+  onOpen,
   onClose,
   onSkip,
   onRetry,
   busy,
   online,
-}: {
-  jobId: number;
-  /** The photo to show; the sheet is hidden while this is null. */
-  item: ScanItem | null;
-  choice: BatchChoice | null;
-  onChange(choice: BatchChoice): void;
-  onClose(): void;
-  onSkip(item: ScanItem): void;
-  onRetry(item: ScanItem): void;
-  /** A skip or retry of this photo is in flight. */
-  busy: boolean;
-  online: boolean;
-}) {
+}: SheetProps & { open: ScanItem }) {
+  const colors = useColors();
+  const reduceMotion = useReduceMotion();
+  const stacked = useAccessibilityText();
+  const window = useWindowDimensions();
+  const [measured, setMeasured] = useState<number | null>(null);
+  // A page sheet is narrower than the window on iPad.
+  const width = measured ?? window.width;
+  const list = useRef<FlatList<ScanItem>>(null);
+  const shownId = useRef(open.id);
+  // The photo that was tapped; only it opens straight into a search.
+  const [firstId] = useState(open.id);
+  const index = items.indexOf(open);
+  const previous = items[index - 1];
+  const next = items[index + 1];
+
+  // Slide to a photo the arrows or a skip chose (a swipe is already there),
+  // and keep the open one on screen when photos before it come or go.
+  useEffect(() => {
+    const moved = shownId.current !== open.id;
+    shownId.current = open.id;
+    list.current?.scrollToOffset({ offset: index * width, animated: moved && !reduceMotion });
+  }, [open.id, index, width, reduceMotion]);
+
+  const step = (item: ScanItem | undefined) => item && onOpen(item);
+
+  const settle = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const landed = items[Math.round(event.nativeEvent.contentOffset.x / width)];
+    if (landed && landed !== open) onOpen(landed);
+  };
+
+  const title = (
+    // In the row it takes the space between the arrows; on a row of its own,
+    // `flex: 1` in a column would leave it no height at all.
+    <View style={stacked ? styles.stackedTitle : styles.title}>
+      <ThemedText variant="heading" accessibilityRole="header" style={styles.centred}>
+        {photoName(open)}
+      </ThemedText>
+      {items.length > 1 ? (
+        <ThemedText variant="caption" color="textSecondary">
+          {index + 1} of {items.length}
+        </ThemedText>
+      ) : null}
+    </View>
+  );
+
   return (
-    <Modal
-      visible={item !== null}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}>
-      <ThemedView style={styles.fill}>
-        {item && choice ? (
-          <SheetContent
-            // A fresh search and scroll position for each photo.
-            key={item.id}
-            jobId={jobId}
-            item={item}
-            choice={choice}
-            onChange={onChange}
-            onClose={onClose}
-            onSkip={onSkip}
-            onRetry={onRetry}
-            busy={busy}
-            online={online}
+    <SafeAreaView edges={['bottom']} style={styles.fill}>
+      <View style={[styles.headerBar, { borderBottomColor: colors.border }]}>
+        <View style={styles.header}>
+          <StepButton
+            icon="chevron.left"
+            label="Previous photo"
+            disabled={!previous}
+            onPress={() => step(previous)}
           />
-        ) : null}
-      </ThemedView>
-    </Modal>
+          {stacked ? <View style={styles.title} /> : title}
+          <StepButton
+            icon="chevron.right"
+            label="Next photo"
+            disabled={!next}
+            onPress={() => step(next)}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Done"
+            onPress={onClose}
+            style={styles.done}>
+            <ThemedText variant="label" style={{ color: colors.accent }}>
+              Done
+            </ThemedText>
+          </Pressable>
+        </View>
+        {/* At the accessibility text sizes the title has a row of its own,
+            rather than breaking "Photo 12" between the arrows. */}
+        {stacked ? title : null}
+      </View>
+      <View style={styles.fill} onLayout={(e) => setMeasured(e.nativeEvent.layout.width)}>
+        <FlatList
+          ref={list}
+          data={items}
+          keyExtractor={(item) => String(item.id)}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          // Pages draw from these as well as from `items`.
+          extraData={{ open, choiceFor, busy, online }}
+          initialScrollIndex={Math.max(0, index)}
+          getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+          // The open photo and one either side.
+          initialNumToRender={1}
+          maxToRenderPerBatch={1}
+          windowSize={3}
+          onMomentumScrollEnd={settle}
+          renderItem={({ item }) => (
+            <View
+              style={{ width }}
+              // VoiceOver reads the photo on screen; the arrows reach the others.
+              accessibilityElementsHidden={item !== open}
+              importantForAccessibility={item === open ? 'auto' : 'no-hide-descendants'}>
+              <SheetContent
+                jobId={jobId}
+                item={item}
+                current={item === open}
+                startSearching={item.id === firstId}
+                choice={choiceFor(item)}
+                onChange={(choice) => onChange(item, choice)}
+                onSkip={onSkip}
+                onRetry={onRetry}
+                busy={busy}
+                online={online}
+              />
+            </View>
+          )}
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
+function StepButton({
+  icon,
+  label,
+  disabled,
+  onPress,
+}: {
+  icon: 'chevron.left' | 'chevron.right';
+  label: string;
+  disabled: boolean;
+  onPress(): void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [styles.step, (pressed || disabled) && styles.dimmed]}>
+      <Icon name={icon} size={18} color="accent" />
+    </Pressable>
+  );
+}
+
+/** One photo's page. Each keeps its own search and scroll position. */
 function SheetContent({
   jobId,
   item,
+  current,
+  startSearching,
   choice,
   onChange,
-  onClose,
   onSkip,
   onRetry,
   busy,
@@ -86,9 +241,12 @@ function SheetContent({
 }: {
   jobId: number;
   item: ScanItem;
+  /** The page on screen; its neighbours are drawn ready for a swipe. */
+  current: boolean;
+  /** Open straight into a search when there are no candidates. */
+  startSearching: boolean;
   choice: BatchChoice;
   onChange(choice: BatchChoice): void;
-  onClose(): void;
   onSkip(item: ScanItem): void;
   onRetry(item: ScanItem): void;
   busy: boolean;
@@ -97,7 +255,11 @@ function SheetContent({
   const colors = useColors();
   const candidates = candidatesOf(item);
   const state = itemState(item);
-  const [searching, setSearching] = useState(candidates.length === 0);
+  const [searching, setSearching] = useState(startSearching && candidates.length === 0);
+  // Upstream's copy of a photo costs a request: only fetched once it is
+  // looked at, not for the neighbours drawn either side.
+  const [seen, setSeen] = useState(current);
+  if (current && !seen) setSeen(true);
   const picked = choice.pick ? pickCard(choice.pick) : null;
 
   const skip = () =>
@@ -116,22 +278,7 @@ function SheetContent({
   };
 
   return (
-    <SafeAreaView edges={['bottom']} style={styles.fill}>
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <ThemedText variant="heading" accessibilityRole="header" style={styles.flex}>
-          {photoName(item)}
-        </ThemedText>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Done"
-          onPress={onClose}
-          style={styles.done}>
-          <ThemedText variant="label" style={{ color: colors.accent }}>
-            Done
-          </ThemedText>
-        </Pressable>
-      </View>
-
+    <>
       {searching ? (
         <CardSearchPane
           initial={searchTermFor(item.recognized)}
@@ -142,7 +289,7 @@ function SheetContent({
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.compare}>
             <View style={styles.compareSide}>
-              <ScanPhoto jobId={jobId} item={item} remote />
+              <ScanPhoto jobId={jobId} item={item} remote={seen} />
               <ThemedText variant="caption" color="textSecondary" style={styles.centred}>
                 Your photo
               </ThemedText>
@@ -216,20 +363,18 @@ function SheetContent({
           </View>
         </ScrollView>
       )}
-    </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: spacing.md,
-    paddingVertical: spacing.xs,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
+  headerBar: { paddingVertical: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.xs },
+  title: { flex: 1, alignItems: 'center' },
+  stackedTitle: { alignItems: 'center', paddingHorizontal: spacing.md },
+  step: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  dimmed: { opacity: 0.4 },
   done: {
     minWidth: 64,
     minHeight: 44,

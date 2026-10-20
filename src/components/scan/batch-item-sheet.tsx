@@ -119,7 +119,7 @@ function Pager({
           onPress={() => step(previous)}
         />
         <View style={styles.title}>
-          <ThemedText variant="heading" accessibilityRole="header" numberOfLines={1}>
+          <ThemedText variant="heading" accessibilityRole="header" style={styles.centred}>
             {photoName(open)}
           </ThemedText>
           {items.length > 1 ? (

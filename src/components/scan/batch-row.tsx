@@ -6,7 +6,7 @@ import { CardImage } from '@/components/card-image';
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { minTapTarget, radius, spacing, useColors } from '@/theme';
-import { describeRow, photoName, pickCard, type RowOutcome } from '@/utils/batch-review';
+import { canReview, describeRow, photoName, pickCard, type RowOutcome } from '@/utils/batch-review';
 
 import { ScanPhoto } from './scan-photo';
 
@@ -38,7 +38,7 @@ export function BatchRow({
   const { title, detail } = describeRow(item, choice, outcome);
   const picked = choice.pick ? pickCard(choice.pick) : null;
   const handled = state === 'handled';
-  const openable = !handled && state !== 'reading';
+  const openable = canReview(item);
   const needsAttention = !picked && (state === 'unmatched' || state === 'failed');
 
   return (

@@ -112,7 +112,9 @@ function Pager({
   };
 
   const title = (
-    <View style={styles.title}>
+    // In the row it takes the space between the arrows; on a row of its own,
+    // `flex: 1` in a column would leave it no height at all.
+    <View style={stacked ? styles.stackedTitle : styles.title}>
       <ThemedText variant="heading" accessibilityRole="header" style={styles.centred}>
         {photoName(open)}
       </ThemedText>
@@ -370,6 +372,7 @@ const styles = StyleSheet.create({
   headerBar: { paddingVertical: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth },
   header: { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.xs },
   title: { flex: 1, alignItems: 'center' },
+  stackedTitle: { alignItems: 'center', paddingHorizontal: spacing.md },
   step: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   dimmed: { opacity: 0.4 },
   done: {

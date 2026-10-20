@@ -1076,3 +1076,26 @@ start folded away, since most copies have none.
   strip across the card. With `orientationSource="interface"` the photo is
   always portrait, like what the screen shows. Auto-capture's frames already
   coped with either (`guideInFrame`).
+
+## 2026-10-20 — Swiping through a batch's photos
+
+- **The opened photo is one page of a horizontal pager,** so checking thirty
+  matches is a swipe each, not Done, tap, Done. It is a `FlatList` with
+  `pagingEnabled`, not a native pager: JavaScript only, so no new dev
+  client. The header has previous and next arrows and "3 of 30", for
+  VoiceOver and for anyone who does not think to swipe; off-screen pages are
+  hidden from VoiceOver.
+- **It pages through the photos that can be opened:** read, and not yet
+  added or skipped. The open one stays in the list while it is open, so a
+  photo handled in the web UI meanwhile does not vanish under the finger;
+  when photos before it come or go, the pager keeps it on screen.
+- **Skipping a photo, or reading it again, moves on** to the next one (or
+  the one before, from the last) instead of closing the sheet.
+- **Only the photo looked at fetches upstream's copy.** The pages either
+  side are drawn ready for a swipe, but a `ScanPhoto` asks for the server's
+  image only once its page has been on screen, so swiping costs a request
+  per photo seen, as tapping did, and only when the phone's copy is gone.
+- **Only the photo tapped opens straight into a search** when it has no
+  candidates. Swiping onto one shows "Search for it" instead, so a swipe
+  never brings up the keyboard. The pager dismisses the keyboard when
+  dragged.

@@ -24,6 +24,7 @@ import { addDeckToCollection, deckContents, importDecklist, type DeckContents } 
 import {
   addCardToPlannedBinder,
   addCollectionItemToBinder,
+  createBinder,
   addDeckEntry,
   addToCollection,
   addToWishlist,
@@ -66,6 +67,7 @@ import {
   updateProduct,
   uploadCollectionPhoto,
   type BinderChanges,
+  type NewBinder,
   type NewCollectionItem,
   type NewProduct,
   type ProductChanges,
@@ -662,6 +664,27 @@ export function useSetBinderEntryQuantity(binderId: number) {
       }
     },
     onSettled: () => invalidateBinder(queryClient, keys, binderId),
+  });
+}
+
+/** Creates an empty binder; its page is filled from the result. */
+export function useCreateBinder() {
+  const queryClient = useQueryClient();
+  const { getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: (binder: NewBinder) => createBinder(getClient(), binder),
+    onSuccess: (binder) =>
+      queryClient.setQueryData<BinderCards>(keys.binder(binder.id), {
+        binder,
+        cards: [],
+        owned_count: 0,
+        total_count: 0,
+        missing_count: 0,
+      }),
+    onError: (error) => reportFailure('Could not create the binder', error),
+    // An empty binder holds no card, so the index of which binders hold a
+    // card stays as it is.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.binders }),
   });
 }
 

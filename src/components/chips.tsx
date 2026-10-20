@@ -1,11 +1,16 @@
 import * as Haptics from 'expo-haptics';
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { minTapTarget, radius, spacing, useColors } from '@/theme';
 
 import { ThemedText } from './themed-text';
 
-type Option<T extends string> = { value: T; label: string };
+type Option<T extends string> = {
+  value: T;
+  label: string;
+  /** A colour to show beside the label, for a choice of colour; the label names it. */
+  swatch?: string;
+};
 
 /** A single choice from a short list, as a scrollable row of chips. */
 export function Chips<T extends string>({
@@ -45,6 +50,14 @@ export function Chips<T extends string>({
                 borderColor: selected ? colors.accent : colors.outline,
               },
             ]}>
+            {option.swatch ? (
+              <View
+                style={[
+                  styles.swatch,
+                  { backgroundColor: option.swatch, borderColor: colors.border },
+                ]}
+              />
+            ) : null}
             <ThemedText variant="label" style={{ color: selected ? colors.onAccent : colors.text }}>
               {option.label}
             </ThemedText>
@@ -62,6 +75,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderRadius: radius.sm + 2,
     borderWidth: 1,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
   },
+  swatch: { width: 14, height: 14, borderRadius: 7, borderWidth: 1 },
 });

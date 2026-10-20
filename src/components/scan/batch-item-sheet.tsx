@@ -22,6 +22,7 @@ import { CardSearchPane } from '@/components/card-search-pane';
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useAccessibilityText } from '@/hooks/use-large-text';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { spacing, useColors } from '@/theme';
 import { photoName, pickCard } from '@/utils/batch-review';
@@ -82,6 +83,7 @@ function Pager({
 }: SheetProps & { open: ScanItem }) {
   const colors = useColors();
   const reduceMotion = useReduceMotion();
+  const stacked = useAccessibilityText();
   const window = useWindowDimensions();
   const [measured, setMeasured] = useState<number | null>(null);
   // A page sheet is narrower than the window on iPad.
@@ -109,40 +111,49 @@ function Pager({
     if (landed && landed !== open) onOpen(landed);
   };
 
+  const title = (
+    <View style={styles.title}>
+      <ThemedText variant="heading" accessibilityRole="header" style={styles.centred}>
+        {photoName(open)}
+      </ThemedText>
+      {items.length > 1 ? (
+        <ThemedText variant="caption" color="textSecondary">
+          {index + 1} of {items.length}
+        </ThemedText>
+      ) : null}
+    </View>
+  );
+
   return (
     <SafeAreaView edges={['bottom']} style={styles.fill}>
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <StepButton
-          icon="chevron.left"
-          label="Previous photo"
-          disabled={!previous}
-          onPress={() => step(previous)}
-        />
-        <View style={styles.title}>
-          <ThemedText variant="heading" accessibilityRole="header" style={styles.centred}>
-            {photoName(open)}
-          </ThemedText>
-          {items.length > 1 ? (
-            <ThemedText variant="caption" color="textSecondary">
-              {index + 1} of {items.length}
+      <View style={[styles.headerBar, { borderBottomColor: colors.border }]}>
+        <View style={styles.header}>
+          <StepButton
+            icon="chevron.left"
+            label="Previous photo"
+            disabled={!previous}
+            onPress={() => step(previous)}
+          />
+          {stacked ? <View style={styles.title} /> : title}
+          <StepButton
+            icon="chevron.right"
+            label="Next photo"
+            disabled={!next}
+            onPress={() => step(next)}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Done"
+            onPress={onClose}
+            style={styles.done}>
+            <ThemedText variant="label" style={{ color: colors.accent }}>
+              Done
             </ThemedText>
-          ) : null}
+          </Pressable>
         </View>
-        <StepButton
-          icon="chevron.right"
-          label="Next photo"
-          disabled={!next}
-          onPress={() => step(next)}
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Done"
-          onPress={onClose}
-          style={styles.done}>
-          <ThemedText variant="label" style={{ color: colors.accent }}>
-            Done
-          </ThemedText>
-        </Pressable>
+        {/* At the accessibility text sizes the title has a row of its own,
+            rather than breaking "Photo 12" between the arrows. */}
+        {stacked ? title : null}
       </View>
       <View style={styles.fill} onLayout={(e) => setMeasured(e.nativeEvent.layout.width)}>
         <FlatList
@@ -356,13 +367,8 @@ function SheetContent({
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: spacing.xs,
-    paddingVertical: spacing.xs,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
+  headerBar: { paddingVertical: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.xs },
   title: { flex: 1, alignItems: 'center' },
   step: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   dimmed: { opacity: 0.4 },

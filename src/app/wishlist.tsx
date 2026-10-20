@@ -189,12 +189,10 @@ function WishlistTile({ item, layout }: { item: WishlistItem; layout: 'tile' | '
     <CardTile
       layout={layout}
       card={card}
-      detail={[
-        price > 0 ? formatPrice(price) : 'No price',
-        item.quantity > 1 ? `${item.quantity} wanted` : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')}
+      detail={price > 0 ? formatPrice(price) : 'No price'}
+      // The tile's ×N badge, as on the collection; one wanted is the usual case.
+      quantity={item.quantity > 1 ? item.quantity : 0}
+      quantityNoun="wanted"
       actions={actions}
     />
   );

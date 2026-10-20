@@ -205,13 +205,21 @@ describe('the batch tray', () => {
 describe('BatchItemSheet', () => {
   const ready = item('done', { matches: [pikachu, raichu] });
 
-  function Sheet(props: { onChange?: jest.Mock; onSkip?: jest.Mock }) {
+  function Sheet(props: {
+    items?: ScanItem[];
+    openId?: number;
+    onChange?: jest.Mock;
+    onOpen?: jest.Mock;
+    onSkip?: jest.Mock;
+  }) {
     return withQueries(
       <BatchItemSheet
         jobId={4}
-        item={ready}
-        choice={defaultChoice(ready)}
+        items={props.items ?? [ready]}
+        openId={props.openId ?? ready.id}
+        choiceFor={defaultChoice}
         onChange={props.onChange ?? jest.fn()}
+        onOpen={props.onOpen ?? jest.fn()}
         onClose={jest.fn()}
         onSkip={props.onSkip ?? jest.fn()}
         onRetry={jest.fn()}
@@ -227,6 +235,7 @@ describe('BatchItemSheet', () => {
     expect(screen.getByRole('button', { name: 'Pikachu, SVI 025' })).toBeSelected();
     await userEvent.setup().press(screen.getByRole('button', { name: 'Raichu, SVI 026' }));
     expect(onChange).toHaveBeenCalledWith(
+      ready,
       expect.objectContaining({
         pick: { kind: 'candidate', match: expect.objectContaining(raichu) },
       }),
@@ -241,26 +250,33 @@ describe('BatchItemSheet', () => {
     alert.mockRestore();
   });
 
+  it('steps to the next and previous photo, and says where it is', async () => {
+    const second = item('done', { id: 8, position: 3, matches: [raichu] });
+    const third = item('done', { id: 9, position: 4, matches: [pikachu] });
+    const onOpen = jest.fn();
+    await render(<Sheet items={[ready, second, third]} openId={8} onOpen={onOpen} />);
+    expect(screen.getByRole('header', { name: 'Photo 4' })).toBeOnTheScreen();
+    expect(screen.getByText('2 of 3')).toBeOnTheScreen();
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Next photo' }));
+    expect(onOpen).toHaveBeenLastCalledWith(third);
+    await user.press(screen.getByRole('button', { name: 'Previous photo' }));
+    expect(onOpen).toHaveBeenLastCalledWith(ready);
+  });
+
+  it('has nowhere to step from a lone photo', async () => {
+    await render(<Sheet />);
+    expect(screen.getByRole('button', { name: 'Previous photo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next photo' })).toBeDisabled();
+    expect(screen.queryByText('1 of 1')).not.toBeOnTheScreen();
+  });
+
   it('opens a search prefilled with what was read', async () => {
     const unmatched = item('done', {
       matches: [],
       recognized: { set_code: 'MEW', number_local: '133' },
     });
-    await render(
-      withQueries(
-        <BatchItemSheet
-          jobId={4}
-          item={unmatched}
-          choice={defaultChoice(unmatched)}
-          onChange={jest.fn()}
-          onClose={jest.fn()}
-          onSkip={jest.fn()}
-          onRetry={jest.fn()}
-          busy={false}
-          online
-        />,
-      ),
-    );
+    await render(<Sheet items={[unmatched]} openId={unmatched.id} />);
     expect(screen.getByLabelText('Search the catalogue')).toHaveDisplayValue('MEW 133');
     // Let the search's debounce and its (failing) request finish inside the
     // test, so their state updates are not reported as outside act().

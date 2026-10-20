@@ -1,7 +1,14 @@
 import { defaultChoice, type BatchChoice } from '@/api/batch';
 import type { ScanItem } from '@/api/schemas';
 
-import { copyLine, describeRow, pickCard, progressLine } from '../batch-review';
+import {
+  canReview,
+  copyLine,
+  describeRow,
+  photoAfter,
+  pickCard,
+  progressLine,
+} from '../batch-review';
 
 const pikachu = {
   id: 'sv1-025_en',
@@ -107,5 +114,29 @@ describe('progressLine', () => {
         handled: 30,
       }),
     ).toBe('All done');
+  });
+});
+
+describe('canReview', () => {
+  it('opens photos that are read and not yet handled', () => {
+    expect(canReview(item('done', { matches: [pikachu] }))).toBe(true);
+    expect(canReview(item('done', { matches: [] }))).toBe(true);
+    expect(canReview(item('failed'))).toBe(true);
+    expect(canReview(item('processing'))).toBe(false);
+    expect(canReview(item('done', { resolved: true }))).toBe(false);
+  });
+});
+
+describe('photoAfter', () => {
+  const photos = [{ id: 1 }, { id: 2 }, { id: 3 }];
+
+  it('moves on to the next photo, or back from the last', () => {
+    expect(photoAfter(photos, 2)).toBe(3);
+    expect(photoAfter(photos, 3)).toBe(2);
+  });
+
+  it('closes when nothing is left', () => {
+    expect(photoAfter([{ id: 1 }], 1)).toBeNull();
+    expect(photoAfter(photos, 9)).toBeNull();
   });
 });

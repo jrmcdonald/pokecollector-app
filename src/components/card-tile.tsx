@@ -14,6 +14,8 @@ type Props = {
   detail?: string;
   /** How many are owned. Shown as a badge from two up: one is the normal case. */
   quantity?: number;
+  /** What `quantity` counts, for VoiceOver: "owned", or "wanted" on the wishlist. */
+  quantityNoun?: string;
   /** Not owned, in a checklist or planned binder: faded, with a dashed outline and a mark. */
   missing?: boolean;
   /** The owned copy's variant, which decides whether the holo edge is drawn. */
@@ -39,6 +41,7 @@ export function CardTile({
   card,
   detail,
   quantity = 0,
+  quantityNoun = 'owned',
   missing = false,
   variant,
   photoItemId,
@@ -47,7 +50,7 @@ export function CardTile({
 }: Props) {
   const colors = useColors();
   const href = { pathname: '/card/[id]', params: { id: card.id } } as const;
-  const label = `${card.name}${quantity > 0 ? `, ${quantity} owned` : missing ? ', missing' : ''}${detail ? `, ${detail}` : ''}`;
+  const label = `${card.name}${quantity > 0 ? `, ${quantity} ${quantityNoun}` : missing ? ', missing' : ''}${detail ? `, ${detail}` : ''}`;
 
   async function showActions() {
     const index = await pick(

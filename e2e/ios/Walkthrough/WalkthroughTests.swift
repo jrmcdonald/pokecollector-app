@@ -165,6 +165,8 @@ final class WalkthroughTests: XCTestCase {
 
     go(button(startingWith: "Wishlist"), to: element(startingWith: "To buy everything"), "Wishlist")
     capture("wishlist")
+    go(app.navigationBars.buttons["Show as grid"], to: app.navigationBars.buttons["Show as list"], "Wishlist as a grid")
+    capture("wishlist-grid")
     back(to: button(startingWith: "Sets"), "More, again")
 
     go(button(startingWith: "Sets"), to: button(startingWith: "151, "), "Sets")

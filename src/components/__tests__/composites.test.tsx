@@ -81,6 +81,12 @@ describe('CardTile', () => {
     expect(screen.getByText('×2')).toBeOnTheScreen();
   });
 
+  it('counts wanted copies on the wishlist the same way', async () => {
+    await render(<CardTile card={card} detail="€1.20" quantity={2} quantityNoun="wanted" />);
+    expect(screen.getByRole('button', { name: 'Pikachu, 2 wanted, €1.20' })).toBeOnTheScreen();
+    expect(screen.getByText('×2')).toBeOnTheScreen();
+  });
+
   it('shows no quantity badge for a single copy', async () => {
     await render(<CardTile card={card} quantity={1} />);
     expect(screen.queryByText('×1')).not.toBeOnTheScreen();

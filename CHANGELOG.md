@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.6.0...v1.7.0) (2026-10-21)
+
+
+### Features
+
+* show a scan's candidates as a grid ([8069bc8](https://github.com/jrmcdonald/pokecollector-app/commit/8069bc8bd0b04ef262b55d50643d1b6ccccebdb3))
+
 ## [1.6.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.5.0...v1.6.0) (2026-10-21)
 
 

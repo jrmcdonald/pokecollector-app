@@ -1100,6 +1100,25 @@ start folded away, since most copies have none.
   never brings up the keyboard. The pager dismisses the keyboard when
   dragged.
 
+## 2026-10-20 — Creating binders
+
+- **Add in the Binders tab's header,** and in the empty list, opens a form:
+  a name, the kind (Collection or Planned, with a line saying what each
+  holds) and a colour. Description, icon and public sharing stay in the web
+  UI, as for editing. Decks are made from More → Decks, so the kinds offered
+  are the two binder kinds only.
+- **The kind is chosen once.** Upstream will not change a binder's type once
+  it has cards, so the form says what each kind is for rather than leaving
+  it to be fixed later.
+- **The colours are the web UI's eight,** as chips with a swatch beside each
+  name (`Chips` takes an optional swatch), red first, as upstream's default.
+- **One request.** `POST /api/binders/` returns the binder, which fills its
+  page, so the app opens it without reading it again; only the binder list
+  is refreshed. An empty binder holds no card, so the index of which
+  binders hold a card is left as it is.
+- **The simulator walkthrough covers the form;** creating writes, which the
+  fake server refuses.
+
 ## 2026-10-20 — The wishlist as a grid
 
 - **A list or a grid, switched in the header** with the collection's button

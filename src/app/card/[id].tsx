@@ -31,9 +31,9 @@ import { QuantityStepper } from '@/components/quantity-stepper';
 import { ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { WishlistButton } from '@/components/wishlist-button';
 import {
   useAddToCollection,
-  useAddToWishlist,
   useBinderContents,
   useBinders,
   useCard,
@@ -411,7 +411,6 @@ function AddCopies({ card, disabled }: { card: Card; disabled: boolean }) {
   const [details, setDetails] = useState<string[]>([]);
   const [quantity, setQuantity] = useState(1);
   const add = useAddToCollection();
-  const wishlist = useAddToWishlist();
   const owner = useOwnerLabel();
 
   return (
@@ -453,13 +452,7 @@ function AddCopies({ card, disabled }: { card: Card; disabled: boolean }) {
           )
         }
       />
-      <Button
-        title={wishlist.isSuccess ? 'On your wishlist' : 'Add to wishlist'}
-        variant="secondary"
-        busy={wishlist.isPending}
-        disabled={disabled || wishlist.isSuccess}
-        onPress={() => wishlist.mutate(card.id)}
-      />
+      <WishlistButton cardId={card.id} disabled={disabled} />
     </View>
   );
 }

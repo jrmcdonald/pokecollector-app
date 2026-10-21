@@ -366,7 +366,7 @@ a revoked service token.
       collection. Tapping a card opens its detail.
 - [x] **Card detail:** large image, set and number, prices, owned entries with
       a quantity stepper and variant and condition pickers. Buttons for "Add to
-      collection", "Add to wishlist" and "Add to binder". Price history and
+      collection", "Add to wishlist" (or "Remove from wishlist") and "Add to binder". Price history and
       the decks that list the card came later (§11).
 - [x] **Search (catalogue):** debounced (≥ 400 ms, given the rate limit),
       `page`/`page_size` infinite scroll, an owned badge computed against the

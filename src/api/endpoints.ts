@@ -240,6 +240,19 @@ export function updateBinderEntry(
   });
 }
 
+/**
+ * A new binder: a collection binder for owned copies, or a planned one
+ * (upstream's "wishlist") for cards to collect. Decks are made elsewhere.
+ */
+export type NewBinder = Pick<Schemas['BinderCreate'], 'name' | 'color'> & {
+  binder_type: 'collection' | 'wishlist';
+};
+
+/** Creates an empty binder and returns it, with its id. */
+export function createBinder(client: PokeCollectorClient, binder: NewBinder): Promise<Binder> {
+  return client.request('/api/binders/', { method: 'POST', json: binder, schema: BinderSchema });
+}
+
 /** The app changes a binder's name and colour; nothing in it reads the rest. */
 export type BinderChanges = Pick<Schemas['BinderUpdate'], 'name' | 'color'>;
 

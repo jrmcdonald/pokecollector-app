@@ -78,6 +78,7 @@ function RootStack() {
         <Stack.Screen name="sets" options={{ title: 'Sets' }} />
         <Stack.Screen name="set/[id]" options={{ title: '' }} />
         <Stack.Screen name="binder/[id]" options={{ title: '' }} />
+        <Stack.Screen name="binder-new" options={{ title: 'New binder' }} />
         <Stack.Screen name="decks" options={{ title: 'Decks' }} />
         <Stack.Screen name="deck/[id]" options={{ title: '' }} />
         <Stack.Screen name="products" options={{ title: 'Sealed products' }} />

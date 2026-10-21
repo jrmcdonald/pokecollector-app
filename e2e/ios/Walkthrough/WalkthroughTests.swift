@@ -155,6 +155,10 @@ final class WalkthroughTests: XCTestCase {
     go(button(startingWith: "151 master set"), to: button(startingWith: "Bulbasaur"), "Planned binder")
     capture("binder")
     back(to: button(startingWith: "151 master set"), "Binders, again")
+    // The new binder form (creating writes, which the fake server refuses).
+    go(app.navigationBars.buttons["New binder"], to: app.textFields["Name"], "New binder")
+    capture("binder-new")
+    back(to: button(startingWith: "151 master set"), "Binders, again")
 
     go(app.tabBars.buttons["More"], to: button(startingWith: "Wishlist"), "More")
     capture("more")

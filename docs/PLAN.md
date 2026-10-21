@@ -377,6 +377,7 @@ a revoked service token.
       by name or number and a rarity filter, both on the phone.
 - [x] **Binders:** list, then the binder's cards as a grid with owned/missing
       state. Add a card from its detail screen; remove from the binder view.
+      Create a binder from the Binders tab.
 - [x] **Wishlist:** list with prices and swipe to remove.
 
 ### 7.2 Offline and optimistic edits

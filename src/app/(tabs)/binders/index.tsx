@@ -1,11 +1,11 @@
 import { FlashList } from '@shopify/flash-list';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import { ListRow } from '@/components/list-row';
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/states';
 import { ThemedView } from '@/components/themed-view';
-import { useBinders } from '@/hooks/queries';
+import { useBinders, useIsOnline } from '@/hooks/queries';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { radius, useColors } from '@/theme';
 import { binderColor, binderKind, bindersOnly } from '@/utils/binders';
@@ -15,9 +15,27 @@ export default function Binders() {
   const binders = useBinders();
   const pull = usePullToRefresh(() => binders.refetch());
   const list = binders.data ? bindersOnly(binders.data) : null;
+  const online = useIsOnline();
+  const add = () => router.push('/binder-new');
 
   return (
     <ThemedView style={styles.fill}>
+      <Stack.Screen
+        options={{
+          unstable_headerRightItems: () =>
+            online
+              ? [
+                  {
+                    type: 'button',
+                    label: 'Add',
+                    accessibilityLabel: 'New binder',
+                    icon: { type: 'sfSymbol', name: 'plus' },
+                    onPress: add,
+                  },
+                ]
+              : [],
+        }}
+      />
       {list ? (
         <FlashList
           data={list}
@@ -59,7 +77,8 @@ export default function Binders() {
           ListEmptyComponent={
             <EmptyState
               title="No binders yet"
-              message="Create binders in the PokeCollector web UI; they show up here."
+              message="A binder holds copies you own, or plans cards to collect."
+              action={online ? { title: 'New binder', onPress: add } : undefined}
             />
           }
         />

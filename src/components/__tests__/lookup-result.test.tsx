@@ -138,11 +138,28 @@ describe('LookupResult', () => {
     expect(await screen.findByRole('button', { name: 'On your wishlist' })).toBeDisabled();
   });
 
-  it('knows a card already on the wishlist', async () => {
+  it('knows a card already on the wishlist, and takes it off', async () => {
     const wished: WishlistItem = { id: 3, card_id: 'sv1-025_en', quantity: 1 };
     queryClient.setQueryData(['acct', 'wishlist'], [wished]);
+    queryClient.setQueryData(['acct', 'card', 'sv1-025_en'], card);
+    mockRequest.mockImplementation((path: string, init?: { method?: string }) =>
+      init?.method === 'DELETE'
+        ? Promise.resolve({})
+        : path === '/api/cards/sv1-025_en'
+          ? Promise.resolve(card)
+          : Promise.reject(new Error('Offline')),
+    );
     await renderResult();
-    expect(screen.getByRole('button', { name: 'On your wishlist' })).toBeDisabled();
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Remove from wishlist' }));
+    expect(mockRequest).toHaveBeenCalledWith('/api/wishlist/3', { method: 'DELETE' });
+    expect(await screen.findByRole('button', { name: 'Add to wishlist' })).toBeOnTheScreen();
+  });
+
+  it('never fetches the wishlist for a look-up', async () => {
+    queryClient.setQueryData(['acct', 'card', 'sv1-025_en'], card);
+    await renderResult();
+    expect(screen.getByRole('button', { name: 'Add to wishlist' })).toBeEnabled();
+    expect(mockRequest).not.toHaveBeenCalledWith('/api/wishlist/', expect.anything());
   });
 
   it("finds it for sale, on the card's own Cardmarket page", async () => {

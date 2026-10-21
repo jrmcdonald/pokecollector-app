@@ -147,7 +147,7 @@ export function removeFromCollection(client: PokeCollectorClient, id: number): P
 }
 
 /** Adds to the wishlist; upstream adds to the quantity if the card is already there. */
-export function addToWishlist(client: PokeCollectorClient, cardId: string): Promise<unknown> {
+export function addToWishlist(client: PokeCollectorClient, cardId: string): Promise<WishlistItem> {
   return client.request('/api/wishlist/', {
     method: 'POST',
     json: { card_id: cardId, quantity: 1 },

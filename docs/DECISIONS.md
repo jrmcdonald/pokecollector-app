@@ -1151,3 +1151,16 @@ start folded away, since most copies have none.
 - **The choice is remembered,** in AsyncStorage like the Scan tab's mode.
   The collection's toggle is not, yet; the wishlist opens as a list until
   the grid is chosen.
+
+## 2026-10-21 — A scan's candidates as a grid
+
+- **"Which one is it?" is a grid,** in the columns a card grid uses (three,
+  two at the large text sizes), and one row per candidate at the
+  accessibility sizes, the picture beside its name, as `CardTile` does. All
+  of them show at once: there are eight at most, so nothing hides off the
+  side of the screen. The same on the Scan tab and in a batch's photo.
+- **A wrapping view, not a list.** The candidates were a horizontal
+  `FlatList`. Inside the batch's horizontal pager it stacked its tiles one
+  per line at a fixed width; the simulator screenshot of the opened photo
+  shows it, and it was approved without that being noticed. Eight tiles need
+  no virtualisation, and a plain view nests in any list.

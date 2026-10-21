@@ -14,6 +14,7 @@ import { BatchItemSheet } from '../scan/batch-item-sheet';
 import { BatchRow } from '../scan/batch-row';
 import { TrayButton, TraySheet } from '../scan/batch-tray';
 import { ReviewEntry } from '../scan/review-entry';
+import { ScanCandidates } from '../scan/scan-candidates';
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({ router: { push: (...args: unknown[]) => mockPush(...args) } }));
@@ -281,5 +282,29 @@ describe('BatchItemSheet', () => {
     // Let the search's debounce and its (failing) request finish inside the
     // test, so their state updates are not reported as outside act().
     await act(() => new Promise((resolve) => setTimeout(resolve, 500)));
+  });
+});
+
+describe('ScanCandidates', () => {
+  it('lays every candidate out, the one matching the number read first', async () => {
+    const onPick = jest.fn();
+    const others = Array.from({ length: 4 }, (_, i) => ({
+      ...pikachu,
+      id: `sv${i + 2}-025_en`,
+      tcg_card_id: `sv${i + 2}-025`,
+      number: String(30 + i),
+    }));
+    await render(
+      <ScanCandidates
+        candidates={[...others, raichu]}
+        recognized={{ name: 'Raichu', number_local: '026' }}
+        onPick={onPick}
+      />,
+    );
+    const tiles = screen.getAllByRole('button');
+    expect(tiles).toHaveLength(5);
+    expect(tiles[0]).toHaveProp('accessibilityLabel', 'Raichu, SVI 026, matches number 026');
+    await userEvent.setup().press(tiles[0]!);
+    expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ id: raichu.id }));
   });
 });

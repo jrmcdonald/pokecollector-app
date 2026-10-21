@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.6.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.5.0...v1.6.0) (2026-10-21)
+
+
+### Features
+
+* create binders from the app ([b1b72f7](https://github.com/jrmcdonald/pokecollector-app/commit/b1b72f71fbfa736ba1164ff5f8346ef84efdea2e))
+* show the wishlist as a grid ([7fffa42](https://github.com/jrmcdonald/pokecollector-app/commit/7fffa424a15fabc8aadb73badf05274b60d5dc7d))
+* show the wishlist as a grid ([06af9b1](https://github.com/jrmcdonald/pokecollector-app/commit/06af9b12aceb1db4e9d589680af72004c181ac0f))
+* show the wishlist as a grid ([33f0b62](https://github.com/jrmcdonald/pokecollector-app/commit/33f0b625a557882a7e02d49ed69f3bb6eeb67006))
+* show the wishlist as a grid ([bfc693b](https://github.com/jrmcdonald/pokecollector-app/commit/bfc693bac022a3109a936217d1cd80d6c431a0da))
+* show the wishlist as a grid ([6f14821](https://github.com/jrmcdonald/pokecollector-app/commit/6f14821098023f561246d0c0fe5d19d46e9423e9))
+* show the wishlist as a grid ([515048f](https://github.com/jrmcdonald/pokecollector-app/commit/515048f5351e0c9515fa3609509aad49e56504e0))
+* show the wishlist as a grid ([7f39443](https://github.com/jrmcdonald/pokecollector-app/commit/7f3944357b220122e8d59917119a352bde7d1589))
+* swipe between photos when reviewing a batch scan ([370ead4](https://github.com/jrmcdonald/pokecollector-app/commit/370ead429926ff46b202dfd2bea52eae521087a4))
+* take a card off the wishlist from its page ([147e623](https://github.com/jrmcdonald/pokecollector-app/commit/147e6235d6cdf37e46c5360c6df372ab85e6a2d8))
+
+
+### Bug fixes
+
+* give the photo sheet's title a row of its own at accessibility sizes ([18227a6](https://github.com/jrmcdonald/pokecollector-app/commit/18227a60d7e51ebf8035b6a9e4460920d6a5ec6f))
+* let the photo sheet's title wrap at the largest text sizes ([2c0cf29](https://github.com/jrmcdonald/pokecollector-app/commit/2c0cf29e391bb506c8d733d26812a5c39f460d17))
+* show the photo sheet's title on its own row at accessibility sizes ([bc3ea18](https://github.com/jrmcdonald/pokecollector-app/commit/bc3ea185259b60507612fa42b1fe2a09bd77e806))
+
 ## [1.5.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.4.0...v1.5.0) (2026-10-18)
 
 

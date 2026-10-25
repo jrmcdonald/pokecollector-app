@@ -6,6 +6,7 @@ import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import type { CollectionItem } from '@/api/schemas';
 import { CardImage, frameForVariant } from '@/components/card-image';
 import { CardTile } from '@/components/card-tile';
+import { ToggleChip } from '@/components/chips';
 import { FilterButton } from '@/components/filter-button';
 import { SearchField } from '@/components/search-field';
 import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
@@ -17,17 +18,15 @@ import { useCardColumns } from '@/hooks/use-large-text';
 import { spacing, useColors } from '@/theme';
 import {
   NO_FILTER,
-  SHOW_LABELS,
   SORT_LABELS,
+  activeFilterCount,
   filterCollection,
   filterOptions,
   hasCollectionFilter,
   placedCards,
   setNameOf,
-  showCounts,
   sortCollection,
   type CollectionFilter,
-  type CollectionShow,
   type CollectionSort,
   type FilterOption,
 } from '@/utils/collection';
@@ -35,7 +34,6 @@ import { pick } from '@/utils/pick';
 import { cardValue, formatPrice } from '@/utils/pricing';
 
 const SORTS = Object.keys(SORT_LABELS) as CollectionSort[];
-const SHOWS = Object.keys(SHOW_LABELS) as CollectionShow[];
 
 export default function Collection() {
   const columns = useCardColumns();
@@ -44,11 +42,13 @@ export default function Collection() {
   const [filter, setFilter] = useState<CollectionFilter>(NO_FILTER);
   const [sort, setSort] = useState<CollectionSort>('recent');
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
+  // The pickers and sort fold away behind the header's Filters button; the
+  // search field and the count, with Clear, stay.
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Reading every binder and deck costs a request each the first time, so
-  // they are read only once asked for; until then a cached index still
-  // gives the picker its count.
-  const unplaced = filter.show === 'unplaced';
+  // they are read only once asked for.
+  const unplaced = filter.unplaced;
   const binders = useBinderContents({ enabled: unplaced });
   const decks = useDeckContents({ enabled: unplaced });
   const placed = useMemo(
@@ -62,7 +62,6 @@ export default function Collection() {
 
   const items = collection.data;
   const options = useMemo(() => filterOptions(items ?? []), [items]);
-  const counts = useMemo(() => showCounts(items ?? [], placed), [items, placed]);
   const shown = useMemo(
     () => sortCollection(filterCollection(items ?? [], filter, placed), sort),
     [items, filter, placed, sort],
@@ -79,19 +78,8 @@ export default function Collection() {
   const labelFor = (list: FilterOption[], value: string | null, fallback: string) =>
     value ? (list.find((o) => o.value === value)?.label ?? value) : fallback;
 
-  async function chooseShow() {
-    const index = await pick(
-      'Show',
-      SHOWS.map((s) => {
-        const count = counts[s];
-        return count === null ? SHOW_LABELS[s].label : `${SHOW_LABELS[s].label} (${count})`;
-      }),
-    );
-    const show = index === null ? undefined : SHOWS[index];
-    if (show) setFilter((f) => ({ ...f, show }));
-  }
-
   const filtered = hasCollectionFilter(filter);
+  const active = activeFilterCount(filter);
 
   return (
     <ThemedView style={styles.fill}>
@@ -101,6 +89,22 @@ export default function Collection() {
           // A native bar button rather than a custom view: iOS lays it out
           // (and gives it the system background) the way it expects.
           unstable_headerRightItems: () => [
+            {
+              type: 'button',
+              label: 'Filters',
+              accessibilityLabel: `${filtersOpen ? 'Hide' : 'Show'} filters and sort${active ? `, ${active} on` : ''}`,
+              icon: {
+                type: 'sfSymbol',
+                // Filled while a filter is on, open or not, as Mail and Files do.
+                name: active
+                  ? 'line.3.horizontal.decrease.circle.fill'
+                  : 'line.3.horizontal.decrease.circle',
+              },
+              selected: filtersOpen,
+              // iOS 26 and later; before, the filled symbol alone says so.
+              ...(active ? { badge: { value: active } } : {}),
+              onPress: () => setFiltersOpen((open) => !open),
+            },
             {
               type: 'button',
               label: layout === 'grid' ? 'List' : 'Grid',
@@ -120,54 +124,64 @@ export default function Collection() {
           onChangeText={(query) => setFilter((f) => ({ ...f, query }))}
           placeholder="Name, set, number or artist"
         />
-        <View style={styles.buttons}>
-          <FilterButton
-            name="Show"
-            label={SHOW_LABELS[filter.show].short}
-            active={filter.show !== 'all'}
-            onPress={chooseShow}
-          />
-          <FilterButton
-            name="Set"
-            label={labelFor(options.sets, filter.setId, 'Set')}
-            active={!!filter.setId}
-            onPress={() => choose('Set', options.sets, 'setId')}
-          />
-          <FilterButton
-            name="Rarity"
-            label={labelFor(options.rarities, filter.rarity, 'Rarity')}
-            active={!!filter.rarity}
-            onPress={() => choose('Rarity', options.rarities, 'rarity')}
-          />
-          <FilterButton
-            name="Variant"
-            label={labelFor(options.variants, filter.variant, 'Variant')}
-            active={!!filter.variant}
-            onPress={() => choose('Variant', options.variants, 'variant')}
-          />
-          <FilterButton
-            name="Sort"
-            icon="arrow.up.arrow.down"
-            label={SORT_LABELS[sort]}
-            active={false}
-            onPress={async () => {
-              const index = await pick(
-                'Sort by',
-                SORTS.map((s) => SORT_LABELS[s]),
-              );
-              const next = index === null ? undefined : SORTS[index];
-              if (next) setSort(next);
-            }}
-          />
-        </View>
+        {filtersOpen ? (
+          <>
+            <View style={styles.buttons}>
+              <FilterButton
+                name="Set"
+                label={labelFor(options.sets, filter.setId, 'Set')}
+                active={!!filter.setId}
+                onPress={() => choose('Set', options.sets, 'setId')}
+              />
+              <FilterButton
+                name="Rarity"
+                label={labelFor(options.rarities, filter.rarity, 'Rarity')}
+                active={!!filter.rarity}
+                onPress={() => choose('Rarity', options.rarities, 'rarity')}
+              />
+              <FilterButton
+                name="Variant"
+                label={labelFor(options.variants, filter.variant, 'Variant')}
+                active={!!filter.variant}
+                onPress={() => choose('Variant', options.variants, 'variant')}
+              />
+              <FilterButton
+                name="Sort"
+                icon="arrow.up.arrow.down"
+                label={SORT_LABELS[sort]}
+                active={false}
+                onPress={async () => {
+                  const index = await pick(
+                    'Sort by',
+                    SORTS.map((s) => SORT_LABELS[s]),
+                  );
+                  const next = index === null ? undefined : SORTS[index];
+                  if (next) setSort(next);
+                }}
+              />
+            </View>
+            <View style={styles.buttons}>
+              <ToggleChip
+                label="Duplicates"
+                value={filter.duplicates}
+                onChange={(duplicates) => setFilter((f) => ({ ...f, duplicates }))}
+              />
+              <ToggleChip
+                label="Not in a binder or deck"
+                value={filter.unplaced}
+                onChange={(unplaced) => setFilter((f) => ({ ...f, unplaced }))}
+              />
+            </View>
+          </>
+        ) : null}
         {items && ready ? (
           <View style={styles.summary}>
             <ThemedText variant="figureSmall" color="textSecondary" style={styles.count}>
               {filtered ? `${shown.length} of ${items.length} entries` : `${items.length} entries`}
             </ThemedText>
             {filtered ? (
-              // With five pickers, one tap back to everything rather than
-              // reopening each one; the search text goes too.
+              // One tap back to everything, the search text included; with
+              // the filters folded away, also the sign that some are on.
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Clear filters"

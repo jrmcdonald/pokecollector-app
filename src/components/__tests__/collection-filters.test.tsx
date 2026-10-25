@@ -1,6 +1,6 @@
 /**
- * The Collection screen's Show picker and Clear, found the way VoiceOver
- * finds them: by role and accessible name.
+ * The Collection screen's folding filters, its toggles and Clear, found the
+ * way VoiceOver finds them: by role and accessible name.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, userEvent, waitFor } from '@testing-library/react-native';
@@ -9,18 +9,31 @@ import type { ReactNode } from 'react';
 import type { BinderCards, CollectionItem } from '@/api/schemas';
 import Collection from '@/app/collection';
 
-jest.mock('expo-router', () => ({
-  router: { push: jest.fn() },
-  Stack: { Screen: () => null },
-}));
+type HeaderItem = { label: string; accessibilityLabel: string; onPress(): void };
+jest.mock('expo-router', () => {
+  const { Pressable: P, Text: T } = jest.requireActual('react-native');
+  return {
+    router: { push: jest.fn() },
+    // The header's buttons, drawn where the test can press them.
+    Stack: {
+      Screen: ({ options }: { options: { unstable_headerRightItems?: () => HeaderItem[] } }) =>
+        (options.unstable_headerRightItems?.() ?? []).map((item: HeaderItem) => (
+          <P
+            key={item.label}
+            accessibilityRole="button"
+            accessibilityLabel={item.accessibilityLabel}
+            onPress={item.onPress}>
+            <T>{item.label}</T>
+          </P>
+        )),
+    },
+  };
+});
 
 jest.mock('@shopify/flash-list', () => {
   const { FlatList } = jest.requireActual('react-native');
   return { FlashList: FlatList };
 });
-
-const mockPick = jest.fn();
-jest.mock('@/utils/pick', () => ({ pick: (...args: unknown[]) => mockPick(...args) }));
 
 const mockRequest = jest.fn();
 jest.mock('@/session/session', () => ({
@@ -79,38 +92,38 @@ function withQueries(ui: ReactNode) {
 
 const requested = () => mockRequest.mock.calls.map(([path]) => path);
 
+async function openFilters() {
+  await render(withQueries(<Collection />));
+  expect(await screen.findByText('3 entries')).toBeTruthy();
+  // Folded away until asked for.
+  expect(screen.queryByRole('switch', { name: 'Duplicates' })).toBeNull();
+  await userEvent.press(screen.getByRole('button', { name: 'Show filters and sort' }));
+}
+
 describe('Collection', () => {
   it('shows duplicates, and clears back to everything', async () => {
-    await render(withQueries(<Collection />));
-    expect(await screen.findByText('3 entries')).toBeTruthy();
-
-    mockPick.mockResolvedValueOnce(2);
-    await userEvent.press(screen.getByRole('button', { name: 'Show: all' }));
-    expect(mockPick).toHaveBeenCalledWith('Show', [
-      'All cards (4)',
-      // Not counted: nothing has read the binders yet.
-      'Not in a binder or deck',
-      'Duplicates (2)',
-    ]);
+    await openFilters();
+    await userEvent.press(screen.getByRole('switch', { name: 'Duplicates' }));
+    expect(screen.getByRole('switch', { name: 'Duplicates' })).toBeChecked();
     expect(await screen.findByText('1 of 3 entries')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Show: Duplicates' })).toBeTruthy();
 
+    // Folded away, the header still says a filter is on, and Clear stays.
+    await userEvent.press(screen.getByRole('button', { name: 'Hide filters and sort, 1 on' }));
+    expect(screen.queryByRole('switch', { name: 'Duplicates' })).toBeNull();
     await userEvent.press(screen.getByRole('button', { name: 'Clear filters' }));
     expect(screen.getByText('3 entries')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Show filters and sort' })).toBeTruthy();
     expect(requested()).toEqual(['/api/collection/']);
   });
 
   it('reads the binders and decks only once asked what is not in one', async () => {
-    await render(withQueries(<Collection />));
-    expect(await screen.findByText('3 entries')).toBeTruthy();
+    await openFilters();
     expect(screen.getByRole('button', { name: /^Pikachu/ })).toBeTruthy();
     expect(requested()).toEqual(['/api/collection/']);
 
-    mockPick.mockResolvedValueOnce(1);
-    await userEvent.press(screen.getByRole('button', { name: 'Show: all' }));
+    await userEvent.press(screen.getByRole('switch', { name: 'Not in a binder or deck' }));
     expect(await screen.findByText('2 of 3 entries')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Show: No binder or deck' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /^Pikachu/ })).toBeNull();
     await waitFor(() =>
       expect(requested()).toEqual(
@@ -118,12 +131,9 @@ describe('Collection', () => {
       ),
     );
 
-    mockPick.mockResolvedValueOnce(null);
-    await userEvent.press(screen.getByRole('button', { name: 'Show: No binder or deck' }));
-    expect(mockPick).toHaveBeenLastCalledWith('Show', [
-      'All cards (4)',
-      'Not in a binder or deck (3)',
-      'Duplicates (2)',
-    ]);
+    // Both at once: Eevee is the loose card owned twice.
+    await userEvent.press(screen.getByRole('switch', { name: 'Duplicates' }));
+    expect(await screen.findByText('1 of 3 entries')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Eevee/ })).toBeTruthy();
   });
 });

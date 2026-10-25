@@ -4,6 +4,7 @@ import type { CollectionItem } from '@/api/schemas';
 
 import {
   NO_FILTER,
+  activeFilterCount,
   compareCollectorNumbers,
   duplicatePrintings,
   entriesForCard,
@@ -11,7 +12,6 @@ import {
   filterOptions,
   hasCollectionFilter,
   placedCards,
-  showCounts,
   sortCollection,
 } from '../collection';
 
@@ -158,16 +158,14 @@ const binder = (
 describe('duplicates', () => {
   it('counts copies of a printing across entries, not variants', () => {
     expect([...duplicatePrintings(copies)].sort()).toEqual(['card-1|Normal', 'card-2|Normal']);
-    expect(filterCollection(copies, { ...NO_FILTER, show: 'duplicates' }).map((i) => i.id)).toEqual(
-      [1, 2, 4],
-    );
+    expect(filterCollection(copies, { ...NO_FILTER, duplicates: true }).map((i) => i.id)).toEqual([
+      1, 2, 4,
+    ]);
   });
 
   it('combines with the other filters', () => {
     expect(
-      filterCollection(copies, { ...NO_FILTER, show: 'duplicates', rarity: 'Rare' }).map(
-        (i) => i.id,
-      ),
+      filterCollection(copies, { ...NO_FILTER, duplicates: true, rarity: 'Rare' }).map((i) => i.id),
     ).toEqual([1]);
   });
 });
@@ -184,20 +182,29 @@ describe('not in a binder or deck', () => {
 
   it('leaves out every entry of a placed card', () => {
     expect(
-      filterCollection(copies, { ...NO_FILTER, show: 'unplaced' }, placed).map((i) => i.id),
+      filterCollection(copies, { ...NO_FILTER, unplaced: true }, placed).map((i) => i.id),
     ).toEqual([2, 3]);
   });
 
-  it('counts copies for each choice, unplaced only once known', () => {
-    expect(showCounts(copies, placed)).toEqual({ all: 8, unplaced: 5, duplicates: 6 });
-    expect(showCounts(copies, undefined).unplaced).toBeNull();
+  it('combines with duplicates', () => {
+    expect(
+      filterCollection(copies, { ...NO_FILTER, unplaced: true, duplicates: true }, placed).map(
+        (i) => i.id,
+      ),
+    ).toEqual([2]);
   });
 });
 
-describe('hasCollectionFilter', () => {
-  it('ignores blank search text, and sees a show choice', () => {
+describe('hasCollectionFilter and activeFilterCount', () => {
+  it('ignores blank search text, and sees the toggles', () => {
     expect(hasCollectionFilter({ ...NO_FILTER, query: '  ' })).toBe(false);
-    expect(hasCollectionFilter({ ...NO_FILTER, show: 'duplicates' })).toBe(true);
+    expect(hasCollectionFilter({ ...NO_FILTER, duplicates: true })).toBe(true);
+  });
+
+  it('counts the filters folded away, not the search text', () => {
+    expect(
+      activeFilterCount({ ...NO_FILTER, query: 'pika', setId: 'sv1_en', unplaced: true }),
+    ).toBe(2);
   });
 });
 

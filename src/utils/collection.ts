@@ -23,25 +23,15 @@ export const SORT_LABELS: Record<CollectionSort, string> = {
   number: 'Set and number',
 };
 
-/**
- * Which entries to show, whatever their set, rarity or variant: one choice,
- * so the screen needs one more button for these rather than one each.
- */
-export type CollectionShow = 'all' | 'unplaced' | 'duplicates';
-
-/** `label` for the picker, `short` for the button, which shares a row. */
-export const SHOW_LABELS: Record<CollectionShow, { label: string; short: string }> = {
-  all: { label: 'All cards', short: 'All cards' },
-  unplaced: { label: 'Not in a binder or deck', short: 'No binder or deck' },
-  duplicates: { label: 'Duplicates', short: 'Duplicates' },
-};
-
 export interface CollectionFilter {
   query: string;
   setId: string | null;
   rarity: string | null;
   variant: string | null;
-  show: CollectionShow;
+  /** Only printings owned more than once: see `duplicatePrintings`. */
+  duplicates: boolean;
+  /** Only cards with no copy in a collection binder or Real Deck: see `placedCards`. */
+  unplaced: boolean;
 }
 
 export const NO_FILTER: CollectionFilter = {
@@ -49,17 +39,19 @@ export const NO_FILTER: CollectionFilter = {
   setId: null,
   rarity: null,
   variant: null,
-  show: 'all',
+  duplicates: false,
+  unplaced: false,
 };
 
+/** The filters chosen besides the search text, which is always on show. */
+export function activeFilterCount(filter: CollectionFilter): number {
+  return [filter.setId, filter.rarity, filter.variant, filter.duplicates, filter.unplaced].filter(
+    Boolean,
+  ).length;
+}
+
 export function hasCollectionFilter(filter: CollectionFilter): boolean {
-  return !!(
-    filter.setId ||
-    filter.rarity ||
-    filter.variant ||
-    filter.query.trim() ||
-    filter.show !== 'all'
-  );
+  return activeFilterCount(filter) > 0 || filter.query.trim().length > 0;
 }
 
 /**
@@ -114,10 +106,10 @@ export function filterCollection(
 ): CollectionItem[] {
   const needle = filter.query.trim().toLocaleLowerCase();
   // Over every entry: a printing's copies are split across entries by condition.
-  const duplicates = filter.show === 'duplicates' ? duplicatePrintings(items) : null;
+  const duplicates = filter.duplicates ? duplicatePrintings(items) : null;
   return items.filter((item) => {
     if (duplicates && !duplicates.has(printing(item))) return false;
-    if (filter.show === 'unplaced' && placed?.has(item.card_id)) return false;
+    if (filter.unplaced && placed?.has(item.card_id)) return false;
     if (filter.setId && setIdOf(item) !== filter.setId) return false;
     if (filter.rarity && item.card?.rarity !== filter.rarity) return false;
     if (filter.variant && (item.variant ?? 'Normal') !== filter.variant) return false;
@@ -202,22 +194,6 @@ export function filterOptions(items: readonly CollectionItem[]): {
       const variant = item.variant ?? 'Normal';
       return [variant, variant];
     }),
-  };
-}
-
-/**
- * Copies each choice of `CollectionShow` shows, for its picker; `unplaced`
- * is null until `placed` is known.
- */
-export function showCounts(
-  items: readonly CollectionItem[],
-  placed: ReadonlySet<string> | undefined,
-): Record<CollectionShow, number | null> {
-  const copies = (list: readonly CollectionItem[]) => list.reduce((n, i) => n + i.quantity, 0);
-  return {
-    all: copies(items),
-    unplaced: placed ? copies(items.filter((item) => !placed.has(item.card_id))) : null,
-    duplicates: copies(filterCollection(items, { ...NO_FILTER, show: 'duplicates' })),
   };
 }
 

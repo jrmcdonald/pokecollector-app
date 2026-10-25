@@ -68,6 +68,48 @@ export function Chips<T extends string>({
   );
 }
 
+/**
+ * A chip that turns something on or off by itself, so several can be on at
+ * once, unlike `Chips`' one choice. A switch to VoiceOver, as the Scan tab's
+ * Auto pill is.
+ */
+export function ToggleChip({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  onChange(next: boolean): void;
+}) {
+  const colors = useColors();
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityState={{ checked: value }}
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => undefined);
+        onChange(!value);
+      }}
+      style={[
+        styles.chip,
+        styles.toggle,
+        {
+          backgroundColor: value ? colors.accent : colors.surface,
+          borderColor: value ? colors.accent : colors.outline,
+        },
+      ]}>
+      <ThemedText
+        variant="label"
+        numberOfLines={1}
+        style={[styles.toggleLabel, { color: value ? colors.onAccent : colors.text }]}>
+        {label}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   row: { gap: spacing.sm, paddingVertical: spacing.xs },
   chip: {
@@ -80,4 +122,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs + 2,
   },
   swatch: { width: 14, height: 14, borderRadius: 7, borderWidth: 1 },
+  // In a wrapping row rather than a scrolling one, cut short only when a
+  // chip has the row to itself.
+  toggle: { maxWidth: '100%' },
+  toggleLabel: { flexShrink: 1 },
 });

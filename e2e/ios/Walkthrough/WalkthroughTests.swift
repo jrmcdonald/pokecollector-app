@@ -72,6 +72,20 @@ final class WalkthroughTests: XCTestCase {
     let entries = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH ' entries'"))
     go(button(startingWith: "Browse your collection"), to: entries.firstMatch, "Collection")
     capture("collection-grid")
+    // The filters, unfolded, with Duplicates on: the fake collection owns
+    // Pikachu and Koraidon ex more than once, and it needs no request. Then
+    // cleared and folded again, so the list below is as it opens.
+    let duplicates = element(startingWith: "Duplicates")
+    go(app.navigationBars.buttons["Show filters and sort"], to: duplicates, "Collection's filters")
+    let narrowed = app.staticTexts.matching(NSPredicate(format: "label CONTAINS ' of ' AND label ENDSWITH ' entries'")).firstMatch
+    go(duplicates, to: narrowed, "Collection's duplicates")
+    capture("collection-filters")
+    tap(app.buttons["Clear filters"])
+    if !narrowed.waitForNonExistence(timeout: 5) {
+      diagnose("Clear left the collection filtered")
+      XCTFail("Clear left the collection filtered")
+    }
+    go(app.navigationBars.buttons["Hide filters and sort"], to: app.navigationBars.buttons["Show filters and sort"], "Collection's filters, folded")
     // The toggle's own label says the list is up: the grid's tiles start
     // "Charizard ex" too, so the card's row alone could match the grid.
     go(app.navigationBars.buttons["Show as list"], to: app.navigationBars.buttons["Show as grid"], "Collection as a list")

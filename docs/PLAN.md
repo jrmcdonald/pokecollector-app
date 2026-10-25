@@ -361,9 +361,10 @@ a revoked service token.
 
 - [x] **Home:** total value, card count, unique cards, recent additions and
       quick links (`/api/dashboard/`, `/api/collection/stats/summary`).
-- [x] **Collection:** grid/list toggle, search, filters (set, rarity, variant)
-      and sort (value, recent, name, set number), all client-side over the cached
-      collection. Tapping a card opens its detail.
+- [x] **Collection:** grid/list toggle, search, filters (set, rarity, variant;
+      later duplicates and cards in no binder or deck) and sort (value, recent,
+      name, set number), all client-side over the cached collection. Tapping a
+      card opens its detail.
 - [x] **Card detail:** large image, set and number, prices, owned entries with
       a quantity stepper and variant and condition pickers. Buttons for "Add to
       collection", "Add to wishlist" (or "Remove from wishlist") and "Add to binder". Price history and

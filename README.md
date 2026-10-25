@@ -7,7 +7,7 @@ works on home Wi-Fi and away from it.
 
 <p align="center">
   <img src="e2e/screenshots/home.png" width="200" alt="Home: collection value, card counts and recently added cards">
-  <img src="e2e/screenshots/collection-grid.png" width="200" alt="Collection grid with search, set, rarity and variant filters">
+  <img src="e2e/screenshots/collection-grid.png" width="200" alt="Collection grid with search, its filters folded behind a header button">
   <img src="e2e/screenshots/card.png" width="200" alt="Card detail with Cardmarket prices and the owned copy's quantity stepper">
   <img src="e2e/screenshots/scan-review.png" width="200" alt="Reviewing a batch of scanned cards before adding them">
 </p>

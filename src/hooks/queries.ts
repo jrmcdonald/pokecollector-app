@@ -287,8 +287,10 @@ export function useBinderCards(id: number) {
  * Shared by every card, and read again only for binders whose counts have
  * changed since (see `binderContents`); each binder read also fills that
  * binder's own page. The binder list it reads is the Binders screen's.
+ * `enabled: false` to only read what is cached, as Collection does until it
+ * is asked for what is not in a binder or deck.
  */
-export function useBinderContents() {
+export function useBinderContents(options: { enabled?: boolean } = {}) {
   const queryClient = useQueryClient();
   const { enabled, getClient, keys } = useKeys();
   return useQuery({
@@ -307,7 +309,7 @@ export function useBinderContents() {
         (id, cards) => queryClient.setQueryData(keys.binder(id), cards),
       );
     },
-    enabled,
+    enabled: enabled && options.enabled !== false,
     staleTime: 30 * 60 * 1000,
   });
 }
@@ -880,9 +882,9 @@ export function useDeck(id: number) {
  * by every card, and read again only for decks changed since (see
  * `deckContents`); each deck read also fills that deck's own page. Changes
  * to the collection leave it alone: they change what is owned, not which
- * cards a deck lists.
+ * cards a deck lists. `enabled: false` to only read what is cached.
  */
-export function useDeckContents() {
+export function useDeckContents(options: { enabled?: boolean } = {}) {
   const queryClient = useQueryClient();
   const { enabled, getClient, keys } = useKeys();
   return useQuery({
@@ -893,7 +895,7 @@ export function useDeckContents() {
         queryClient.getQueryData<DeckContents[]>(keys.deckContents),
         (deck) => queryClient.setQueryData(keys.deck(deck.id), deck),
       ),
-    enabled,
+    enabled: enabled && options.enabled !== false,
     staleTime: 30 * 60 * 1000,
   });
 }

@@ -1164,3 +1164,46 @@ start folded away, since most copies have none.
   per line at a fixed width; the simulator screenshot of the opened photo
   shows it, and it was approved without that being noticed. Eight tiles need
   no virtualisation, and a plain view nests in any list.
+
+## 2026-10-25 — Collection: duplicates, cards in no binder or deck, and folding filters
+
+- **Two on/off chips, Duplicates and Not in a binder or deck,** in their own
+  row under the pickers, so they combine with each other and with set,
+  rarity, variant and search: loose duplicates are the trade pile. A first
+  try made them one "Show" pull-down, which fitted the row but allowed only
+  one; an action sheet cannot pick several. A chip is a switch to VoiceOver,
+  as the Scan tab's Auto pill is.
+- **The pickers, sort and chips fold away** behind a Filters button in the
+  header, beside the grid/list toggle, and start folded: browsing is the common case, and two rows of controls push the grid down the screen. The search field stays, as searching is the
+  most used of them. The button's symbol fills while a filter is on, as in
+  Mail and Files, with a count badge on iOS 26; VoiceOver hears "Show
+  filters and sort, 2 on". Sort is not counted: it hides nothing. The badge
+  is drawn in the accent, dark on yellow: iOS's own white on red nearly
+  failed the Simulator's contrast audit at the largest text size.
+- **A Clear button by the count** whenever anything is filtered, search text
+  included. With the filters folded away it is also where one shows as on,
+  and it undoes five controls in one tap. Its frame is a whole 44 pt tap
+  target, reaching into the gaps around the count's line: the audit
+  measures the frame, not `hitSlop`, and failed it at 35 by 18.
+- **The walkthrough opens the filters** and turns Duplicates on for
+  `collection-filters.png`, then clears and folds them, so the grid and
+  list screenshots are the screen as it opens.
+- **Not a side drawer or a filter sheet, yet.** A drawer is an Android
+  pattern iOS has none of. A sheet over the grid (Photos, Mail) would need a
+  sheet route or a library and hides the results being narrowed; worth it
+  if the filters outgrow two rows. A native header menu with checkmarks
+  (`UIMenu`, which expo-router's header items support) suits the toggles and
+  sort, but not a list of a hundred sets.
+- **A duplicate is a printing owned more than once:** the same card in the
+  same variant, counted across entries, so two Near Mint and one Played copy
+  are duplicates, but a Normal and a Reverse Holo are not. Upstream's
+  `/api/analytics/duplicates` is untyped and a request; the cached
+  collection answers it for nothing.
+- **"In a binder or deck" means a collection binder or a Real Deck,** the
+  two that hold owned copies. A card only planned binders or decks list is
+  still loose. It is per card: a card with one copy in a binder and spares
+  in a box is not shown (Duplicates finds the spares).
+- **The binder and deck indexes are read only once that is switched on.**
+  They are the card page's (`useBinderContents`, `useDeckContents`), costing
+  a request a binder or deck the first time. Pulling to refresh reads them
+  again too while the chip is on.

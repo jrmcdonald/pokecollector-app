@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.8.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.7.0...v1.8.0) (2026-10-25)
+
+
+### Features
+
+* combine collection filters, folded behind a Filters button ([bcd8e30](https://github.com/jrmcdonald/pokecollector-app/commit/bcd8e306307fecb8dd5b58fcf7885f2b9a33d748))
+* combine collection filters, folded behind a Filters button ([3f6a49e](https://github.com/jrmcdonald/pokecollector-app/commit/3f6a49e40bcceb2d1220c892e8dea71dc6fa8cb7))
+* filter the collection to duplicates or cards in no binder or deck ([54f4a66](https://github.com/jrmcdonald/pokecollector-app/commit/54f4a666eeaaa74b07357c4a4830a8c8f40998ce))
+
+
+### Bug fixes
+
+* draw the Filters badge in the accent colours ([481c539](https://github.com/jrmcdonald/pokecollector-app/commit/481c539ca205fc4fcb8ae21f7102521c97c951f7))
+* give the collection's Clear button a whole tap target ([fc64450](https://github.com/jrmcdonald/pokecollector-app/commit/fc64450d83bb2edf3edb6cb4fec6d4596732835b))
+
 ## [1.7.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.6.0...v1.7.0) (2026-10-21)
 
 

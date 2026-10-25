@@ -1177,10 +1177,17 @@ start folded away, since most copies have none.
   header, beside the grid/list toggle, and start folded: browsing is the common case, and two rows of controls push the grid down the screen. The search field stays, as searching is the
   most used of them. The button's symbol fills while a filter is on, as in
   Mail and Files, with a count badge on iOS 26; VoiceOver hears "Show
-  filters and sort, 2 on". Sort is not counted: it hides nothing.
+  filters and sort, 2 on". Sort is not counted: it hides nothing. The badge
+  is drawn in the accent, dark on yellow: iOS's own white on red nearly
+  failed the Simulator's contrast audit at the largest text size.
 - **A Clear button by the count** whenever anything is filtered, search text
   included. With the filters folded away it is also where one shows as on,
-  and it undoes five controls in one tap.
+  and it undoes five controls in one tap. Its frame is a whole 44 pt tap
+  target, reaching into the gaps around the count's line: the audit
+  measures the frame, not `hitSlop`, and failed it at 35 by 18.
+- **The walkthrough opens the filters** and turns Duplicates on for
+  `collection-filters.png`, then clears and folds them, so the grid and
+  list screenshots are the screen as it opens.
 - **Not a side drawer or a filter sheet, yet.** A drawer is an Android
   pattern iOS has none of. A sheet over the grid (Photos, Mail) would need a
   sheet route or a library and hides the results being narrowed; worth it

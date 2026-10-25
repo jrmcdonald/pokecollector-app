@@ -17,7 +17,7 @@ const PAIRS: [fg: Role, bg: Role[], minimum: number, what: string][] = [
     'secondary text and captions',
   ],
   ['accent', ['background', 'surface', 'surfaceRaised'], AA.text, 'links and accent icons'],
-  ['onAccent', ['accent'], AA.text, 'text on accent buttons and chips'],
+  ['onAccent', ['accent'], AA.text, 'text on accent buttons, chips and badges'],
   ['onAccent', ['danger'], AA.text, 'text on destructive buttons and swipe actions'],
   ['onAccent', ['success'], AA.text, 'the "Matches" mark on a scan candidate'],
   [

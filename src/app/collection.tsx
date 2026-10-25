@@ -101,8 +101,17 @@ export default function Collection() {
                   : 'line.3.horizontal.decrease.circle',
               },
               selected: filtersOpen,
-              // iOS 26 and later; before, the filled symbol alone says so.
-              ...(active ? { badge: { value: active } } : {}),
+              // iOS 26 and later; before, the filled symbol alone says so. In
+              // the accent: iOS's own white on red nearly fails the contrast
+              // audit at the largest text size.
+              ...(active
+                ? {
+                    badge: {
+                      value: active,
+                      style: { color: colors.onAccent, backgroundColor: colors.accent },
+                    },
+                  }
+                : {}),
               onPress: () => setFiltersOpen((open) => !open),
             },
             {

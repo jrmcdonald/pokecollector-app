@@ -11,18 +11,23 @@ import { SearchField } from '@/components/search-field';
 import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useCollection } from '@/hooks/queries';
+import { useBinderContents, useCollection, useDeckContents } from '@/hooks/queries';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useCardColumns } from '@/hooks/use-large-text';
 import { spacing, useColors } from '@/theme';
 import {
   NO_FILTER,
+  SHOW_LABELS,
   SORT_LABELS,
   filterCollection,
   filterOptions,
+  hasCollectionFilter,
+  placedCards,
   setNameOf,
+  showCounts,
   sortCollection,
   type CollectionFilter,
+  type CollectionShow,
   type CollectionSort,
   type FilterOption,
 } from '@/utils/collection';
@@ -30,22 +35,40 @@ import { pick } from '@/utils/pick';
 import { cardValue, formatPrice } from '@/utils/pricing';
 
 const SORTS = Object.keys(SORT_LABELS) as CollectionSort[];
+const SHOWS = Object.keys(SHOW_LABELS) as CollectionShow[];
 
 export default function Collection() {
   const columns = useCardColumns();
   const colors = useColors();
   const collection = useCollection();
-  const pull = usePullToRefresh(() => collection.refetch());
   const [filter, setFilter] = useState<CollectionFilter>(NO_FILTER);
   const [sort, setSort] = useState<CollectionSort>('recent');
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
 
+  // Reading every binder and deck costs a request each the first time, so
+  // they are read only once asked for; until then a cached index still
+  // gives the picker its count.
+  const unplaced = filter.show === 'unplaced';
+  const binders = useBinderContents({ enabled: unplaced });
+  const decks = useDeckContents({ enabled: unplaced });
+  const placed = useMemo(
+    () => (binders.data && decks.data ? placedCards(binders.data, decks.data) : undefined),
+    [binders.data, decks.data],
+  );
+  const placementError = unplaced && !placed ? (binders.error ?? decks.error) : null;
+  const pull = usePullToRefresh(() =>
+    Promise.all([collection.refetch(), ...(unplaced ? [binders.refetch(), decks.refetch()] : [])]),
+  );
+
   const items = collection.data;
   const options = useMemo(() => filterOptions(items ?? []), [items]);
+  const counts = useMemo(() => showCounts(items ?? [], placed), [items, placed]);
   const shown = useMemo(
-    () => sortCollection(filterCollection(items ?? [], filter), sort),
-    [items, filter, sort],
+    () => sortCollection(filterCollection(items ?? [], filter, placed), sort),
+    [items, filter, placed, sort],
   );
+  // Nothing to show yet rather than everything, while the index loads.
+  const ready = !unplaced || !!placed;
 
   async function choose(title: string, list: FilterOption[], key: 'setId' | 'rarity' | 'variant') {
     const index = await pick(title, ['All', ...list.map((o) => `${o.label} (${o.count})`)]);
@@ -56,7 +79,19 @@ export default function Collection() {
   const labelFor = (list: FilterOption[], value: string | null, fallback: string) =>
     value ? (list.find((o) => o.value === value)?.label ?? value) : fallback;
 
-  const filtered = filter.setId || filter.rarity || filter.variant || filter.query;
+  async function chooseShow() {
+    const index = await pick(
+      'Show',
+      SHOWS.map((s) => {
+        const count = counts[s];
+        return count === null ? SHOW_LABELS[s].label : `${SHOW_LABELS[s].label} (${count})`;
+      }),
+    );
+    const show = index === null ? undefined : SHOWS[index];
+    if (show) setFilter((f) => ({ ...f, show }));
+  }
+
+  const filtered = hasCollectionFilter(filter);
 
   return (
     <ThemedView style={styles.fill}>
@@ -86,6 +121,12 @@ export default function Collection() {
           placeholder="Name, set, number or artist"
         />
         <View style={styles.buttons}>
+          <FilterButton
+            name="Show"
+            label={SHOW_LABELS[filter.show].short}
+            active={filter.show !== 'all'}
+            onPress={chooseShow}
+          />
           <FilterButton
             name="Set"
             label={labelFor(options.sets, filter.setId, 'Set')}
@@ -119,14 +160,31 @@ export default function Collection() {
             }}
           />
         </View>
-        {items ? (
-          <ThemedText variant="figureSmall" color="textSecondary">
-            {filtered ? `${shown.length} of ${items.length} entries` : `${items.length} entries`}
-          </ThemedText>
+        {items && ready ? (
+          <View style={styles.summary}>
+            <ThemedText variant="figureSmall" color="textSecondary" style={styles.count}>
+              {filtered ? `${shown.length} of ${items.length} entries` : `${items.length} entries`}
+            </ThemedText>
+            {filtered ? (
+              // With five pickers, one tap back to everything rather than
+              // reopening each one; the search text goes too.
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear filters"
+                // Its text is half a tap target tall.
+                hitSlop={{ top: 12, bottom: 12, left: spacing.md, right: spacing.md }}
+                onPress={() => setFilter(NO_FILTER)}
+                style={({ pressed }) => pressed && { opacity: 0.7 }}>
+                <ThemedText variant="label" color="accent">
+                  Clear
+                </ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
       </View>
 
-      {items ? (
+      {items && ready ? (
         <FlashList
           // No recycle pool: FlashList 2.0.2 keeps cells past the end of a list
           // that shrank, showing their old items (a set searched for "char"
@@ -177,6 +235,11 @@ export default function Collection() {
         />
       ) : collection.error ? (
         <ErrorState error={collection.error} onRetry={() => collection.refetch()} />
+      ) : placementError ? (
+        <ErrorState
+          error={placementError}
+          onRetry={() => Promise.all([binders.refetch(), decks.refetch()])}
+        />
       ) : (
         <GridSkeleton />
       )}
@@ -227,6 +290,8 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   controls: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: spacing.sm },
   buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  summary: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  count: { flex: 1 },
   list: { padding: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.sm },
   rowImage: { width: 48 },

@@ -1,11 +1,17 @@
+import type { BinderContents } from '@/api/binders';
+import type { DeckContents } from '@/api/decks';
 import type { CollectionItem } from '@/api/schemas';
 
 import {
   NO_FILTER,
   compareCollectorNumbers,
+  duplicatePrintings,
   entriesForCard,
   filterCollection,
   filterOptions,
+  hasCollectionFilter,
+  placedCards,
+  showCounts,
   sortCollection,
 } from '../collection';
 
@@ -127,6 +133,71 @@ describe('filterOptions', () => {
       { value: 'sv1_en', label: 'Scarlet & Violet', count: 5 },
     ]);
     expect(options.variants.map((v) => v.value)).toEqual(['Holo', 'Normal']);
+  });
+});
+
+// Two entries for one printing (by condition) and one for another variant.
+const copies = [
+  ...items,
+  { ...item(4, 'Pikachu'), card_id: 'card-1', condition: 'LP' },
+  { ...item(5, 'Pikachu', { variant: 'Reverse Holo' }), card_id: 'card-1' },
+];
+
+const binder = (
+  id: number,
+  type: string,
+  cards: Record<string, number>,
+): BinderContents & DeckContents => ({
+  id,
+  name: `List ${id}`,
+  binder_type: type,
+  version: '',
+  cards,
+});
+
+describe('duplicates', () => {
+  it('counts copies of a printing across entries, not variants', () => {
+    expect([...duplicatePrintings(copies)].sort()).toEqual(['card-1|Normal', 'card-2|Normal']);
+    expect(filterCollection(copies, { ...NO_FILTER, show: 'duplicates' }).map((i) => i.id)).toEqual(
+      [1, 2, 4],
+    );
+  });
+
+  it('combines with the other filters', () => {
+    expect(
+      filterCollection(copies, { ...NO_FILTER, show: 'duplicates', rarity: 'Rare' }).map(
+        (i) => i.id,
+      ),
+    ).toEqual([1]);
+  });
+});
+
+describe('not in a binder or deck', () => {
+  const placed = placedCards(
+    [binder(1, 'collection', { 'card-1': 1 }), binder(2, 'wishlist', { 'card-2': 1 })],
+    [binder(3, 'physical_deck', { 'card-3': 0 }), binder(4, 'deck', { 'card-3': 4 })],
+  );
+
+  it('counts only collection binders and Real Decks as places', () => {
+    expect([...placed]).toEqual(['card-1']);
+  });
+
+  it('leaves out every entry of a placed card', () => {
+    expect(
+      filterCollection(copies, { ...NO_FILTER, show: 'unplaced' }, placed).map((i) => i.id),
+    ).toEqual([2, 3]);
+  });
+
+  it('counts copies for each choice, unplaced only once known', () => {
+    expect(showCounts(copies, placed)).toEqual({ all: 8, unplaced: 5, duplicates: 6 });
+    expect(showCounts(copies, undefined).unplaced).toBeNull();
+  });
+});
+
+describe('hasCollectionFilter', () => {
+  it('ignores blank search text, and sees a show choice', () => {
+    expect(hasCollectionFilter({ ...NO_FILTER, query: '  ' })).toBe(false);
+    expect(hasCollectionFilter({ ...NO_FILTER, show: 'duplicates' })).toBe(true);
   });
 });
 

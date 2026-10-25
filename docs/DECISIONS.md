@@ -1164,3 +1164,28 @@ start folded away, since most copies have none.
   per line at a fixed width; the simulator screenshot of the opened photo
   shows it, and it was approved without that being noticed. Eight tiles need
   no virtualisation, and a plain view nests in any list.
+
+## 2026-10-25 — Collection: duplicates, and cards in no binder or deck
+
+- **One "Show" button for both,** a pull-down of All cards, Not in a binder
+  or deck, and Duplicates, rather than a button each: six buttons would wrap
+  to three rows at the default text size. They are one choice, not two
+  filters to combine; set, rarity, variant and search still narrow either.
+  It comes first, since it decides what the others narrow. Its button says
+  "No binder or deck", short enough to share a row.
+- **A Clear button by the count** whenever anything is filtered, search text
+  included: with five pickers, undoing them one sheet at a time was tedious.
+- **A duplicate is a printing owned more than once:** the same card in the
+  same variant, counted across entries, so two Near Mint and one Played copy
+  are duplicates, but a Normal and a Reverse Holo are not. Upstream's
+  `/api/analytics/duplicates` is untyped and a request; the cached
+  collection answers it for nothing.
+- **"In a binder or deck" means a collection binder or a Real Deck,** the
+  two that hold owned copies. A card only planned binders or decks list is
+  still loose. It is per card: a card with one copy in a binder and spares
+  in a box is not shown (Duplicates finds the spares).
+- **The binder and deck indexes are read only once that is chosen.** They
+  are the card page's (`useBinderContents`, `useDeckContents`), costing a
+  request a binder or deck the first time. Until chosen, Collection only
+  reads them from the cache, so the picker counts that choice only when the
+  index is already there.

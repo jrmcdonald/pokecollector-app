@@ -6,8 +6,12 @@
  * changing them costs no requests, which matters under a 60-a-minute limit
  * shared with every other client behind the tunnel.
  */
+import type { BinderContents } from '@/api/binders';
+import type { DeckContents } from '@/api/decks';
 import type { CollectionItem } from '@/api/schemas';
 
+import { isPlanned } from './binders';
+import { isRealDeck } from './decks';
 import { cardValue } from './pricing';
 
 export type CollectionSort = 'recent' | 'value' | 'name' | 'number';
@@ -19,14 +23,77 @@ export const SORT_LABELS: Record<CollectionSort, string> = {
   number: 'Set and number',
 };
 
+/**
+ * Which entries to show, whatever their set, rarity or variant: one choice,
+ * so the screen needs one more button for these rather than one each.
+ */
+export type CollectionShow = 'all' | 'unplaced' | 'duplicates';
+
+/** `label` for the picker, `short` for the button, which shares a row. */
+export const SHOW_LABELS: Record<CollectionShow, { label: string; short: string }> = {
+  all: { label: 'All cards', short: 'All cards' },
+  unplaced: { label: 'Not in a binder or deck', short: 'No binder or deck' },
+  duplicates: { label: 'Duplicates', short: 'Duplicates' },
+};
+
 export interface CollectionFilter {
   query: string;
   setId: string | null;
   rarity: string | null;
   variant: string | null;
+  show: CollectionShow;
 }
 
-export const NO_FILTER: CollectionFilter = { query: '', setId: null, rarity: null, variant: null };
+export const NO_FILTER: CollectionFilter = {
+  query: '',
+  setId: null,
+  rarity: null,
+  variant: null,
+  show: 'all',
+};
+
+export function hasCollectionFilter(filter: CollectionFilter): boolean {
+  return !!(
+    filter.setId ||
+    filter.rarity ||
+    filter.variant ||
+    filter.query.trim() ||
+    filter.show !== 'all'
+  );
+}
+
+/**
+ * The cards that have a copy put somewhere: in a collection binder or a Real
+ * Deck. Planned binders and decks list cards to collect, not copies, so a
+ * card only they list is still loose.
+ */
+export function placedCards(
+  binders: readonly BinderContents[],
+  decks: readonly DeckContents[],
+): Set<string> {
+  const placed = new Set<string>();
+  for (const list of [...binders.filter((b) => !isPlanned(b)), ...decks.filter(isRealDeck)]) {
+    for (const [cardId, copies] of Object.entries(list.cards)) {
+      if (copies > 0) placed.add(cardId);
+    }
+  }
+  return placed;
+}
+
+const printing = (item: CollectionItem) => `${item.card_id}|${item.variant ?? 'Normal'}`;
+
+/**
+ * The printings (a card in one variant) owned more than once, across every
+ * entry: two Near Mint and one Played copy are duplicates, but a Normal and
+ * a Reverse Holo copy are two different cards to a collector.
+ */
+export function duplicatePrintings(items: readonly CollectionItem[]): Set<string> {
+  const copies = new Map<string, number>();
+  for (const item of items) {
+    copies.set(printing(item), (copies.get(printing(item)) ?? 0) + item.quantity);
+  }
+  return new Set([...copies].filter(([, n]) => n > 1).map(([key]) => key));
+}
 
 export function setIdOf(item: CollectionItem): string | null {
   return item.card?.set_ref?.id ?? item.card?.set_id ?? null;
@@ -36,12 +103,21 @@ export function setNameOf(item: CollectionItem): string | null {
   return item.card?.set_ref?.name ?? item.card?.set_id ?? null;
 }
 
+/**
+ * `placed` is `placedCards`, needed only to show what is not in a binder or
+ * deck; without it, that shows everything.
+ */
 export function filterCollection(
   items: readonly CollectionItem[],
   filter: CollectionFilter,
+  placed?: ReadonlySet<string>,
 ): CollectionItem[] {
   const needle = filter.query.trim().toLocaleLowerCase();
+  // Over every entry: a printing's copies are split across entries by condition.
+  const duplicates = filter.show === 'duplicates' ? duplicatePrintings(items) : null;
   return items.filter((item) => {
+    if (duplicates && !duplicates.has(printing(item))) return false;
+    if (filter.show === 'unplaced' && placed?.has(item.card_id)) return false;
     if (filter.setId && setIdOf(item) !== filter.setId) return false;
     if (filter.rarity && item.card?.rarity !== filter.rarity) return false;
     if (filter.variant && (item.variant ?? 'Normal') !== filter.variant) return false;
@@ -126,6 +202,22 @@ export function filterOptions(items: readonly CollectionItem[]): {
       const variant = item.variant ?? 'Normal';
       return [variant, variant];
     }),
+  };
+}
+
+/**
+ * Copies each choice of `CollectionShow` shows, for its picker; `unplaced`
+ * is null until `placed` is known.
+ */
+export function showCounts(
+  items: readonly CollectionItem[],
+  placed: ReadonlySet<string> | undefined,
+): Record<CollectionShow, number | null> {
+  const copies = (list: readonly CollectionItem[]) => list.reduce((n, i) => n + i.quantity, 0);
+  return {
+    all: copies(items),
+    unplaced: placed ? copies(items.filter((item) => !placed.has(item.card_id))) : null,
+    duplicates: copies(filterCollection(items, { ...NO_FILTER, show: 'duplicates' })),
   };
 }
 

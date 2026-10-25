@@ -15,7 +15,7 @@ import { ThemedView } from '@/components/themed-view';
 import { useBinderContents, useCollection, useDeckContents } from '@/hooks/queries';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useCardColumns } from '@/hooks/use-large-text';
-import { spacing, useColors } from '@/theme';
+import { minTapTarget, spacing, useColors } from '@/theme';
 import {
   NO_FILTER,
   SORT_LABELS,
@@ -194,10 +194,8 @@ export default function Collection() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Clear filters"
-                // Its text is half a tap target tall.
-                hitSlop={{ top: 12, bottom: 12, left: spacing.md, right: spacing.md }}
                 onPress={() => setFilter(NO_FILTER)}
-                style={({ pressed }) => pressed && { opacity: 0.7 }}>
+                style={({ pressed }) => [styles.clear, pressed && { opacity: 0.7 }]}>
                 <ThemedText variant="label" color="accent">
                   Clear
                 </ThemedText>
@@ -315,6 +313,16 @@ const styles = StyleSheet.create({
   buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   summary: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   count: { flex: 1 },
+  // A whole tap target, as the accessibility audit measures the frame and
+  // not hitSlop. It reaches into the gaps above and below, so the count's
+  // line grows by less.
+  clear: {
+    minWidth: minTapTarget,
+    minHeight: minTapTarget,
+    marginVertical: -spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   list: { padding: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.sm },
   rowImage: { width: 48 },

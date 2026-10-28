@@ -108,9 +108,8 @@ decides, because it needs no login. See `PLAN.md` §2.0.
   (`sv1-025`), `name`, `number`, `rarity`, `set_abbreviation`, `lang`, and
   `image`/`image_hd` URLs, usually TCGdex's, so their pictures cost no
   requests. Since 1.51.x a catalogue card with no TCGdex artwork offers its
-  `custom_image_url` there instead, which may be on any host; the app loads
-  that one through `/api/images/card/{id}/{size}`, as it does any custom
-  image (`scanMatchImageFields`).
+  `custom_image_url` there instead: a public HTTPS address upstream has
+  checked, which the app loads directly, as the web UI does.
   `recognized` is what the model read: `name`, `name_en`, `number_local`,
   `set_code`, `language` and more. The app checks each candidate on its own
   and drops malformed ones rather than failing the scan.

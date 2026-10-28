@@ -1223,10 +1223,11 @@ untyped responses.
   `{ code, message, product_sources }` rather than a string. The client
   shows the message and names the products ("Linked to …"), and still reads
   the string from an older server.
-- **A scan candidate's picture can be a custom image on any host.** The app
-  sends any picture not on TCGdex's CDN through upstream's image proxy, as
-  it already does for custom cards, rather than loading it from wherever it
-  points. Such cards are rare, so the extra requests are few.
+- **A scan candidate's picture can be a custom image on any host,** and the
+  app loads it directly, as upstream's web UI does. Telling a custom address
+  from catalogue art by its host was tried and dropped: catalogue art is not
+  always on TCGdex's CDN (the simulator's fake server serves its own), and
+  those pictures then went through the image proxy, a request each.
 - **The persisted cache's buster stays `pokecollector-1.51.0`.** Nothing it
   holds changed shape; a new one would make every phone fetch everything
   again for nothing.

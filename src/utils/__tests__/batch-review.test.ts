@@ -36,11 +36,8 @@ describe('pickCard', () => {
     ).toMatchObject({ name: 'Pikachu', code: 'SV1 025' });
   });
 
-  it('keeps a custom image, picked either way', () => {
+  it('keeps the custom image of a card picked from search', () => {
     const url = 'https://images.example.com/pikachu.png';
-    expect(
-      pickCard({ kind: 'candidate', match: { ...pikachu, image: url, image_hd: url } }),
-    ).toMatchObject({ custom_image_url: url });
     expect(
       pickCard({
         kind: 'search',

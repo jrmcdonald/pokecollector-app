@@ -7,7 +7,6 @@ import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { useCardColumns } from '@/hooks/use-large-text';
 import { radius, spacing, useColors } from '@/theme';
-import { scanMatchImageFields } from '@/utils/images';
 
 /**
  * What the scanner read, and its candidates as a grid of tiles, as many
@@ -77,7 +76,7 @@ export function ScanCandidates({
                 pressed && styles.pressed,
               ]}>
               <CardImage
-                card={scanMatchImageFields(match)}
+                card={{ id: match.id, images_small: match.image, images_large: match.image_hd }}
                 size="small"
                 style={[
                   asRows && styles.rowImage,

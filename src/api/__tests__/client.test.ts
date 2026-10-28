@@ -2,6 +2,7 @@ import { buildUrl, PokeCollectorClient, PRIMARY_PROBE_TIMEOUT_MS } from '../clie
 import {
   ProxyError,
   AuthError,
+  ConflictError,
   NetworkError,
   NotFoundError,
   RateLimitError,
@@ -253,6 +254,62 @@ describe('PokeCollectorClient', () => {
       expect(error).toBeInstanceOf(type);
       expect((error as Error).message).toBe(message);
     }
+  });
+
+  describe('a collection row linked to a sealed product', () => {
+    const message =
+      'This collection item is linked to a product. Sell or unlink the product card before removing it from the active collection.';
+    const source = {
+      product_card_id: 7,
+      product_id: 3,
+      product_type: 'Booster Box',
+      purchase_date: '2026-09-01',
+      active_quantity: 1,
+      initial_quantity: 1,
+      linked_at: '2026-09-02T10:00:00',
+    };
+
+    async function conflict(body: unknown): Promise<unknown> {
+      const { fetch } = fakeFetch(() => ({ status: 409, body }));
+      return new PokeCollectorClient(CREDENTIALS, fetch)
+        .requestAnonymous('/api/collection/1', { method: 'DELETE' })
+        .catch((e: unknown) => e);
+    }
+
+    it('shows the message and names the products, from 1.52.0 on', async () => {
+      const error = await conflict({
+        detail: {
+          code: 'collection_product_link_conflict',
+          message,
+          product_sources: [
+            { ...source, product_name: 'Surging Sparks Booster Box' },
+            { ...source, product_card_id: 8, product_name: 'Surging Sparks Booster Box' },
+            { ...source, product_card_id: 9, product_id: 4, product_name: 'Prismatic ETB' },
+          ],
+        },
+      });
+      expect(error).toBeInstanceOf(ConflictError);
+      expect((error as Error).message).toBe(
+        `${message} Linked to Surging Sparks Booster Box, Prismatic ETB.`,
+      );
+    });
+
+    it('shows the message alone when no product is named', async () => {
+      for (const product_sources of [[], undefined, [{ ...source, product_name: null }]]) {
+        const error = await conflict({ detail: { message, product_sources } });
+        expect((error as Error).message).toBe(message);
+      }
+    });
+
+    it('still reads the string an older server sends', async () => {
+      expect(((await conflict({ detail: message })) as Error).message).toBe(message);
+    });
+
+    it('falls back to the status when the object has no message', async () => {
+      const error = await conflict({ detail: { code: 'collection_product_link_conflict' } });
+      expect(error).toBeInstanceOf(ConflictError);
+      expect((error as Error).message).toBe('DELETE /api/collection/1: conflict.');
+    });
   });
 
   it('carries Retry-After on a 429', async () => {

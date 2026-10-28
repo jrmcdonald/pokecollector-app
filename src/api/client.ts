@@ -477,7 +477,11 @@ function safeParse(text: string): unknown {
   }
 }
 
-/** FastAPI's `{ "detail": ... }`, where detail is a string or a list of 422 issues. */
+/**
+ * FastAPI's `{ "detail": ... }`, where detail is a string, a list of 422
+ * issues, or (for a collection row linked to a sealed product, since upstream
+ * 1.52.0) `{ code, message, product_sources }`.
+ */
 function describeDetail(body: unknown): string | undefined {
   if (typeof body !== 'object' || body === null || !('detail' in body)) return undefined;
   const { detail } = body as { detail: unknown };
@@ -486,7 +490,25 @@ function describeDetail(body: unknown): string | undefined {
     const first = detail[0] as { msg?: unknown } | undefined;
     if (first && typeof first.msg === 'string') return first.msg;
   }
+  if (typeof detail === 'object' && detail !== null) {
+    const { message, product_sources } = detail as { message?: unknown; product_sources?: unknown };
+    if (typeof message === 'string') return withProductNames(message, product_sources);
+  }
   return undefined;
+}
+
+/** "… first. Linked to Booster Box, Elite Trainer Box." */
+function withProductNames(message: string, sources: unknown): string {
+  if (!Array.isArray(sources)) return message;
+  const names = [
+    ...new Set(
+      sources
+        .map((source) => (source as { product_name?: unknown } | null)?.product_name)
+        .filter((name): name is string => typeof name === 'string' && name.trim() !== '')
+        .map((name) => name.trim()),
+    ),
+  ];
+  return names.length ? `${message} Linked to ${names.join(', ')}.` : message;
 }
 
 export function buildUrl(

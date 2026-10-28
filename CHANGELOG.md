@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.1](https://github.com/jrmcdonald/pokecollector-app/compare/v1.8.0...v1.8.1) (2026-10-28)
+
+
+### Bug fixes
+
+* show why a product-linked collection change is refused (upstream 1.55.1) ([6c5b1fd](https://github.com/jrmcdonald/pokecollector-app/commit/6c5b1fdc9d422e4494386129f7278a06eaed6b31))
+* show why a product-linked collection change is refused (upstream 1.55.1) ([4dd759d](https://github.com/jrmcdonald/pokecollector-app/commit/4dd759dd212f343c0d7198517574a04147f95104))
+
 ## [1.8.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.7.0...v1.8.0) (2026-10-25)
 
 

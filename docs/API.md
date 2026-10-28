@@ -6,7 +6,7 @@ pinned upstream version, in `openapi/`, from which `src/api/generated.ts` is
 generated. This file records what the app relies on and anything the spec does
 not say.
 
-Pinned upstream version: **1.51.0** (match `ha-addons/pokecollector/Dockerfile`).
+Pinned upstream version: **1.55.1** (match `ha-addons/pokecollector/Dockerfile`).
 
 ## Every request
 
@@ -106,7 +106,11 @@ decides, because it needs no login. See `PLAN.md` §2.0.
 
 - **Scan candidates** (`matches`) carry `id` (`sv1-025_en`), `tcg_card_id`
   (`sv1-025`), `name`, `number`, `rarity`, `set_abbreviation`, `lang`, and
-  TCGdex `image`/`image_hd` URLs, so their pictures cost no requests.
+  `image`/`image_hd` URLs, usually TCGdex's, so their pictures cost no
+  requests. Since 1.51.x a catalogue card with no TCGdex artwork offers its
+  `custom_image_url` there instead, which may be on any host; the app loads
+  that one through `/api/images/card/{id}/{size}`, as it does any custom
+  image (`scanMatchImageFields`).
   `recognized` is what the model read: `name`, `name_en`, `number_local`,
   `set_code`, `language` and more. The app checks each candidate on its own
   and drops malformed ones rather than failing the scan.
@@ -155,7 +159,14 @@ decides, because it needs no login. See `PLAN.md` §2.0.
 attempts. Try again in 1 minute." }`. Behind the tunnel all external clients
   share one IP.
 - **Errors** are FastAPI's `{ "detail": string }`, or for 422
-  `{ "detail": [{ loc, msg, type }] }`.
+  `{ "detail": [{ loc, msg, type }] }`. Since 1.52.0 a 409 from
+  `PUT`/`DELETE /api/collection/{id}` on a row linked to a sealed product
+  (fewer copies than are linked; a new variant, condition, language,
+  printing details or purchase price; deleting it) is
+  `{ "detail": { code: "collection_product_link_conflict", message, product_sources } }`,
+  each source `{ product_card_id, product_id, product_name, product_type,
+purchase_date, active_quantity, initial_quantity, linked_at }`. The client
+  shows `message` and names the products; older servers send the string.
 - **401** on any authenticated route means the JWT is missing, expired or
   signed with a key the backend no longer has. The client logs in again once.
 - **Card images.** `images_small` and `images_large` on a card are full

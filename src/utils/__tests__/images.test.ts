@@ -3,6 +3,7 @@ import {
   cardImageSource,
   collectionPhotoSource,
   hasCatalogueImage,
+  scanMatchImageFields,
   scanPhotoSource,
 } from '../images';
 
@@ -105,5 +106,49 @@ describe('hasCatalogueImage', () => {
     expect(hasCatalogueImage({ id: 'a', images_large: 'https://x/high.webp' })).toBe(true);
     expect(hasCatalogueImage({ id: 'a', custom_image_url: 'https://x/c.png' })).toBe(true);
     expect(hasCatalogueImage({ id: 'a', images_small: null, images_large: null })).toBe(false);
+  });
+});
+
+describe('scanMatchImageFields', () => {
+  it('loads TCGdex pictures directly', () => {
+    const match = {
+      id: 'sv1-025_en',
+      image: 'https://assets.tcgdex.net/en/sv/sv1/025/low.webp',
+      image_hd: 'https://assets.tcgdex.net/en/sv/sv1/025/high.webp',
+    };
+    const fields = scanMatchImageFields(match);
+    expect(fields).toEqual({
+      id: match.id,
+      images_small: match.image,
+      images_large: match.image_hd,
+    });
+    expect(cardImageSource(fields, 'small', proxy)).toEqual({
+      uri: match.image,
+      cacheKey: match.image,
+    });
+  });
+
+  it('sends a custom image on another host through the proxy', () => {
+    const url = 'https://images.example.com/my-card.png';
+    const fields = scanMatchImageFields({ id: 'custom-1', image: url, image_hd: url });
+    expect(fields).toEqual({ id: 'custom-1', custom_image_url: url });
+    expect(cardImageSource(fields, 'large', proxy)).toEqual({
+      uri: 'https://pc.example.com/api/images/card/custom-1/large',
+      headers: proxy.headers,
+      cacheKey: 'https://pc.example.com/api/images/card/custom-1/large',
+    });
+  });
+
+  it('does not take a look-alike host for TCGdex', () => {
+    const url = 'https://assets.tcgdex.net.example.com/low.webp';
+    expect(scanMatchImageFields({ id: 'x', image: url })).toEqual({
+      id: 'x',
+      custom_image_url: url,
+    });
+  });
+
+  it('has no picture when the candidate has none', () => {
+    const fields = scanMatchImageFields({ id: 'x', image: null });
+    expect(hasCatalogueImage(fields)).toBe(false);
   });
 });

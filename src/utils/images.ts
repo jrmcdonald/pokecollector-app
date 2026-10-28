@@ -43,6 +43,30 @@ export function cardImageSource(
 }
 
 /**
+ * A scan candidate's `image` and `image_hd` as card image fields. They are
+ * usually TCGdex URLs, but since upstream 1.51.x a card with no TCGdex
+ * artwork offers its custom image address there instead, and that can be on
+ * any host. Such a picture goes through the image proxy, as a custom image
+ * does everywhere else, rather than being loaded from wherever it points.
+ */
+export function scanMatchImageFields(match: {
+  id: string;
+  image?: string | null;
+  image_hd?: string | null;
+}): CardImageFields {
+  const small = match.image ?? null;
+  const large = match.image_hd ?? null;
+  if ([small, large].every((url) => url === null || isTcgdexUrl(url))) {
+    return { id: match.id, images_small: small, images_large: large };
+  }
+  return { id: match.id, custom_image_url: large ?? small };
+}
+
+function isTcgdexUrl(url: string): boolean {
+  return /^https:\/\/assets\.tcgdex\.net\//.test(url);
+}
+
+/**
  * A PokeCollector account's avatar: the Pokémon (1–151) chosen in the web UI,
  * as the official artwork the server keeps in its own cache. That route needs
  * no PokeCollector login, only Access. The cache key leaves out the address,

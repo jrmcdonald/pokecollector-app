@@ -6698,7 +6698,7 @@
   "info": {
     "description": "Complete Pokemon TCG collection management system",
     "title": "Pokemon TCG Collection API",
-    "version": "1.51.0"
+    "version": "1.55.1"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -11782,7 +11782,7 @@
     },
     "/api/export/csv": {
       "get": {
-        "description": "Export collection as CSV.",
+        "description": "Export collection as CSV in the requested display currency.",
         "operationId": "export_csv_api_export_csv_get",
         "parameters": [
           {
@@ -11807,19 +11807,6 @@
               "description": "Display currency",
               "title": "Currency",
               "type": "string"
-            }
-          },
-          {
-            "description": "EUR to selected currency rate",
-            "in": "query",
-            "name": "exchange_rate",
-            "required": false,
-            "schema": {
-              "default": 1.0,
-              "description": "EUR to selected currency rate",
-              "exclusiveMinimum": 0,
-              "title": "Exchange Rate",
-              "type": "number"
             }
           }
         ],
@@ -11856,7 +11843,7 @@
     },
     "/api/export/pdf": {
       "get": {
-        "description": "Export collection as PDF.",
+        "description": "Export collection as PDF in the requested display currency.",
         "operationId": "export_pdf_api_export_pdf_get",
         "parameters": [
           {
@@ -11881,19 +11868,6 @@
               "description": "Display currency",
               "title": "Currency",
               "type": "string"
-            }
-          },
-          {
-            "description": "EUR to selected currency rate",
-            "in": "query",
-            "name": "exchange_rate",
-            "required": false,
-            "schema": {
-              "default": 1.0,
-              "description": "EUR to selected currency rate",
-              "exclusiveMinimum": 0,
-              "title": "Exchange Rate",
-              "type": "number"
             }
           }
         ],
@@ -13951,6 +13925,30 @@
         ]
       }
     },
+    "/api/settings/currencies": {
+      "get": {
+        "operationId": "get_currencies_api_settings_currencies_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Get Currencies",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/api/settings/debug-log": {
       "get": {
         "operationId": "download_debug_log_api_settings_debug_log_get",
@@ -14018,11 +14016,6 @@
             "description": "Validation Error"
           }
         },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
         "summary": "Get Exchange Rate",
         "tags": [
           "settings"

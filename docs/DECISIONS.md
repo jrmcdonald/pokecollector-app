@@ -1207,3 +1207,31 @@ start folded away, since most copies have none.
   They are the card page's (`useBinderContents`, `useDeckContents`), costing
   a request a binder or deck the first time. Pulling to refresh reads them
   again too while the chip is on.
+
+## 2026-10-28 — Upstream 1.55.1
+
+The addon now runs upstream 1.55.1, so `openapi/` holds its spec in place of
+1.51.0's. The typed spec barely moved (a `GET /api/settings/currencies`, and
+the exports' `exchange_rate` parameter gone); the changes that matter are in
+untyped responses.
+
+- **The spec was exported from upstream's source at the tag,** with its
+  pinned requirements on Python 3.11, because the session's network could
+  not pull the image's layers. Done the same way, 1.51.0 came out byte for
+  byte as committed, so it is the spec the image would give.
+- **A 409 on a collection row linked to a sealed product** now carries
+  `{ code, message, product_sources }` rather than a string. The client
+  shows the message and names the products ("Linked to …"), and still reads
+  the string from an older server.
+- **A scan candidate's picture can be a custom image on any host.** The app
+  sends any picture not on TCGdex's CDN through upstream's image proxy, as
+  it already does for custom cards, rather than loading it from wherever it
+  points. Such cards are rare, so the extra requests are few.
+- **The persisted cache's buster stays `pokecollector-1.51.0`.** Nothing it
+  holds changed shape; a new one would make every phone fetch everything
+  again for nothing.
+- **Not taken up yet:** display currency (`/api/settings/currencies`,
+  `/api/settings/exchange-rate`, the `currency` setting; amounts are still
+  stored in euros) and `product_sources` on search results' `owned_items`.
+  Collection entries have carried `product_sources` since before 1.51.0, so
+  a card's page can say which product a copy came from without either.

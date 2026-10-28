@@ -1572,7 +1572,7 @@ export interface paths {
     };
     /**
      * Export Csv
-     * @description Export collection as CSV.
+     * @description Export collection as CSV in the requested display currency.
      */
     get: operations['export_csv_api_export_csv_get'];
     put?: never;
@@ -1592,7 +1592,7 @@ export interface paths {
     };
     /**
      * Export Pdf
-     * @description Export collection as PDF.
+     * @description Export collection as PDF in the requested display currency.
      */
     get: operations['export_pdf_api_export_pdf_get'];
     put?: never;
@@ -2243,6 +2243,23 @@ export interface paths {
      * @description Permanently delete only this user's private collection-card photos.
      */
     delete: operations['delete_card_photos_api_settings_card_photos_delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/settings/currencies': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Currencies */
+    get: operations['get_currencies_api_settings_currencies_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -7753,8 +7770,6 @@ export interface operations {
         price_field?: string;
         /** @description Display currency */
         currency?: string;
-        /** @description EUR to selected currency rate */
-        exchange_rate?: number;
       };
       header?: never;
       path?: never;
@@ -7789,8 +7804,6 @@ export interface operations {
         price_field?: string;
         /** @description Display currency */
         currency?: string;
-        /** @description EUR to selected currency rate */
-        exchange_rate?: number;
       };
       header?: never;
       path?: never;
@@ -8965,6 +8978,26 @@ export interface operations {
     };
   };
   delete_card_photos_api_settings_card_photos_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_currencies_api_settings_currencies_get: {
     parameters: {
       query?: never;
       header?: never;

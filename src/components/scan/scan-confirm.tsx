@@ -7,6 +7,7 @@ import { CardImage } from '@/components/card-image';
 import { ThemedText } from '@/components/themed-text';
 import { useOwnerLabel } from '@/hooks/use-owner-label';
 import { spacing } from '@/theme';
+import { scanMatchImageFields } from '@/utils/images';
 
 import { CopyDetailsFields, DEFAULT_COPY, type CopyDetails } from './copy-details';
 
@@ -57,11 +58,7 @@ export function MatchSummary({
 }) {
   return (
     <View style={styles.card}>
-      <CardImage
-        card={{ id: match.id, images_small: match.image, images_large: match.image_hd }}
-        size="small"
-        style={styles.image}
-      />
+      <CardImage card={scanMatchImageFields(match)} size="small" style={styles.image} />
       <View style={styles.text}>
         <ThemedText variant="heading" numberOfLines={2}>
           {match.name}

@@ -35,6 +35,19 @@ describe('pickCard', () => {
       }),
     ).toMatchObject({ name: 'Pikachu', code: 'SV1 025' });
   });
+
+  it('keeps a custom image, picked either way', () => {
+    const url = 'https://images.example.com/pikachu.png';
+    expect(
+      pickCard({ kind: 'candidate', match: { ...pikachu, image: url, image_hd: url } }),
+    ).toMatchObject({ custom_image_url: url });
+    expect(
+      pickCard({
+        kind: 'search',
+        card: { id: 'custom-1', name: 'Pikachu', custom_image_url: url },
+      }),
+    ).toMatchObject({ custom_image_url: url });
+  });
 });
 
 describe('copyLine', () => {

@@ -1,23 +1,16 @@
 /** What the batch review says about each photo and about the batch. */
 import { itemState, type BatchChoice, type BatchPick, type BatchProgress } from '@/api/batch';
 import type { ScanItem } from '@/api/schemas';
+import { scanMatchImageFields, type CardImageFields } from '@/utils/images';
 
 /** A picked card's name, code and images, whichever way it was picked. */
-export function pickCard(pick: BatchPick): {
-  id: string;
-  name: string;
-  code: string;
-  images_small: string | null;
-  images_large: string | null;
-} {
+export function pickCard(pick: BatchPick): CardImageFields & { name: string; code: string } {
   if (pick.kind === 'candidate') {
     const { match } = pick;
     return {
-      id: match.id,
       name: match.name,
       code: [match.set_abbreviation?.toUpperCase(), match.number].filter(Boolean).join(' '),
-      images_small: match.image ?? null,
-      images_large: match.image_hd ?? null,
+      ...scanMatchImageFields(match),
     };
   }
   const { card } = pick;
@@ -29,6 +22,7 @@ export function pickCard(pick: BatchPick): {
       .join(' '),
     images_small: card.images_small ?? null,
     images_large: card.images_large ?? null,
+    custom_image_url: card.custom_image_url ?? null,
   };
 }
 

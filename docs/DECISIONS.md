@@ -1236,3 +1236,23 @@ untyped responses.
   stored in euros) and `product_sources` on search results' `owned_items`.
   Collection entries have carried `product_sources` since before 1.51.0, so
   a card's page can say which product a copy came from without either.
+
+## 2026-11-11 — Upstream 1.56.0
+
+`openapi/` now holds 1.56.0's spec in place of 1.55.1's, exported from
+upstream's source at the tag on Python 3.11 with its pinned requirements, as
+for 1.55.1: this session had no Docker. Exported the same way, 1.55.1 came
+out byte for byte as committed. The only upstream backend changes are the
+holo effects (`api/cards.py`, `api/images.py`, `api/settings.py`,
+`schemas.py`), so the typed diff is small and asked nothing of the app:
+
+- `GET /api/images/card/{id}/fingerprint`, new, not used (see "Holo shimmer").
+- `lang` on `CardBase`, and `tcg_card_id` on `GET /api/cards/{id}` (an
+  untyped response, so not in the diff). Neither is needed yet.
+- A per-user `holo_effects_enabled` setting, default `"false"`.
+
+**The addon still runs 1.55.1** until `ha-addons`' `pokecollector/Dockerfile`
+moves. Nothing breaks there: the setting is a 404, read as off, and writing
+it stores it as an ordinary user setting that 1.55.1's web UI ignores. The
+persisted cache's buster stays `pokecollector-1.51.0`: nothing it holds
+changed shape.

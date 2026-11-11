@@ -1660,6 +1660,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/images/card/{card_id}/fingerprint': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Card Image Fingerprint
+     * @description Identify the exact official large-image bytes served by the image proxy.
+     */
+    get: operations['get_card_image_fingerprint_api_images_card__card_id__fingerprint_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/images/card/{card_id}/{size}': {
     parameters: {
       query?: never;
@@ -2938,6 +2958,8 @@ export interface components {
        * @default false
        */
       is_shared_template: boolean;
+      /** Lang */
+      lang?: string | null;
       /** Name */
       name: string;
       /** Number */
@@ -3118,6 +3140,8 @@ export interface components {
        * @default false
        */
       is_shared_template: boolean;
+      /** Lang */
+      lang?: string | null;
       /** Name */
       name: string;
       /** Number */
@@ -7887,6 +7911,37 @@ export interface operations {
         };
         content: {
           'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_card_image_fingerprint_api_images_card__card_id__fingerprint_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        card_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };

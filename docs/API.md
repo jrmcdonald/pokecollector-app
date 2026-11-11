@@ -6,7 +6,9 @@ pinned upstream version, in `openapi/`, from which `src/api/generated.ts` is
 generated. This file records what the app relies on and anything the spec does
 not say.
 
-Pinned upstream version: **1.55.1** (match `ha-addons/pokecollector/Dockerfile`).
+Pinned upstream version: **1.56.0** (match `ha-addons/pokecollector/Dockerfile`).
+The addon may still run 1.55.1 until its Dockerfile moves; everything the app
+uses works there too, and the one 1.56.0 setting it reads is off when missing.
 
 ## Every request
 

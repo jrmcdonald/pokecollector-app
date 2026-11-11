@@ -43,6 +43,7 @@ import {
   getDashboard,
   getDeck,
   getDecks,
+  getHoloEffectsSetting,
   getPriceHistory,
   getPrintingDetailTags,
   getProducts,
@@ -60,6 +61,7 @@ import {
   resolveAndAddScan,
   retryScanItem,
   searchCards,
+  setHoloEffectsSetting,
   updateBinder,
   updateBinderEntry,
   updateCollectionItem,
@@ -136,6 +138,7 @@ export function useKeys() {
       scanJob: (id: number) => [cacheId, 'scan-job', id] as const,
       products: [cacheId, 'products'] as const,
       productTypes: [cacheId, 'product-types'] as const,
+      holoEffects: [cacheId, 'setting', 'holo_effects_enabled'] as const,
     },
   };
 }
@@ -357,6 +360,61 @@ export function useInvalidateOwnership() {
         keys.products,
       ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
     );
+}
+
+/** Accounts whose holo setting has been read since the app started. */
+const holoSettingRead = new Set<string>();
+
+/**
+ * Whether this account has holo effects on (upstream's per-user
+ * `holo_effects_enabled`, shared with the web UI). Read once per app launch
+ * for each account used, with the startup data on Home; between reads the
+ * persisted value stands. Off until known.
+ *
+ * `cachedOnly` for a card's page: it only looks at what Home read, and never
+ * asks, even when that read failed.
+ */
+export function useHoloEffectsSetting({ cachedOnly = false } = {}): boolean {
+  const { enabled, cacheId, getClient, keys } = useKeys();
+  const query = useQuery({
+    queryKey: keys.holoEffects,
+    queryFn: async () => {
+      const value = await getHoloEffectsSetting(getClient());
+      if (cacheId) holoSettingRead.add(cacheId);
+      return value;
+    },
+    enabled: enabled && !cachedOnly,
+    // Stale until read this launch, so the mount on Home reads it once;
+    // never stale after that, so focus, reconnects and card pages do not.
+    staleTime: cacheId && holoSettingRead.has(cacheId) ? Infinity : 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+  return query.data ?? false;
+}
+
+/** Optimistic: the switch moves at once and goes back if the server says no. */
+export function useSetHoloEffects() {
+  const queryClient = useQueryClient();
+  const { cacheId, getClient, keys } = useKeys();
+  return useMutation({
+    mutationFn: (on: boolean) => setHoloEffectsSetting(getClient(), on),
+    onMutate: async (on) => {
+      await queryClient.cancelQueries({ queryKey: keys.holoEffects });
+      const previous = queryClient.getQueryData<boolean>(keys.holoEffects);
+      queryClient.setQueryData(keys.holoEffects, on);
+      return { previous };
+    },
+    onError: (error, _on, context) => {
+      queryClient.setQueryData(keys.holoEffects, context?.previous ?? false);
+      reportFailure('Could not change the holo shimmer', error);
+    },
+    // What upstream stored; no read afterwards, which would cost a request.
+    onSuccess: (stored) => {
+      queryClient.setQueryData(keys.holoEffects, stored);
+      if (cacheId) holoSettingRead.add(cacheId);
+    },
+  });
 }
 
 /** A success tap. Never allowed to fail the mutation it follows. */

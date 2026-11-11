@@ -9,3 +9,8 @@ jest.mock('expo-symbols', () => {
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return { SymbolView: View };
 });
+
+// Reanimated's and Worklets' own stand-ins: animated views are plain views,
+// styles are computed once, and sensors report nothing.
+jest.mock('react-native-worklets', () => jest.requireActual('react-native-worklets/src/mock'));
+jest.mock('react-native-reanimated', () => jest.requireActual('react-native-reanimated/mock'));

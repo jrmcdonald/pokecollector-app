@@ -85,6 +85,9 @@ export function createRouter(origin: string) {
     if (path === '/api/products/') return ok(fixtures.products);
     if (path === '/api/products/types') return ok(fixtures.productTypes);
     if (path === '/api/cards/recognize/jobs') return ok({ jobs: fixtures.scanJobs });
+    // Upstream 1.56.0's default; the walkthrough's screenshots show no shimmer.
+    if (path === '/api/settings/holo_effects_enabled')
+      return ok({ key: 'holo_effects_enabled', value: 'false' });
     if (path === '/api/cards/search') {
       const page = Number(url.searchParams.get('page') ?? '1') || 1;
       const pageSize = Number(url.searchParams.get('page_size') ?? '30') || 30;

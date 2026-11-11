@@ -6,10 +6,12 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import type { User } from '@/api/schemas';
 import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/icon';
-import { ListRow } from '@/components/list-row';
+import { ListRow, SwitchRow } from '@/components/list-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useHoloEffectsSetting, useIsOnline, useSetHoloEffects } from '@/hooks/queries';
 import { useMe } from '@/hooks/use-me';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { clearQueryCache } from '@/session/query';
 import { useActiveRoute, useSession } from '@/session/session';
 import { spacing, useColors } from '@/theme';
@@ -135,6 +137,10 @@ export default function Settings() {
           />
         </Group>
 
+        <Group title="Cards">
+          <HoloSetting />
+        </Group>
+
         <Group title="Data">
           <ListRow
             title="Clear cached data"
@@ -156,6 +162,33 @@ export default function Settings() {
         </Group>
       </ScrollView>
     </ThemedView>
+  );
+}
+
+/**
+ * Upstream's per-account holo setting, so it matches the web UI: on, a
+ * card's page shimmers as the phone tilts. Saved at once, and put back if
+ * the server says no.
+ */
+function HoloSetting() {
+  const on = useHoloEffectsSetting();
+  const change = useSetHoloEffects();
+  const online = useIsOnline();
+  const reduceMotion = useReduceMotion();
+  return (
+    <SwitchRow
+      title="Holo shimmer"
+      subtitle={
+        reduceMotion
+          ? 'Off while Reduce Motion is on. Also in the web UI.'
+          : !online
+            ? 'Needs a connection to change.'
+            : 'Holo cards shimmer on their page as you tilt the phone. Also in the web UI.'
+      }
+      value={on}
+      onChange={(value) => change.mutate(value)}
+      disabled={!online}
+    />
   );
 }
 

@@ -158,6 +158,24 @@ export type PrintingDetailTag = z.infer<typeof PrintingDetailTagSchema>;
 
 export const PrintingDetailTagsSchema = z.array(PrintingDetailTagSchema);
 
+/**
+ * One per-user setting, `GET`/`POST /api/settings/{key}`. Upstream stores
+ * every value as a string; a flag is `"true"` or `"false"`.
+ */
+export const SettingSchema = z.looseObject({
+  key: z.string(),
+  value: z.unknown().optional(),
+});
+export type Setting = z.infer<typeof SettingSchema>;
+
+/**
+ * A flag setting as upstream's web UI reads it: on only for the string
+ * `"true"`. Anything else, a missing setting included, is off.
+ */
+export function settingFlag(value: unknown): boolean {
+  return value === 'true';
+}
+
 const DashboardCardSchema = z.looseObject({
   collection_item_id: z.number().nullish(),
   card_id: z.string(),

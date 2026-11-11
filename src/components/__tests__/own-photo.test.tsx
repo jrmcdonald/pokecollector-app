@@ -13,6 +13,7 @@ import CardDetail from '@/app/card/[id]';
 jest.mock('expo-router', () => ({
   router: { push: jest.fn() },
   useLocalSearchParams: () => ({ id: 'mcd21-25_en' }),
+  useIsFocused: () => true,
   Stack: { Screen: () => null },
 }));
 

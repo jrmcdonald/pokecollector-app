@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.8.1...v1.9.0) (2026-11-13)
+
+
+### Features
+
+* a holo shimmer on a card's page ([b650013](https://github.com/jrmcdonald/pokecollector-app/commit/b650013717835f4bc976f2aae01e45a88b75c2dd))
+* a holo shimmer on a card's page ([84cf9c8](https://github.com/jrmcdonald/pokecollector-app/commit/84cf9c86e98f4bb0abb3b03f654e746ac4d2c94a))
+
 ## [1.8.1](https://github.com/jrmcdonald/pokecollector-app/compare/v1.8.0...v1.8.1) (2026-10-28)
 
 

@@ -10,7 +10,7 @@ import { StatTile } from '@/components/stat-tile';
 import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useDashboard, useIsOnline } from '@/hooks/queries';
+import { useDashboard, useHoloEffectsSetting, useIsOnline } from '@/hooks/queries';
 import { useAccountMenu } from '@/hooks/use-account-menu';
 import { useLargeText } from '@/hooks/use-large-text';
 import { useMe } from '@/hooks/use-me';
@@ -30,6 +30,9 @@ export default function Home() {
   const colors = useColors();
   const me = useMe();
   const dashboard = useDashboard();
+  // Read with the startup data, once per launch and account, so a card's
+  // page knows it without asking.
+  useHoloEffectsSetting();
   const pull = usePullToRefresh(() => Promise.all([dashboard.refetch(), me.refetch()]));
   const online = useIsOnline();
   const d = dashboard.data;

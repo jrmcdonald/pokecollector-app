@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { minTapTarget, spacing, useColors } from '@/theme';
 
@@ -78,6 +78,62 @@ export function ListRow({
   );
 }
 
+/**
+ * A setting that is on or off, as iOS Settings draws one: the text, then a
+ * switch. The whole row is the control, so VoiceOver reads one element
+ * ("Holo shimmer, switch, off") and a tap anywhere on it flips it.
+ */
+export function SwitchRow({
+  title,
+  subtitle,
+  value,
+  onChange,
+  disabled,
+}: {
+  title: string;
+  subtitle?: string;
+  value: boolean;
+  onChange(value: boolean): void;
+  disabled?: boolean;
+}) {
+  const colors = useColors();
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={title}
+      accessibilityHint={subtitle}
+      accessibilityState={{ checked: value, disabled: !!disabled }}
+      disabled={disabled}
+      onPress={() => onChange(!value)}
+      style={({ pressed }) => [
+        styles.row,
+        { borderBottomColor: colors.border },
+        pressed && { backgroundColor: colors.surface },
+      ]}>
+      <View style={[styles.text, disabled && styles.disabled]}>
+        <ThemedText variant="label" style={styles.title}>
+          {title}
+        </ThemedText>
+        {subtitle ? (
+          <ThemedText variant="caption" color="textSecondary">
+            {subtitle}
+          </ThemedText>
+        ) : null}
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        disabled={disabled}
+        // The row speaks for it; a second element would read the same twice.
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        trackColor={{ false: colors.outline, true: colors.accent }}
+        ios_backgroundColor={colors.outline}
+      />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
@@ -92,4 +148,5 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   text: { flex: 1, gap: 2 },
   title: { fontSize: 16, lineHeight: 21 },
+  disabled: { opacity: 0.5 },
 });

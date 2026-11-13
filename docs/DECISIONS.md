@@ -1236,3 +1236,86 @@ untyped responses.
   stored in euros) and `product_sources` on search results' `owned_items`.
   Collection entries have carried `product_sources` since before 1.51.0, so
   a card's page can say which product a copy came from without either.
+
+## 2026-11-11 — Upstream 1.56.0
+
+`openapi/` now holds 1.56.0's spec in place of 1.55.1's, exported from
+upstream's source at the tag on Python 3.11 with its pinned requirements, as
+for 1.55.1: this session had no Docker. Exported the same way, 1.55.1 came
+out byte for byte as committed. The only upstream backend changes are the
+holo effects (`api/cards.py`, `api/images.py`, `api/settings.py`,
+`schemas.py`), so the typed diff is small and asked nothing of the app:
+
+- `GET /api/images/card/{id}/fingerprint`, new, not used (see "Holo shimmer").
+- `lang` on `CardBase`, and `tcg_card_id` on `GET /api/cards/{id}` (an
+  untyped response, so not in the diff). Neither is needed yet.
+- A per-user `holo_effects_enabled` setting, default `"false"`.
+
+**The addon still runs 1.55.1** until `ha-addons`' `pokecollector/Dockerfile`
+moves. Nothing breaks there: the setting is a 404, read as off, and writing
+it stores it as an ordinary user setting that 1.55.1's web UI ignores. The
+persisted cache's buster stays `pokecollector-1.51.0`: nothing it holds
+changed shape.
+
+## 2026-11-11 — Holo shimmer
+
+Upstream 1.56.0's "Advanced Holo effects" lay a moving foil over a card's
+art in the web UI. The app has its own, on a card's page only.
+
+- **Our own drawing, not upstream's.** The web UI's effects are
+  pokemon-cards-css (GPL-3.0) with its textures, driven by a hand-made mask
+  and foil map per card, which upstream fetches from a design publisher on
+  its author's host after checking the art's fingerprint. None of that is
+  used or copied; the app is Unlicensed, and that CSS would not run in React
+  Native anyway. Upstream's code was read only for its behaviour: which
+  cards, which variant wins, how motion is calibrated, and when it stops.
+- **Which cards.** As upstream: a Holo or Reverse Holo copy, the reverse
+  winning when both are owned; Normal and First Edition get nothing, and
+  nor does a custom card or the owner's own photo. Upstream needs an owned
+  copy; the app also shimmers a card not owned when the catalogue lists only
+  foil printings (`defaultVariant` is Holo), so an Ultra Rare looks like one
+  in search.
+- **Five looks, not twenty.** Upstream's foil profile comes from each card's
+  design. Without designs the app picks from the variant and rarity:
+  `reverse` (fine stripes) for a reverse holo; for a holo copy `holo` (one
+  soft band, upstream's `swholo`/`cosmos`), `sparkle` (band and glitter, its
+  V, VMAX, VSTAR, full-art, radiant and shiny profiles), `rainbow` (its
+  rainbow, rainbow-alt and amazing) or `gold` (its secret-rare gold, which
+  Scarlet & Violet calls hyper rare). An unknown rarity gets plain holo.
+  `src/utils/holo.ts`.
+- **No new dependency, and no native build.** Skia and `expo-sensors` are
+  not installed. Reanimated, already in the build for expo-router, has
+  `useAnimatedSensor`, which reads Core Motion's gravity vector on the UI
+  thread; `react-native-svg`, already there for charts, draws the gradients.
+  Device motion needs no permission and no `Info.plist` key.
+- **Cheap per frame.** The layers are drawn once and only moved: each
+  reading updates a transform and an opacity on the UI thread, and React
+  does not render. The smooth bands are drawn at a quarter size (stripes at
+  half) and scaled up, so their bitmaps stay small on older phones. The card
+  also leans up to 6°.
+- **Calibration** follows the phone: "level" drifts towards how it is held,
+  over a couple of seconds, much as upstream recalibrates after a steady
+  hold, so reading on a table or lying down needs nothing.
+- **When it stops.** No effect, and no sensor, with Reduce Motion on, while
+  the card's screen is not focused, or while the app is not active
+  (`inactive` too: Control Centre, the app switcher). The sensor component
+  is mounted only while all hold; unmounting it unregisters Core Motion.
+- **The setting is upstream's,** per account, so it matches the web UI:
+  `GET`/`POST /api/settings/holo_effects_enabled`, a Settings → Cards switch.
+  Read once per launch for each account used, from Home with the startup
+  data, then never stale until the next launch; a card's page only reads the
+  cache, so it never costs a request, even if Home's read failed. Written
+  optimistically. Not `GET /api/settings/`, which is every setting, the
+  Telegram bot token among them.
+- **No fingerprint check.** `GET /api/images/card/{id}/fingerprint` lets the
+  web UI make sure a hand-made design matches the art under it. The app has
+  no per-card designs to misalign, and loads art from TCGdex directly, so the
+  hash of the proxy's copy would not even describe what is on screen, at a
+  request per card. Worth revisiting only if the app ever uses upstream's
+  designs.
+- **Colours are decoration,** like `border`: no contrast minimum. The
+  Settings switch's tracks are in the contrast test.
+- **Not tested on a phone here.** The looks were checked by rendering the
+  same gradients and blend modes in Chromium; on the phone, check the blend
+  over real art, the frame rate on the oldest iPhone to hand, and that the
+  sensor stops (Xcode's energy gauge) when the page is left.

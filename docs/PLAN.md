@@ -723,6 +723,14 @@ versioned. So:
 - [x] Editing decks (copies, cards, name; deleting), and finding wishlist
       cards on eBay, Cardmarket and TCGplayer
 - [x] Finding any card for sale from its page and from a look-up's result
+- [x] **A holo shimmer on a card's page,** as upstream 1.56.0's "Advanced
+      Holo effects": a band of light that moves as the phone tilts, over a
+      Holo or Reverse Holo card, in one of five looks by rarity. Our own
+      drawing (Reanimated's gravity sensor and react-native-svg, so
+      JavaScript only), not upstream's GPL CSS. Off with Reduce Motion, and
+      the sensor stops when the page or app is left. Switched by upstream's
+      per-account `holo_effects_enabled` in Settings, read once per launch.
+      See `DECISIONS.md`, "Holo shimmer".
 - Top movers
 - A "rip mode" that scans each card as it is flipped onto the table: batch
   mode with Auto on (§8) comes close; what is left is sending each photo as

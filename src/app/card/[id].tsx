@@ -24,6 +24,7 @@ import { CardBinders, CardDecks } from '@/components/card-lists';
 import { CardImage, frameForVariant } from '@/components/card-image';
 import { Chips } from '@/components/chips';
 import { FindForSale } from '@/components/find-for-sale';
+import { HoloArt } from '@/components/holo-art';
 import { Icon } from '@/components/icon';
 import { PriceHistory } from '@/components/price-history';
 import { PrintingDetailsPicker } from '@/components/printing-details-picker';
@@ -40,6 +41,7 @@ import {
   useCardPhoto,
   useCollection,
   useDeckContents,
+  useHoloEffectsSetting,
   useIsOnline,
   usePriceHistory,
   useSetQuantity,
@@ -54,6 +56,7 @@ import { radius, spacing, useColors } from '@/theme';
 import { binderKind, bindersOnly } from '@/utils/binders';
 import { CameraDeniedError, takeCardPhoto, type PhotoSource } from '@/utils/card-photo';
 import { entriesForCard } from '@/utils/collection';
+import { holoStyleFor } from '@/utils/holo';
 import { hasCatalogueImage } from '@/utils/images';
 import { pick } from '@/utils/pick';
 import { showToast } from '@/utils/toast';
@@ -78,6 +81,8 @@ export default function CardDetail() {
     ]),
   );
   const online = useIsOnline();
+  // From Home's startup read; a card's page never asks for it.
+  const holoEffects = useHoloEffectsSetting({ cachedOnly: true });
   const entries = entriesForCard(collection.data, id);
   const setRef = useSetRef(id, card.data?.set_id);
 
@@ -106,13 +111,27 @@ export default function CardDetail() {
               tintColor={colors.textSecondary}
             />
           }>
-          <CardImage
-            card={c}
-            size="large"
+          <HoloArt
+            // Official art only, as upstream: never the owner's own photo.
+            look={
+              !c.is_custom && (c.images_large || c.images_small)
+                ? holoStyleFor(
+                    c,
+                    entries.map((e) => e.variant),
+                  )
+                : null
+            }
+            enabled={holoEffects}
             style={styles.image}
-            frame={holo ? 'holo' : 'plain'}
-            photoItemId={entries.find((e) => e.has_scan_photo)?.id}
-          />
+            borderRadius={radius.md}>
+            <CardImage
+              card={c}
+              size="large"
+              style={styles.imageFrame}
+              frame={holo ? 'holo' : 'plain'}
+              photoItemId={entries.find((e) => e.has_scan_photo)?.id}
+            />
+          </HoloArt>
           {hasCatalogueImage(c) ? null : (
             <OwnPhoto cardId={c.id} entries={entries} disabled={!online} />
           )}
@@ -495,7 +514,8 @@ function AddToBinder({
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   content: { padding: spacing.lg, gap: spacing.lg },
-  image: { width: '65%', alignSelf: 'center', borderRadius: radius.md },
+  image: { width: '65%', alignSelf: 'center' },
+  imageFrame: { width: '100%', borderRadius: radius.md },
   heading: { gap: spacing.sm },
   photo: { gap: spacing.sm },
   photoNote: { textAlign: 'center' },

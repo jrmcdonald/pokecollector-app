@@ -1,4 +1,5 @@
 import type { PokeCollectorClient } from './client';
+import { NotFoundError } from './errors';
 import {
   AuthModeSchema,
   BinderCardsSchema,
@@ -24,9 +25,11 @@ import {
   ScanJobSchema,
   SearchResponseSchema,
   SetsSchema,
+  SettingSchema,
   UserSchema,
   WishlistItemSchema,
   WishlistSchema,
+  settingFlag,
   type AuthMode,
   type Binder,
   type BinderCards,
@@ -384,6 +387,43 @@ export function dismissScanItem(
 /** Drops a job and its photos, when a scan or a whole batch is abandoned. */
 export function deleteScanJob(client: PokeCollectorClient, jobId: number): Promise<unknown> {
   return client.request(`/api/cards/recognize/jobs/${jobId}`, { method: 'DELETE' });
+}
+
+/** The per-user setting that turns on holo effects, in the app and the web UI. */
+export const HOLO_EFFECTS_SETTING = 'holo_effects_enabled';
+
+/**
+ * Whether this account has holo effects on. Upstream 1.56.0 answers with its
+ * default, `"false"`, until the account sets it; before 1.56.0 the setting is
+ * unknown and the route is a 404 until the app has written it once. Missing
+ * means off.
+ */
+export async function getHoloEffectsSetting(client: PokeCollectorClient): Promise<boolean> {
+  try {
+    const setting = await client.request(`/api/settings/${HOLO_EFFECTS_SETTING}`, {
+      schema: SettingSchema,
+    });
+    return settingFlag(setting.value);
+  } catch (error) {
+    if (error instanceof NotFoundError) return false;
+    throw error;
+  }
+}
+
+/**
+ * Turns holo effects on or off for this account. Returns what upstream
+ * stored, which it coerces to `"true"` or `"false"`.
+ */
+export async function setHoloEffectsSetting(
+  client: PokeCollectorClient,
+  enabled: boolean,
+): Promise<boolean> {
+  const setting = await client.request(`/api/settings/${HOLO_EFFECTS_SETTING}`, {
+    method: 'POST',
+    json: { value: enabled ? 'true' : 'false' },
+    schema: SettingSchema,
+  });
+  return settingFlag(setting.value);
 }
 
 export function getPrintingDetailTags(client: PokeCollectorClient): Promise<PrintingDetailTag[]> {

@@ -13,6 +13,7 @@ import {
 import type { ProxyAuth } from '../proxy';
 import { UserSchema } from '../schemas';
 import { CREDENTIALS, fakeFetch, loginOk, type Call } from './fake-server';
+import { assigned, both, productLinked } from './removal-fixtures';
 
 const ME = { id: 1, username: 'ash', role: 'user', must_change_password: false };
 
@@ -299,6 +300,40 @@ describe('PokeCollectorClient', () => {
         const error = await conflict({ detail: { message, product_sources } });
         expect((error as Error).message).toBe(message);
       }
+    });
+
+    it('names the binders and decks holding a copy, from 1.57.0 on', async () => {
+      const error = await conflict(assigned);
+      expect(error).toBeInstanceOf(ConflictError);
+      expect((error as Error).message).toBe(
+        'Some selected cards are still assigned to binders or decks. Nothing was removed. ' +
+          'In Physical binder, Real deck.',
+      );
+      // The whole object stays on the error, for the release flow to read.
+      expect((error as ConflictError).detail).toEqual(assigned.detail);
+    });
+
+    it("keeps 1.57.0's product-link code and its product_sources", async () => {
+      const error = await conflict(productLinked);
+      expect((error as ConflictError).detail).toMatchObject({
+        code: 'collection_product_link_conflict',
+        changed: false,
+      });
+      expect((error as Error).message).toBe(
+        'A selected collection item is linked to a product. Sell or unlink it before removal. ' +
+          'Nothing was removed. Linked to Test product.',
+      );
+    });
+
+    it('names both lists and products when a copy has each', async () => {
+      expect(((await conflict(both)) as Error).message).toBe(
+        'Some selected cards are still assigned to binders or decks. Nothing was removed. ' +
+          'In Physical binder, Real deck. Linked to Test product.',
+      );
+    });
+
+    it('keeps no detail object for a string', async () => {
+      expect(((await conflict({ detail: message })) as ConflictError).detail).toBeUndefined();
     });
 
     it('still reads the string an older server sends', async () => {

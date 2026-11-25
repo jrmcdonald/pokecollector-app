@@ -568,6 +568,95 @@
         "title": "BulkCollectionAddResponse",
         "type": "object"
       },
+      "BulkProductUnlinkRequest": {
+        "properties": {
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/ConfirmedProductLink"
+            },
+            "maxItems": 5000,
+            "minItems": 1,
+            "title": "Links",
+            "type": "array"
+          }
+        },
+        "required": [
+          "links"
+        ],
+        "title": "BulkProductUnlinkRequest",
+        "type": "object"
+      },
+      "BulkProductUnlinkResponse": {
+        "properties": {
+          "unlinked_copies": {
+            "title": "Unlinked Copies",
+            "type": "integer"
+          },
+          "unlinked_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Unlinked Ids",
+            "type": "array"
+          },
+          "unlinked_links": {
+            "title": "Unlinked Links",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "unlinked_ids",
+          "unlinked_links",
+          "unlinked_copies"
+        ],
+        "title": "BulkProductUnlinkResponse",
+        "type": "object"
+      },
+      "BulkRemoveRequest": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "exclusiveMinimum": 0.0,
+              "type": "integer"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Item Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_ids"
+        ],
+        "title": "BulkRemoveRequest",
+        "type": "object"
+      },
+      "BulkRemoveResponse": {
+        "properties": {
+          "removed_copies": {
+            "title": "Removed Copies",
+            "type": "integer"
+          },
+          "removed_entries": {
+            "title": "Removed Entries",
+            "type": "integer"
+          },
+          "removed_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Removed Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "removed_ids",
+          "removed_entries",
+          "removed_copies"
+        ],
+        "title": "BulkRemoveResponse",
+        "type": "object"
+      },
       "CardBase": {
         "properties": {
           "abilities": {
@@ -970,6 +1059,17 @@
             ],
             "title": "Price Source Lang"
           },
+          "price_tcg_first_edition_market": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Tcg First Edition Market"
+          },
           "price_tcg_holo_low": {
             "anyOf": [
               {
@@ -1079,6 +1179,17 @@
               }
             ],
             "title": "Price Tcg Reverse Mid"
+          },
+          "price_tcg_usd_to_eur": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Tcg Usd To Eur"
           },
           "price_trend": {
             "anyOf": [
@@ -1215,6 +1326,11 @@
               }
             ],
             "title": "Tcg Card Id"
+          },
+          "tcgplayer_fallback_allowed": {
+            "default": false,
+            "title": "Tcgplayer Fallback Allowed",
+            "type": "boolean"
           },
           "trainer_type": {
             "anyOf": [
@@ -1833,6 +1949,17 @@
             ],
             "title": "Price Source Lang"
           },
+          "price_tcg_first_edition_market": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Tcg First Edition Market"
+          },
           "price_tcg_holo_low": {
             "anyOf": [
               {
@@ -1942,6 +2069,17 @@
               }
             ],
             "title": "Price Tcg Reverse Mid"
+          },
+          "price_tcg_usd_to_eur": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Tcg Usd To Eur"
           },
           "price_trend": {
             "anyOf": [
@@ -2088,6 +2226,11 @@
               }
             ],
             "title": "Tcg Card Id"
+          },
+          "tcgplayer_fallback_allowed": {
+            "default": false,
+            "title": "Tcgplayer Fallback Allowed",
+            "type": "boolean"
           },
           "trainer_type": {
             "anyOf": [
@@ -2430,12 +2573,59 @@
         "title": "CollectionItemUpdate",
         "type": "object"
       },
+      "CollectionOfflineManifestResponse": {
+        "properties": {
+          "image_urls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Image Urls",
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CollectionItemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "missing_artwork_card_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Artwork Card Ids",
+            "type": "array"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          },
+          "version": {
+            "default": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "items",
+          "image_urls",
+          "missing_artwork_card_ids"
+        ],
+        "title": "CollectionOfflineManifestResponse",
+        "type": "object"
+      },
       "CollectionProductSourceResponse": {
         "properties": {
           "active_quantity": {
             "default": 0,
             "title": "Active Quantity",
             "type": "integer"
+          },
+          "can_unlink": {
+            "default": false,
+            "title": "Can Unlink",
+            "type": "boolean"
           },
           "initial_quantity": {
             "default": 0,
@@ -2488,6 +2678,17 @@
               }
             ],
             "title": "Purchase Date"
+          },
+          "unlink_blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unlink Blocked Reason"
           }
         },
         "required": [
@@ -2507,6 +2708,71 @@
         ],
         "title": "CollectionVariant",
         "type": "string"
+      },
+      "ConfirmedAssignment": {
+        "properties": {
+          "assignment_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Assignment Id",
+            "type": "integer"
+          },
+          "item_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "list_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "List Id",
+            "type": "integer"
+          },
+          "quantity": {
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "assignment_id",
+          "list_id",
+          "item_id",
+          "quantity"
+        ],
+        "title": "ConfirmedAssignment",
+        "type": "object"
+      },
+      "ConfirmedProductLink": {
+        "properties": {
+          "active_quantity": {
+            "maximum": 999.0,
+            "minimum": 1.0,
+            "title": "Active Quantity",
+            "type": "integer"
+          },
+          "collection_item_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Collection Item Id",
+            "type": "integer"
+          },
+          "product_card_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Product Card Id",
+            "type": "integer"
+          },
+          "product_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Product Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_id",
+          "product_card_id",
+          "collection_item_id",
+          "active_quantity"
+        ],
+        "title": "ConfirmedProductLink",
+        "type": "object"
       },
       "CreateUserRequest": {
         "properties": {
@@ -5431,6 +5697,103 @@
         "title": "PublicWishlist",
         "type": "object"
       },
+      "PushKeys": {
+        "properties": {
+          "auth": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Auth",
+            "type": "string"
+          },
+          "p256dh": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "P256Dh",
+            "type": "string"
+          }
+        },
+        "required": [
+          "p256dh",
+          "auth"
+        ],
+        "title": "PushKeys",
+        "type": "object"
+      },
+      "PushSubscribeRequest": {
+        "properties": {
+          "endpoint": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "keys": {
+            "$ref": "#/components/schemas/PushKeys"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          }
+        },
+        "required": [
+          "endpoint",
+          "keys"
+        ],
+        "title": "PushSubscribeRequest",
+        "type": "object"
+      },
+      "PushUnsubscribeRequest": {
+        "properties": {
+          "endpoint": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Endpoint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint"
+        ],
+        "title": "PushUnsubscribeRequest",
+        "type": "object"
+      },
+      "ReleaseAssignmentsRequest": {
+        "properties": {
+          "assignments": {
+            "items": {
+              "$ref": "#/components/schemas/ConfirmedAssignment"
+            },
+            "maxItems": 5000,
+            "minItems": 1,
+            "title": "Assignments",
+            "type": "array"
+          },
+          "item_ids": {
+            "items": {
+              "exclusiveMinimum": 0.0,
+              "type": "integer"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Item Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_ids",
+          "assignments"
+        ],
+        "title": "ReleaseAssignmentsRequest",
+        "type": "object"
+      },
       "ResolveAndAddScanItemRequest": {
         "properties": {
           "card_id": {
@@ -5689,6 +6052,28 @@
             "default": 0,
             "title": "Total",
             "type": "integer"
+          },
+          "translated_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translated Name"
+          },
+          "translated_name_lang": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translated Name Lang"
           }
         },
         "required": [
@@ -6720,7 +7105,7 @@
   "info": {
     "description": "Complete Pokemon TCG collection management system",
     "title": "Pokemon TCG Collection API",
-    "version": "1.56.0"
+    "version": "1.59.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -7477,7 +7862,7 @@
     },
     "/api/backup/clear-image-cache": {
       "post": {
-        "description": "Clear the image cache directory (admin only).",
+        "description": "Delete the shared server image cache, not uploads or device downloads.",
         "operationId": "clear_image_cache_api_backup_clear_image_cache_post",
         "responses": {
           "200": {
@@ -8206,6 +8591,63 @@
         ]
       }
     },
+    "/api/binders/{binder_id}/entries/bulk-delete": {
+      "post": {
+        "operationId": "bulk_remove_binder_entries_api_binders__binder_id__entries_bulk_delete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "binder_id",
+            "required": true,
+            "schema": {
+              "title": "Binder Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkRemoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkRemoveResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Bulk Remove Binder Entries",
+        "tags": [
+          "binders"
+        ]
+      }
+    },
     "/api/binders/{binder_id}/entries/{binder_card_id}": {
       "delete": {
         "description": "Remove one exact binder entry.",
@@ -8803,6 +9245,276 @@
         "summary": "Add Binder Cards To Wishlist",
         "tags": [
           "binders"
+        ]
+      }
+    },
+    "/api/cards/artist-checklist": {
+      "get": {
+        "description": "Artist completion checklist grouped by card identity across printings.\n\nCards sharing a ``tcg_card_id`` (or the bare id for rows without one) are\none checklist entry. Ownership is aggregated across every visible printing\nunless a specific language narrows participation to that language's rows.",
+        "operationId": "artist_checklist_api_cards_artist_checklist_get",
+        "parameters": [
+          {
+            "description": "Artist name",
+            "in": "query",
+            "name": "artist",
+            "required": true,
+            "schema": {
+              "description": "Artist name",
+              "minLength": 1,
+              "title": "Artist",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "artist_match",
+            "required": false,
+            "schema": {
+              "default": "contains",
+              "title": "Artist Match",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language filter: supported TCGdex language code or 'all'",
+            "in": "query",
+            "name": "lang",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "all",
+              "description": "Language filter: supported TCGdex language code or 'all'",
+              "title": "Lang"
+            }
+          },
+          {
+            "description": "Ownership filter: 'owned' or 'missing'",
+            "in": "query",
+            "name": "ownership",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Ownership filter: 'owned' or 'missing'",
+              "title": "Ownership"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 60,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort_by",
+            "required": false,
+            "schema": {
+              "default": "number",
+              "title": "Sort By",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort_order",
+            "required": false,
+            "schema": {
+              "default": "asc",
+              "title": "Sort Order",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "price_field",
+            "required": false,
+            "schema": {
+              "default": "price_trend",
+              "title": "Price Field",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Artist Checklist",
+        "tags": [
+          "cards"
+        ]
+      }
+    },
+    "/api/cards/artists": {
+      "get": {
+        "description": "Artist index: per-artist completion across card identities.\n\nCard identities are grouped exactly like the artist checklist (``tcg_card_id``\nor the bare id), so the counts here match the checklist page. Catalogue rows\nare read as lightweight columns and aggregated in Python; no ORM entities are\nloaded.",
+        "operationId": "artists_index_api_cards_artists_get",
+        "parameters": [
+          {
+            "description": "Accent-insensitive artist name substring",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Accent-insensitive artist name substring",
+              "title": "Q"
+            }
+          },
+          {
+            "description": "Language filter: supported TCGdex language code or 'all'",
+            "in": "query",
+            "name": "lang",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "all",
+              "description": "Language filter: supported TCGdex language code or 'all'",
+              "title": "Lang"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort_by",
+            "required": false,
+            "schema": {
+              "default": "progress",
+              "title": "Sort By",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort_order",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "title": "Sort Order",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "price_field",
+            "required": false,
+            "schema": {
+              "default": "price_trend",
+              "title": "Price Field",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Artists Index",
+        "tags": [
+          "cards"
         ]
       }
     },
@@ -9660,7 +10372,7 @@
     },
     "/api/cards/search": {
       "get": {
-        "description": "Search cards from the local DB.\n\nSpecial patterns supported:\n- \"MEP 022\" or \"sv08 032\" \u2192 set abbreviation/id + card number search\n- q is the preferred free-text parameter; name remains a compatible alias\n- number uses the same leading-zero and alphanumeric matching as exact lookup\n- lang: supported TCGdex language code or \"all\" for all languages",
+        "description": "Search cards from the local DB.\n\nSpecial patterns supported:\n- \"MEP 022\" or \"sv08 032\" \u2192 set abbreviation/id + card number search\n- q is the preferred free-text parameter; name remains a compatible alias\n- number uses the same leading-zero and alphanumeric matching as exact lookup\n- lang: supported TCGdex language code or \"all\" for all languages\n- ownership: \"owned\" or \"missing\" filters on this user's collection",
         "operationId": "search_cards_api_cards_search_get",
         "parameters": [
           {
@@ -9960,6 +10672,24 @@
               "description": "Language filter: supported TCGdex language code or 'all'",
               "title": "Lang"
             }
+          },
+          {
+            "description": "Ownership filter: 'owned' or 'missing'",
+            "in": "query",
+            "name": "ownership",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Ownership filter: 'owned' or 'missing'",
+              "title": "Ownership"
+            }
           }
         ],
         "responses": {
@@ -10222,6 +10952,89 @@
         ]
       }
     },
+    "/api/cards/{card_id}/valuation": {
+      "get": {
+        "description": "Return the shared card value and its market/currency provenance.\n\nStored Cardmarket prices remain EUR; TCGplayer fallback values use the\nconversion saved during sync. Display conversion uses the existing rate\nservice. This read never runs a catalogue sync or exposes another owner's\nprivate custom cards.",
+        "operationId": "get_card_valuation_api_cards__card_id__valuation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "title": "Card Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "variant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CollectionVariant"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Variant"
+            }
+          },
+          {
+            "in": "query",
+            "name": "price_field",
+            "required": false,
+            "schema": {
+              "default": "price_trend",
+              "title": "Price Field",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "currency",
+            "required": false,
+            "schema": {
+              "default": "EUR",
+              "pattern": "^[A-Z]{3}$",
+              "title": "Currency",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Get Card Valuation",
+        "tags": [
+          "cards"
+        ]
+      }
+    },
     "/api/collection/": {
       "get": {
         "description": "Get all collection items.",
@@ -10407,6 +11220,52 @@
         ]
       }
     },
+    "/api/collection/bulk-delete": {
+      "post": {
+        "operationId": "bulk_remove_collection_items_api_collection_bulk_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkRemoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkRemoveResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Bulk Remove Collection Items",
+        "tags": [
+          "collection"
+        ]
+      }
+    },
     "/api/collection/import-csv": {
       "post": {
         "description": "Import collection rows from a strict CSV format.\n\nPreferred header, in this exact order:\nset_code,number,quantity,condition,variant,lang,purchase_price,printing_details\n\nThe legacy seven-column header remains accepted; it imports with no\nprinting-detail tags.",
@@ -10449,6 +11308,33 @@
           }
         ],
         "summary": "Import Collection Csv",
+        "tags": [
+          "collection"
+        ]
+      }
+    },
+    "/api/collection/offline-manifest": {
+      "get": {
+        "description": "Full owner-scoped snapshot and original artwork URLs for device downloads.\n\nNo ownership or private photo bytes are stored in HTTP caches. Artwork uses\nthe existing public image proxy; missing artwork is explicitly identified.\nThis read-only endpoint does not download anything onto the server or device.",
+        "operationId": "get_collection_offline_manifest_api_collection_offline_manifest_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionOfflineManifestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Get Collection Offline Manifest",
         "tags": [
           "collection"
         ]
@@ -10638,6 +11524,50 @@
         ]
       }
     },
+    "/api/collection/release-assignments": {
+      "post": {
+        "operationId": "release_collection_assignments_api_collection_release_assignments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseAssignmentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Release Collection Assignments",
+        "tags": [
+          "collection"
+        ]
+      }
+    },
     "/api/collection/stats/summary": {
       "get": {
         "description": "Get collection statistics.",
@@ -10741,7 +11671,6 @@
     },
     "/api/collection/{item_id}": {
       "delete": {
-        "description": "Remove a card from collection.",
         "operationId": "remove_from_collection_api_collection__item_id__delete",
         "parameters": [
           {
@@ -11577,6 +12506,63 @@
           }
         ],
         "summary": "Add Deck Entry",
+        "tags": [
+          "decks"
+        ]
+      }
+    },
+    "/api/decks/{deck_id}/entries/bulk-delete": {
+      "post": {
+        "operationId": "bulk_remove_deck_entries_api_decks__deck_id__entries_bulk_delete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "title": "Deck Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkRemoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkRemoveResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Bulk Remove Deck Entries",
         "tags": [
           "decks"
         ]
@@ -12535,6 +13521,52 @@
         ]
       }
     },
+    "/api/products/cards/bulk-unlink": {
+      "post": {
+        "operationId": "bulk_unlink_product_cards_api_products_cards_bulk_unlink_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkProductUnlinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkProductUnlinkResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Bulk Unlink Product Cards",
+        "tags": [
+          "products"
+        ]
+      }
+    },
     "/api/products/lifecycle/bulk": {
       "put": {
         "description": "Classify ambiguous legacy products transactionally.",
@@ -12982,6 +14014,45 @@
               "description": "Cardmarket price field for linked-card valuation",
               "title": "Price Field",
               "type": "string"
+            }
+          },
+          {
+            "description": "Confirmed collection entry; pair with expected_active_quantity",
+            "in": "query",
+            "name": "expected_collection_item_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Confirmed collection entry; pair with expected_active_quantity",
+              "title": "Expected Collection Item Id"
+            }
+          },
+          {
+            "description": "Confirmed active copies; a changed link returns 409",
+            "in": "query",
+            "name": "expected_active_quantity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 999,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Confirmed active copies; a changed link returns 409",
+              "title": "Expected Active Quantity"
             }
           }
         ],
@@ -13653,6 +14724,135 @@
         ]
       }
     },
+    "/api/push/subscribe": {
+      "delete": {
+        "operationId": "unsubscribe_api_push_subscribe_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushUnsubscribeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Unsubscribe",
+        "tags": [
+          "push"
+        ]
+      },
+      "post": {
+        "operationId": "subscribe_api_push_subscribe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSubscribeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Subscribe",
+        "tags": [
+          "push"
+        ]
+      }
+    },
+    "/api/push/test": {
+      "post": {
+        "operationId": "send_test_notification_api_push_test_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Send Test Notification",
+        "tags": [
+          "push"
+        ]
+      }
+    },
+    "/api/push/vapid-public-key": {
+      "get": {
+        "operationId": "get_vapid_public_key_api_push_vapid_public_key_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Get Vapid Public Key",
+        "tags": [
+          "push"
+        ]
+      }
+    },
     "/api/sets/": {
       "get": {
         "description": "Get all sets, optionally refresh from TCGdex API.\n\nlang: filter by set language code or 'all'.\nSets are stored separately per language, with no 'both' entries.",
@@ -13666,6 +14866,22 @@
               "default": false,
               "title": "Refresh",
               "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "name_lang",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name Lang"
             }
           },
           {

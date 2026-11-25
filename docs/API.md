@@ -6,9 +6,12 @@ pinned upstream version, in `openapi/`, from which `src/api/generated.ts` is
 generated. This file records what the app relies on and anything the spec does
 not say.
 
-Pinned upstream version: **1.56.0** (match `ha-addons/pokecollector/Dockerfile`).
-The addon may still run 1.55.1 until its Dockerfile moves; everything the app
-uses works there too, and the one 1.56.0 setting it reads is off when missing.
+Pinned upstream version: **1.59.0** (match `ha-addons/pokecollector/Dockerfile`).
+The addon's Dockerfile pins **1.59.0** too (backend and frontend images, by
+tag and digest), so the app is typed against what runs. A server can still be
+older, between an addon update and its restart or on someone else's install,
+so every feature from after 1.56.0 hides itself, or does without, on an
+older server: see each endpoint's notes.
 
 ## Every request
 
@@ -59,7 +62,7 @@ decides, because it needs no login. See `PLAN.md` §2.0.
 | `GET /api/cards/search?q=&page=&page_size=&set_id=&rarity=&category=&type=` | JWT                | Search                                                              | `{ data, total_count, page, page_size }`. Each result carries `owned`, `owned_quantity` and `wishlisted`, so the owned badge costs no extra requests. Each filter is a case- and accent-insensitive substring in the catalogue's language: `category` matches `supertype` (`Pokemon`, `Trainer`, `Energy`), `type` the JSON of `types`, and `rarity` also finds longer rarities (`Rare` finds `Ultra Rare`), so the app keeps exact matches only. With no `q`, the filters alone search. A `q` like `PFL 001` ignores the filters. `sort_by` exists but is not used: it has no newest, sorts numbers as text, and on Postgres a descending price puts unpriced cards first |
 | `POST /api/collection/`                                                     | JWT                | Add copies                                                          | `{ card_id, quantity, variant, condition }`. Merges into an existing entry with the same card, variant, condition and language                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `PUT /api/collection/{id}`                                                  | JWT                | Quantity stepper                                                    | Quantity must be 1–999                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `DELETE /api/collection/{id}`                                               | JWT                | Quantity to 0                                                       | Confirmed first                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `DELETE /api/collection/{id}`                                               | JWT                | Quantity to 0                                                       | Confirmed first. 409 for a copy in a binder, a Real Deck or a product; see "Removing a collection copy" below                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `POST /api/wishlist/`                                                       | JWT                | Add to wishlist                                                     | Adds to the quantity if already wishlisted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `GET /api/wishlist/`                                                        | JWT                | Wishlist                                                            | Each entry embeds its `card` with `set_ref`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `DELETE /api/wishlist/{id}`                                                 | JWT                | Wishlist, swipe to remove                                           | Optimistic                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -168,8 +171,73 @@ attempts. Try again in 1 minute." }`. Behind the tunnel all external clients
   printing details or purchase price; deleting it) is
   `{ "detail": { code: "collection_product_link_conflict", message, product_sources } }`,
   each source `{ product_card_id, product_id, product_name, product_type,
-purchase_date, active_quantity, initial_quantity, linked_at }`. The client
-  shows `message` and names the products; older servers send the string.
+purchase_date, active_quantity, initial_quantity, linked_at }`, and since
+  1.57.0 also `can_unlink` and `unlink_blocked_reason`
+  (`"sale_or_trade_history"`). The client shows `message` and names the
+  products; older servers send the string. Whatever its shape, the client
+  keeps an object `detail` on the error (`ApiError.detail`) for the screen
+  that needs more than the message.
+- **Removing a collection copy that is in a binder or deck (1.57.0).**
+  `DELETE /api/collection/{id}` now runs upstream's bulk removal for one id,
+  so a copy assigned to a collection binder or a Real Deck is a 409 whose
+  `detail` is an object, where before 1.57.0 it was the string "This
+  collection item has N copies allocated to Card Lists. Release … first.":
+
+  ```json
+  {
+    "code": "collection_assignment_conflict",
+    "message": "Some selected cards are still assigned to binders or decks. Nothing was removed.",
+    "changed": false,
+    "blockers": [
+      { "code": "assigned_to_lists", "action": "release_assignments",
+        "resource": "collection_item", "item_id": 1, "card_id": "sv1-025_en",
+        "name": "Pikachu", "variant": "Normal", "condition": "NM", "lang": "en",
+        "assignments": [{ "assignment_id": 1, "list_id": 4, "item_id": 1,
+                          "quantity": 1, "list_name": "Trade binder",
+                          "list_type": "collection" }] },
+      { "code": "linked_to_products", "action": "unlink_products", "products": [ … ], … }
+    ],
+    "conflicts": [{ "item_id": 1, "card_id": "…", "name": "…", "variant": "…",
+                    "condition": "…", "lang": "…", "quantity": 3,
+                    "assignments": [ … ], "products": [ … ] }],
+    "product_sources": [ … ],
+    "resolutions": [
+      { "method": "POST", "path": "/api/collection/release-assignments",
+        "requires_confirmation": true,
+        "body": { "item_ids": [1], "assignments": [{ "assignment_id": 1, "list_id": 4,
+                                                     "item_id": 1, "quantity": 1 }] } },
+      { "method": "POST", "path": "/api/products/cards/bulk-unlink",
+        "requires_confirmation": true, "can_execute": true, "blocked_by_history": [],
+        "body": { "links": [{ "product_id": 2, "product_card_id": 7,
+                              "collection_item_id": 1, "active_quantity": 1 }] } }
+    ]
+  }
+  ```
+
+  `list_type` is `collection` or `physical_deck`; planned binders and decks
+  never block. The code is `collection_assignment_conflict` whenever any
+  copy is assigned; with only product links it stays
+  `collection_product_link_conflict`, in the same envelope, `product_sources`
+  included. Nothing is removed in either case. The client shows `message`
+  and names the binders and decks ("In Trade binder, Charizard deck."), then
+  the products. A missing or foreign id is a 404 in the same envelope, code
+  `collection_entries_unavailable`.
+
+- **Card prices from TCGplayer (1.58.4).** Cards (`CardBase`, `CardWithSet`,
+  and the untyped `GET /api/sets/{id}/checklist` rows) carry, besides the
+  `price_tcg_{normal,holo,reverse}_{low,mid,market,high}` they already had,
+  `price_tcg_first_edition_market`, `price_tcg_usd_to_eur` (the USD→EUR rate
+  upstream converted with when it synced the card; TCGplayer prices are in
+  dollars) and `tcgplayer_fallback_allowed` (default `false`: whether a `de`
+  card may be valued from TCGplayer). Upstream values a card from TCGplayer
+  only when Cardmarket has nothing (`services/card_values.py`,
+  `effective_price_quote`). All optional, so an older server's cards simply
+  have none. The app does not use them yet.
+- **Translated set names (1.59.0).** `SetBase` in `GET /api/sets/` carries
+  `translated_name` and `translated_name_lang`: the set's name in the
+  account's display language (or `?name_lang=`), only when exactly one set in
+  that language has the same TCGdex id. Null otherwise, and absent before
+  1.59.0. The app does not show it yet.
 - **401** on any authenticated route means the JWT is missing, expired or
   signed with a key the backend no longer has. The client logs in again once.
 - **Card images.** `images_small` and `images_large` on a card are full

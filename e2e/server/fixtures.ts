@@ -97,7 +97,15 @@ type CardInfo = {
   reverse?: boolean;
   /** No catalogue picture, as TCGdex has none for some promos. */
   noImage?: boolean;
+  /**
+   * TCGplayer's market price in dollars, for a card Cardmarket has none for:
+   * upstream 1.58.4 values it from this, converted at `USD_TO_EUR`.
+   */
+  tcgplayer?: number;
 };
+
+/** The rate upstream saves with a card's TCGplayer prices. */
+const USD_TO_EUR = 0.9;
 
 /** The 151 subset is small on purpose, so its checklist is short and complete. */
 const KANTO = [
@@ -146,6 +154,7 @@ const CARD_INFO: CardInfo[] = [
     rarity: 'Promo',
     price: 0,
     noImage: true,
+    tcgplayer: 9.5,
   },
   { set: 'sv2', number: '231', name: 'Iono', rarity: 'Special Illustration Rare', price: 71.2 },
   {
@@ -196,6 +205,10 @@ export function buildFixtures(origin: string) {
     variants_holo: !!c.holo,
     variants_reverse: !!c.reverse,
     variants_first_edition: false,
+    lang: 'en',
+    ...(c.tcgplayer
+      ? { price_tcg_normal_market: c.tcgplayer, price_tcg_usd_to_eur: USD_TO_EUR }
+      : {}),
   }));
 
   const card = (id: string): Card => {

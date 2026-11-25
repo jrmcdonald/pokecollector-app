@@ -17,7 +17,7 @@ import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { minTapTarget, spacing, useColors } from '@/theme';
 import { marketplaces } from '@/utils/marketplaces';
 import { pick } from '@/utils/pick';
-import { cardValue, formatPrice, formatTotal } from '@/utils/pricing';
+import { formatQuote, formatTotal, priceQuote, spokenQuote } from '@/utils/pricing';
 import { wishlistCost } from '@/utils/wishlist';
 import {
   loadWishlistLayout,
@@ -184,12 +184,13 @@ function useWishlistActions(item: WishlistItem) {
  */
 function WishlistTile({ item, layout }: { item: WishlistItem; layout: 'tile' | 'row' }) {
   const { card, actions } = useWishlistActions(item);
-  const price = cardValue(item.card);
+  const quote = priceQuote(item.card);
   return (
     <CardTile
       layout={layout}
       card={card}
-      detail={price > 0 ? formatPrice(price) : 'No price'}
+      detail={quote.amount > 0 ? formatQuote(quote) : 'No price'}
+      detailLabel={quote.amount > 0 ? spokenQuote(quote) : 'No price'}
       // The tile's ×N badge, as on the collection; one wanted is the usual case.
       quantity={item.quantity > 1 ? item.quantity : 0}
       quantityNoun="wanted"
@@ -208,7 +209,8 @@ function WishlistRow({ item }: { item: WishlistItem }) {
   const colors = useColors();
   const { card, online, remove, actions } = useWishlistActions(item);
   const set = item.card?.set_ref?.name;
-  const price = cardValue(item.card);
+  const quote = priceQuote(item.card);
+  const price = quote.amount;
 
   async function offerActions() {
     const index = await pick(
@@ -234,7 +236,7 @@ function WishlistRow({ item }: { item: WishlistItem }) {
       onSwipeableOpen={remove}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${card.name}, ${price > 0 ? formatPrice(price) : 'no price yet'}${item.quantity > 1 ? `, ${item.quantity} wanted` : ''}`}
+        accessibilityLabel={`${card.name}, ${price > 0 ? spokenQuote(quote) : 'no price yet'}${item.quantity > 1 ? `, ${item.quantity} wanted` : ''}`}
         accessibilityActions={actions.map(({ name, label }) => ({
           name,
           label: name === 'delete' ? 'Remove' : label,
@@ -260,7 +262,7 @@ function WishlistRow({ item }: { item: WishlistItem }) {
         </View>
         <View style={styles.right}>
           <ThemedText variant="figureSmall" color={price > 0 ? 'text' : 'textSecondary'}>
-            {price > 0 ? formatPrice(price) : 'No price'}
+            {price > 0 ? formatQuote(quote) : 'No price'}
           </ThemedText>
           {item.quantity > 1 ? (
             <ThemedText variant="figureSmall" color="textSecondary">

@@ -108,8 +108,16 @@ decides, because it needs no login. See `PLAN.md` §2.0.
   both as plain strings so a new value from upstream cannot hide an entry.
 - **Prices** are Cardmarket's, in euros. A card's value for a variant is the
   trend price, then market; a Reverse Holo tries the `*_holo` (reverse
-  listing) prices first. Zero means no price. Mirrors upstream's
-  `services/card_values.py`, so totals agree with the web UI.
+  listing) prices first. Zero means no price. Since 1.58.4, a card with no
+  Cardmarket price falls back to TCGplayer: for an `en` card (or a `de` one
+  with `tcgplayer_fallback_allowed`), the variant's `price_tcg_*_market`
+  (Normal → `normal`, Holo → `holo`, Reverse Holo → `reverse`, First
+  Edition → `first_edition`; with no variant, Holo for a card printed holo
+  and never normal, else Normal) times `price_tcg_usd_to_eur`, when both are
+  finite and above zero. Mirrors upstream's `services/card_values.py`
+  (`effective_price_quote`) in `src/utils/pricing.ts`, so totals agree with
+  the web UI. The app never calls `GET /api/cards/{id}/valuation`, which
+  answers the same per card, a request each.
 
 - **Scan candidates** (`matches`) carry `id` (`sv1-025_en`), `tcg_card_id`
   (`sv1-025`), `name`, `number`, `rarity`, `set_abbreviation`, `lang`, and
@@ -232,7 +240,9 @@ purchase_date, active_quantity, initial_quantity, linked_at }`, and since
   card may be valued from TCGplayer). Upstream values a card from TCGplayer
   only when Cardmarket has nothing (`services/card_values.py`,
   `effective_price_quote`). All optional, so an older server's cards simply
-  have none. The app does not use them yet.
+  have none, and are valued from Cardmarket alone. The app reads them
+  leniently: a value that is not a number is no price, never a card that
+  fails to load.
 - **Translated set names (1.59.0).** `SetBase` in `GET /api/sets/` carries
   `translated_name` and `translated_name_lang`: the set's name in the
   account's display language (or `?name_lang=`), only when exactly one set in

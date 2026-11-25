@@ -60,7 +60,7 @@ import { holoStyleFor } from '@/utils/holo';
 import { hasCatalogueImage } from '@/utils/images';
 import { pick } from '@/utils/pick';
 import { showToast } from '@/utils/toast';
-import { cardValue, formatPrice } from '@/utils/pricing';
+import { formatPrice, formatQuote, priceQuote, quoteSource, spokenQuote } from '@/utils/pricing';
 import { defaultVariant } from '@/utils/variants';
 
 export default function CardDetail() {
@@ -275,18 +275,31 @@ function Prices({ card }: { card: Card }) {
   if (card.variants_reverse || card.price_trend_holo) {
     rows.push(['Reverse', card.price_trend_holo]);
   }
+  // Upstream 1.58.4: with nothing from Cardmarket, TCGplayer's price for the
+  // card's usual printing, converted, as the web UI shows it.
+  const quote = priceQuote(card);
+  const estimate = quote.source === 'tcgplayer' ? quote : null;
   return (
     <ThemedView background="surface" style={[styles.panel, { borderColor: colors.border }]}>
       <View
         style={styles.trend}
         accessible
-        accessibilityLabel={`Trend price: ${formatPrice(card.price_trend)}`}>
+        accessibilityLabel={
+          estimate
+            ? `Estimated price: ${spokenQuote(estimate)}`
+            : `Trend price: ${formatPrice(card.price_trend)}`
+        }>
         <ThemedText variant="overline" color="textSecondary">
-          Trend
+          {estimate ? 'Estimate' : 'Trend'}
         </ThemedText>
         <ThemedText variant="figure" style={styles.trendValue}>
-          {formatPrice(card.price_trend)}
+          {estimate ? formatQuote(estimate) : formatPrice(card.price_trend)}
         </ThemedText>
+        {estimate ? (
+          <ThemedText variant="caption" color="textSecondary">
+            {quoteSource(estimate)}
+          </ThemedText>
+        ) : null}
       </View>
       <View style={[styles.priceTiles, largeText && styles.stacked]}>
         {rows.map(([label, value]) => (
@@ -306,7 +319,9 @@ function Prices({ card }: { card: Card }) {
         ))}
       </View>
       <ThemedText variant="caption" color="textSecondary">
-        Cardmarket, in euros.
+        {estimate
+          ? 'Cardmarket has no price for this card, so it is valued from TCGplayer’s English market, in dollars converted to euros.'
+          : 'Cardmarket, in euros.'}
       </ThemedText>
     </ThemedView>
   );
@@ -344,6 +359,8 @@ function Owned({ entries, disabled }: { entries: CollectionItem[]; disabled: boo
       {entries.map((item) => {
         const details = (item.printing_details ?? []).map((d) => d.name);
         const open = editing === item.id;
+        const quote = priceQuote(item.card, item.variant);
+        const source = quoteSource(quote);
         return (
           <View key={item.id} style={styles.entry}>
             <View style={styles.ownedRow}>
@@ -361,9 +378,13 @@ function Owned({ entries, disabled }: { entries: CollectionItem[]; disabled: boo
                   <Icon name={open ? 'chevron.up' : 'pencil'} size={13} color="accent" />
                 </View>
                 <ThemedText variant="caption" color="textSecondary">
-                  {[item.condition, ...details].join(' · ')} ·{' '}
-                  {formatPrice(cardValue(item.card, item.variant))} each
+                  {[item.condition, ...details].join(' · ')} · {formatQuote(quote)} each
                 </ThemedText>
+                {source ? (
+                  <ThemedText variant="caption" color="textSecondary">
+                    {source}
+                  </ThemedText>
+                ) : null}
               </Pressable>
               <QuantityStepper
                 label={`${item.variant ?? 'Normal'} ${item.condition}`}

@@ -12,6 +12,8 @@ type Props = {
   card: CardImageFields & { name: string };
   /** The line under the name: a price, a set, a variant. */
   detail?: string;
+  /** What VoiceOver reads for `detail`, when that is not the same words. */
+  detailLabel?: string;
   /** How many are owned. Shown as a badge from two up: one is the normal case. */
   quantity?: number;
   /** What `quantity` counts, for VoiceOver: "owned", or "wanted" on the wishlist. */
@@ -40,6 +42,7 @@ export type TileAction = { name: string; label: string; destructive?: boolean; o
 export function CardTile({
   card,
   detail,
+  detailLabel = detail,
   quantity = 0,
   quantityNoun = 'owned',
   missing = false,
@@ -50,7 +53,7 @@ export function CardTile({
 }: Props) {
   const colors = useColors();
   const href = { pathname: '/card/[id]', params: { id: card.id } } as const;
-  const label = `${card.name}${quantity > 0 ? `, ${quantity} ${quantityNoun}` : missing ? ', missing' : ''}${detail ? `, ${detail}` : ''}`;
+  const label = `${card.name}${quantity > 0 ? `, ${quantity} ${quantityNoun}` : missing ? ', missing' : ''}${detailLabel ? `, ${detailLabel}` : ''}`;
 
   async function showActions() {
     const index = await pick(

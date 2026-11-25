@@ -31,7 +31,7 @@ import {
   type FilterOption,
 } from '@/utils/collection';
 import { pick } from '@/utils/pick';
-import { cardValue, formatPrice } from '@/utils/pricing';
+import { formatQuote, priceQuote, spokenQuote } from '@/utils/pricing';
 
 const SORTS = Object.keys(SORT_LABELS) as CollectionSort[];
 
@@ -229,7 +229,8 @@ export default function Collection() {
               <CardTile
                 layout={columns === 1 ? 'row' : 'tile'}
                 card={item.card ?? { id: item.card_id, name: item.card_id }}
-                detail={formatPrice(cardValue(item.card, item.variant))}
+                detail={formatQuote(priceQuote(item.card, item.variant))}
+                detailLabel={spokenQuote(priceQuote(item.card, item.variant))}
                 quantity={item.quantity}
                 variant={item.variant}
                 photoItemId={item.has_scan_photo ? item.id : null}
@@ -270,13 +271,13 @@ export default function Collection() {
 
 function CollectionRow({ item }: { item: CollectionItem }) {
   const card = item.card ?? { id: item.card_id, name: item.card_id };
-  const value = cardValue(item.card, item.variant);
+  const quote = priceQuote(item.card, item.variant);
   const where = [setNameOf(item), item.card?.number].filter(Boolean).join(' · ');
   const what = [item.variant ?? 'Normal', item.condition].join(' · ');
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${card.name}, ${where}, ${what}, ${item.quantity} owned, ${formatPrice(value * item.quantity)}`}
+      accessibilityLabel={`${card.name}, ${where}, ${what}, ${item.quantity} owned, ${spokenQuote(quote, item.quantity)}`}
       onPress={() => router.push({ pathname: '/card/[id]', params: { id: item.card_id } })}
       style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}>
       <CardImage
@@ -300,7 +301,7 @@ function CollectionRow({ item }: { item: CollectionItem }) {
       <View style={styles.rowRight}>
         {item.quantity > 1 ? <ThemedText variant="figureSmall">×{item.quantity}</ThemedText> : null}
         <ThemedText variant="figureSmall" color="textSecondary">
-          {formatPrice(value * item.quantity)}
+          {formatQuote(quote, item.quantity)}
         </ThemedText>
       </View>
     </Pressable>

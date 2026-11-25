@@ -1353,3 +1353,37 @@ unlinks, the artist checklist and directory) and some the app leaves alone.
   taking up with display languages).
 - **Not 1.60.0.** Upstream has released it, but the addon pins 1.59.0, and
   the app is typed against what the addon runs.
+
+## 2026-11-25 — TCGplayer prices when Cardmarket has none
+
+Upstream 1.58.4 (Git-Romer/pokecollector#476) values a card from
+TCGplayer's market price when Cardmarket has none, so the web UI's totals
+moved and the app's did not.
+
+- **The same rule, in the app's own code.** `priceQuote` in
+  `src/utils/pricing.ts` is upstream's `effective_price_quote` at 1.59.0:
+  Cardmarket first, unchanged; then, for an English card, or a German one
+  the server allows, the matching variant's dollar price times the rate
+  upstream saved with it. No borrowing between editions or finishes, and no
+  rate means no price, never dollars read as euros. Upstream's
+  `TcgplayerValuationTests` are ported case for case
+  (`src/utils/__tests__/pricing.test.ts`). `cardValue` now returns its
+  amount, so every total the app sums (collection, wishlist, sorting by
+  value) moved with it.
+- **Not `GET /api/cards/{id}/valuation`.** It answers the same question with
+  a request per card, which a grid of cards cannot afford.
+- **Labelled wherever it shows.** A TCGplayer price is an English-market
+  estimate, not a Cardmarket price. Where there is room (a card's page, its
+  owned copies, a scan look-up) it says "TCGplayer, converted from $4.00";
+  on a tile or a row, which have no room, it reads "≈€3.60". VoiceOver hears
+  "€3.60, a TCGplayer estimate converted from $4.00" rather than "almost
+  equal to". The web UI's equivalent is FallbackBadges' amber
+  "Price TCGplayer (EN)"; amber is the app's accent and action colour, so
+  the app uses words, not a colour.
+- **On an older server nothing changes.** The fields are absent and read as
+  no price. They are read leniently, since a card failing to parse over a
+  fallback price would hide it.
+- **The persisted cache's buster stays.** A cached card simply lacks the new
+  fields until it is fetched again.
+- **The set checklist** now prices with the same rule. It used
+  `price_trend ?? price_market`, which let a zero trend hide a market price.

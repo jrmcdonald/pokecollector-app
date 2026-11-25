@@ -15,7 +15,7 @@ import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useCardColumns } from '@/hooks/use-large-text';
 import { spacing, useColors } from '@/theme';
 import { pick } from '@/utils/pick';
-import { formatPrice } from '@/utils/pricing';
+import { formatQuote, priceQuote, spokenQuote } from '@/utils/pricing';
 import { rarityLabel } from '@/utils/search-filters';
 import {
   checklistRarities,
@@ -139,9 +139,10 @@ export default function SetChecklist() {
               <CardTile
                 layout={columns === 1 ? 'row' : 'tile'}
                 card={card}
-                detail={[card.number, formatPrice(card.price_trend ?? card.price_market)]
+                detail={[card.number, formatQuote(priceQuote(card))].filter(Boolean).join(' · ')}
+                detailLabel={[card.number, spokenQuote(priceQuote(card))]
                   .filter(Boolean)
-                  .join(' · ')}
+                  .join(', ')}
                 quantity={card.owned_quantity ?? 0}
                 missing={!isOwned(card)}
               />

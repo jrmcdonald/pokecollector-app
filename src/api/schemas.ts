@@ -42,6 +42,12 @@ export type AuthMode = z.infer<typeof AuthModeSchema>;
 
 const price = z.number().nullish();
 
+/** A number, or null for anything else: for fields the app can do without. */
+const lenientPrice = z
+  .unknown()
+  .transform((value) => (typeof value === 'number' && Number.isFinite(value) ? value : null))
+  .optional();
+
 export const SetRefSchema = z.looseObject({
   id: z.string(),
   name: z.string(),
@@ -81,6 +87,24 @@ export const CardSchema = z.looseObject({
   variants_reverse: z.boolean().nullish(),
   variants_holo: z.boolean().nullish(),
   variants_first_edition: z.boolean().nullish(),
+  /** The catalogue language, `en`, `de`, …; decides whether TCGplayer may value it. */
+  lang: z.string().nullish(),
+  /**
+   * TCGplayer's market prices in dollars, and the USD→EUR rate upstream
+   * saved with them (1.58.4). Only a fallback for a card Cardmarket has no
+   * price for; see `priceQuote`. Read leniently: a value that is not a
+   * number is no price, never a card that fails to load.
+   */
+  price_tcg_normal_market: lenientPrice,
+  price_tcg_holo_market: lenientPrice,
+  price_tcg_reverse_market: lenientPrice,
+  price_tcg_first_edition_market: lenientPrice,
+  price_tcg_usd_to_eur: lenientPrice,
+  /** Whether a `de` card may be valued from TCGplayer: the server's setting. */
+  tcgplayer_fallback_allowed: z
+    .unknown()
+    .transform((value) => value === true)
+    .optional(),
   /**
    * TCGdex's Cardmarket product ids, each `{ product_id, variant, foil }`.
    * Unchecked rows: `cardmarketUrl` reads what it can and skips the rest.

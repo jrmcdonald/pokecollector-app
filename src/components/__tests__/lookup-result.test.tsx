@@ -91,6 +91,25 @@ describe('LookupResult', () => {
     expect(screen.getByLabelText('You own: 2 (Normal NM)')).toBeOnTheScreen();
   });
 
+  it('labels a TCGplayer estimate when Cardmarket has no price (1.58.4)', async () => {
+    queryClient.setQueryData(['acct', 'card', 'sv1-025_en'], {
+      id: 'sv1-025_en',
+      name: 'Pikachu',
+      lang: 'en',
+      price_tcg_normal_market: 4,
+      price_tcg_usd_to_eur: 0.9,
+    } satisfies Card);
+    queryClient.setQueryData(['acct', 'collection'], []);
+    await renderResult();
+    expect(
+      await screen.findByLabelText(
+        'Estimated price: €3.60, a TCGplayer estimate converted from $4.00',
+      ),
+    ).toBeOnTheScreen();
+    expect(screen.getByText('≈€3.60')).toBeOnTheScreen();
+    expect(screen.getByText('TCGplayer, converted from $4.00')).toBeOnTheScreen();
+  });
+
   it('says when the card is not owned', async () => {
     queryClient.setQueryData(['acct', 'card', 'sv1-025_en'], card);
     queryClient.setQueryData(['acct', 'collection'], []);

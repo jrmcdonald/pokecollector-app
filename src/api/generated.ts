@@ -291,7 +291,7 @@ export interface paths {
     put?: never;
     /**
      * Clear Image Cache
-     * @description Clear the image cache directory (admin only).
+     * @description Delete the shared server image cache, not uploads or device downloads.
      */
     post: operations['clear_image_cache_api_backup_clear_image_cache_post'];
     delete?: never;
@@ -540,6 +540,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/binders/{binder_id}/entries/bulk-delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Bulk Remove Binder Entries */
+    post: operations['bulk_remove_binder_entries_api_binders__binder_id__entries_bulk_delete_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/binders/{binder_id}/entries/{binder_card_id}': {
     parameters: {
       query?: never;
@@ -702,6 +719,55 @@ export interface paths {
      * @description Add only missing cards from a planned binder or deck to the global wishlist.
      */
     post: operations['add_binder_cards_to_wishlist_api_binders__binder_id__wishlist_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cards/artist-checklist': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Artist Checklist
+     * @description Artist completion checklist grouped by card identity across printings.
+     *
+     *     Cards sharing a ``tcg_card_id`` (or the bare id for rows without one) are
+     *     one checklist entry. Ownership is aggregated across every visible printing
+     *     unless a specific language narrows participation to that language's rows.
+     */
+    get: operations['artist_checklist_api_cards_artist_checklist_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cards/artists': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Artists Index
+     * @description Artist index: per-artist completion across card identities.
+     *
+     *     Card identities are grouped exactly like the artist checklist (``tcg_card_id``
+     *     or the bare id), so the counts here match the checklist page. Catalogue rows
+     *     are read as lightweight columns and aggregated in Python; no ORM entities are
+     *     loaded.
+     */
+    get: operations['artists_index_api_cards_artists_get'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1031,6 +1097,7 @@ export interface paths {
      *     - q is the preferred free-text parameter; name remains a compatible alias
      *     - number uses the same leading-zero and alphanumeric matching as exact lookup
      *     - lang: supported TCGdex language code or "all" for all languages
+     *     - ownership: "owned" or "missing" filters on this user's collection
      */
     get: operations['search_cards_api_cards_search_get'];
     put?: never;
@@ -1131,6 +1198,31 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/cards/{card_id}/valuation': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Card Valuation
+     * @description Return the shared card value and its market/currency provenance.
+     *
+     *     Stored Cardmarket prices remain EUR; TCGplayer fallback values use the
+     *     conversion saved during sync. Display conversion uses the existing rate
+     *     service. This read never runs a catalogue sync or exposes another owner's
+     *     private custom cards.
+     */
+    get: operations['get_card_valuation_api_cards__card_id__valuation_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/collection/': {
     parameters: {
       query?: never;
@@ -1180,6 +1272,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/collection/bulk-delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Bulk Remove Collection Items */
+    post: operations['bulk_remove_collection_items_api_collection_bulk_delete_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/collection/import-csv': {
     parameters: {
       query?: never;
@@ -1200,6 +1309,30 @@ export interface paths {
      *     printing-detail tags.
      */
     post: operations['import_collection_csv_api_collection_import_csv_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/collection/offline-manifest': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Collection Offline Manifest
+     * @description Full owner-scoped snapshot and original artwork URLs for device downloads.
+     *
+     *     No ownership or private photo bytes are stored in HTTP caches. Artwork uses
+     *     the existing public image proxy; missing artwork is explicitly identified.
+     *     This read-only endpoint does not download anything onto the server or device.
+     */
+    get: operations['get_collection_offline_manifest_api_collection_offline_manifest_get'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1237,6 +1370,23 @@ export interface paths {
     post?: never;
     /** Delete Printing Detail Tag */
     delete: operations['delete_printing_detail_tag_api_collection_printing_detail_tags__tag_id__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/collection/release-assignments': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Release Collection Assignments */
+    post: operations['release_collection_assignments_api_collection_release_assignments_post'];
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -1296,10 +1446,7 @@ export interface paths {
      */
     put: operations['update_collection_item_api_collection__item_id__put'];
     post?: never;
-    /**
-     * Remove From Collection
-     * @description Remove a card from collection.
-     */
+    /** Remove From Collection */
     delete: operations['remove_from_collection_api_collection__item_id__delete'];
     options?: never;
     head?: never;
@@ -1522,6 +1669,23 @@ export interface paths {
     put?: never;
     /** Add Deck Entry */
     post: operations['add_deck_entry_api_decks__deck_id__entries_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/decks/{deck_id}/entries/bulk-delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Bulk Remove Deck Entries */
+    post: operations['bulk_remove_deck_entries_api_decks__deck_id__entries_bulk_delete_post'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1806,6 +1970,23 @@ export interface paths {
      * @description Create independent, identically priced product purchases in one transaction.
      */
     post: operations['create_product_batch_api_products_batch_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/products/cards/bulk-unlink': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Bulk Unlink Product Cards */
+    post: operations['bulk_unlink_product_cards_api_products_cards_bulk_unlink_post'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2115,6 +2296,58 @@ export interface paths {
     };
     /** Get Public Wishlist */
     get: operations['get_public_wishlist_api_public_profiles__handle__wishlist_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/push/subscribe': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Subscribe */
+    post: operations['subscribe_api_push_subscribe_post'];
+    /** Unsubscribe */
+    delete: operations['unsubscribe_api_push_subscribe_delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/push/test': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Send Test Notification */
+    post: operations['send_test_notification_api_push_test_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/push/vapid-public-key': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Vapid Public Key */
+    get: operations['get_vapid_public_key_api_push_vapid_public_key_get'];
     put?: never;
     post?: never;
     delete?: never;
@@ -2902,6 +3135,34 @@ export interface components {
       /** Updated */
       updated: number;
     };
+    /** BulkProductUnlinkRequest */
+    BulkProductUnlinkRequest: {
+      /** Links */
+      links: components['schemas']['ConfirmedProductLink'][];
+    };
+    /** BulkProductUnlinkResponse */
+    BulkProductUnlinkResponse: {
+      /** Unlinked Copies */
+      unlinked_copies: number;
+      /** Unlinked Ids */
+      unlinked_ids: number[];
+      /** Unlinked Links */
+      unlinked_links: number;
+    };
+    /** BulkRemoveRequest */
+    BulkRemoveRequest: {
+      /** Item Ids */
+      item_ids: number[];
+    };
+    /** BulkRemoveResponse */
+    BulkRemoveResponse: {
+      /** Removed Copies */
+      removed_copies: number;
+      /** Removed Entries */
+      removed_entries: number;
+      /** Removed Ids */
+      removed_ids: number[];
+    };
     /** CardBase */
     CardBase: {
       /** Abilities */
@@ -2994,6 +3255,8 @@ export interface components {
       price_mid?: number | null;
       /** Price Source Lang */
       price_source_lang?: string | null;
+      /** Price Tcg First Edition Market */
+      price_tcg_first_edition_market?: number | null;
       /** Price Tcg Holo Low */
       price_tcg_holo_low?: number | null;
       /** Price Tcg Holo Market */
@@ -3014,6 +3277,8 @@ export interface components {
       price_tcg_reverse_market?: number | null;
       /** Price Tcg Reverse Mid */
       price_tcg_reverse_mid?: number | null;
+      /** Price Tcg Usd To Eur */
+      price_tcg_usd_to_eur?: number | null;
       /** Price Trend */
       price_trend?: number | null;
       /** Price Trend Holo */
@@ -3038,6 +3303,11 @@ export interface components {
       supertype?: string | null;
       /** Tcg Card Id */
       tcg_card_id?: string | null;
+      /**
+       * Tcgplayer Fallback Allowed
+       * @default false
+       */
+      tcgplayer_fallback_allowed: boolean;
       /** Trainer Type */
       trainer_type?: string | null;
       /** Types */
@@ -3176,6 +3446,8 @@ export interface components {
       price_mid?: number | null;
       /** Price Source Lang */
       price_source_lang?: string | null;
+      /** Price Tcg First Edition Market */
+      price_tcg_first_edition_market?: number | null;
       /** Price Tcg Holo Low */
       price_tcg_holo_low?: number | null;
       /** Price Tcg Holo Market */
@@ -3196,6 +3468,8 @@ export interface components {
       price_tcg_reverse_market?: number | null;
       /** Price Tcg Reverse Mid */
       price_tcg_reverse_mid?: number | null;
+      /** Price Tcg Usd To Eur */
+      price_tcg_usd_to_eur?: number | null;
       /** Price Trend */
       price_trend?: number | null;
       /** Price Trend Holo */
@@ -3221,6 +3495,11 @@ export interface components {
       supertype?: string | null;
       /** Tcg Card Id */
       tcg_card_id?: string | null;
+      /**
+       * Tcgplayer Fallback Allowed
+       * @default false
+       */
+      tcgplayer_fallback_allowed: boolean;
       /** Trainer Type */
       trainer_type?: string | null;
       /** Types */
@@ -3330,6 +3609,22 @@ export interface components {
       quantity?: number | null;
       variant?: components['schemas']['CollectionVariant'] | null;
     };
+    /** CollectionOfflineManifestResponse */
+    CollectionOfflineManifestResponse: {
+      /** Image Urls */
+      image_urls: string[];
+      /** Items */
+      items: components['schemas']['CollectionItemResponse'][];
+      /** Missing Artwork Card Ids */
+      missing_artwork_card_ids: string[];
+      /** User Id */
+      user_id: number;
+      /**
+       * Version
+       * @default 1
+       */
+      version: number;
+    };
     /** CollectionProductSourceResponse */
     CollectionProductSourceResponse: {
       /**
@@ -3337,6 +3632,11 @@ export interface components {
        * @default 0
        */
       active_quantity: number;
+      /**
+       * Can Unlink
+       * @default false
+       */
+      can_unlink: boolean;
       /**
        * Initial Quantity
        * @default 0
@@ -3354,12 +3654,36 @@ export interface components {
       product_type?: string | null;
       /** Purchase Date */
       purchase_date?: string | null;
+      /** Unlink Blocked Reason */
+      unlink_blocked_reason?: string | null;
     };
     /**
      * CollectionVariant
      * @enum {string}
      */
     CollectionVariant: 'Normal' | 'Holo' | 'Reverse Holo' | 'First Edition';
+    /** ConfirmedAssignment */
+    ConfirmedAssignment: {
+      /** Assignment Id */
+      assignment_id: number;
+      /** Item Id */
+      item_id: number;
+      /** List Id */
+      list_id: number;
+      /** Quantity */
+      quantity: number;
+    };
+    /** ConfirmedProductLink */
+    ConfirmedProductLink: {
+      /** Active Quantity */
+      active_quantity: number;
+      /** Collection Item Id */
+      collection_item_id: number;
+      /** Product Card Id */
+      product_card_id: number;
+      /** Product Id */
+      product_id: number;
+    };
     /** CreateUserRequest */
     CreateUserRequest: {
       /** Avatar Id */
@@ -4328,6 +4652,33 @@ export interface components {
       /** Trainer Name */
       trainer_name: string;
     };
+    /** PushKeys */
+    PushKeys: {
+      /** Auth */
+      auth: string;
+      /** P256Dh */
+      p256dh: string;
+    };
+    /** PushSubscribeRequest */
+    PushSubscribeRequest: {
+      /** Endpoint */
+      endpoint: string;
+      keys: components['schemas']['PushKeys'];
+      /** User Agent */
+      user_agent?: string | null;
+    };
+    /** PushUnsubscribeRequest */
+    PushUnsubscribeRequest: {
+      /** Endpoint */
+      endpoint: string;
+    };
+    /** ReleaseAssignmentsRequest */
+    ReleaseAssignmentsRequest: {
+      /** Assignments */
+      assignments: components['schemas']['ConfirmedAssignment'][];
+      /** Item Ids */
+      item_ids: number[];
+    };
     /** ResolveAndAddScanItemRequest */
     ResolveAndAddScanItemRequest: {
       /** Card Id */
@@ -4448,6 +4799,10 @@ export interface components {
        * @default 0
        */
       total: number;
+      /** Translated Name */
+      translated_name?: string | null;
+      /** Translated Name Lang */
+      translated_name_lang?: string | null;
     };
     /** TokenResponse */
     TokenResponse: {
@@ -5766,6 +6121,41 @@ export interface operations {
       };
     };
   };
+  bulk_remove_binder_entries_api_binders__binder_id__entries_bulk_delete_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        binder_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BulkRemoveRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BulkRemoveResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   update_binder_entry_api_binders__binder_id__entries__binder_card_id__put: {
     parameters: {
       query?: never;
@@ -6084,6 +6474,87 @@ export interface operations {
       path: {
         binder_id: number;
       };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  artist_checklist_api_cards_artist_checklist_get: {
+    parameters: {
+      query: {
+        /** @description Artist name */
+        artist: string;
+        artist_match?: string;
+        /** @description Language filter: supported TCGdex language code or 'all' */
+        lang?: string | null;
+        /** @description Ownership filter: 'owned' or 'missing' */
+        ownership?: string | null;
+        page?: number;
+        page_size?: number;
+        sort_by?: string;
+        sort_order?: string;
+        price_field?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  artists_index_api_cards_artists_get: {
+    parameters: {
+      query?: {
+        /** @description Accent-insensitive artist name substring */
+        q?: string | null;
+        /** @description Language filter: supported TCGdex language code or 'all' */
+        lang?: string | null;
+        sort_by?: string;
+        sort_order?: string;
+        page?: number;
+        page_size?: number;
+        price_field?: string;
+      };
+      header?: never;
+      path?: never;
       cookie?: never;
     };
     requestBody?: never;
@@ -6680,6 +7151,8 @@ export interface operations {
         page_size?: number;
         /** @description Language filter: supported TCGdex language code or 'all' */
         lang?: string | null;
+        /** @description Ownership filter: 'owned' or 'missing' */
+        ownership?: string | null;
       };
       header?: never;
       path?: never;
@@ -6838,6 +7311,41 @@ export interface operations {
       };
     };
   };
+  get_card_valuation_api_cards__card_id__valuation_get: {
+    parameters: {
+      query?: {
+        variant?: components['schemas']['CollectionVariant'] | null;
+        price_field?: string;
+        currency?: string;
+      };
+      header?: never;
+      path: {
+        card_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   get_collection_api_collection__get: {
     parameters: {
       query?: {
@@ -6937,6 +7445,39 @@ export interface operations {
       };
     };
   };
+  bulk_remove_collection_items_api_collection_bulk_delete_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BulkRemoveRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BulkRemoveResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   import_collection_csv_api_collection_import_csv_post: {
     parameters: {
       query?: never;
@@ -6966,6 +7507,26 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_collection_offline_manifest_api_collection_offline_manifest_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CollectionOfflineManifestResponse'];
         };
       };
     };
@@ -7070,6 +7631,39 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  release_collection_assignments_api_collection_release_assignments_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReleaseAssignmentsRequest'];
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {
@@ -7683,6 +8277,41 @@ export interface operations {
       };
     };
   };
+  bulk_remove_deck_entries_api_decks__deck_id__entries_bulk_delete_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        deck_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BulkRemoveRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BulkRemoveResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   delete_deck_entry_api_decks__deck_id__entries__entry_id__delete: {
     parameters: {
       query?: never;
@@ -8212,6 +8841,39 @@ export interface operations {
       };
     };
   };
+  bulk_unlink_product_cards_api_products_cards_bulk_unlink_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BulkProductUnlinkRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BulkProductUnlinkResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   bulk_update_product_lifecycle_api_products_lifecycle_bulk_put: {
     parameters: {
       query?: never;
@@ -8478,6 +9140,10 @@ export interface operations {
       query?: {
         /** @description Cardmarket price field for linked-card valuation */
         price_field?: string;
+        /** @description Confirmed collection entry; pair with expected_active_quantity */
+        expected_collection_item_id?: number | null;
+        /** @description Confirmed active copies; a changed link returns 409 */
+        expected_active_quantity?: number | null;
       };
       header?: never;
       path: {
@@ -8829,10 +9495,115 @@ export interface operations {
       };
     };
   };
+  subscribe_api_push_subscribe_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PushSubscribeRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  unsubscribe_api_push_subscribe_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PushUnsubscribeRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  send_test_notification_api_push_test_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_vapid_public_key_api_push_vapid_public_key_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
   get_sets_api_sets__get: {
     parameters: {
       query?: {
         refresh?: boolean;
+        name_lang?: string | null;
         /** @description Language filter: supported TCGdex language code or 'all' */
         lang?: string | null;
       };

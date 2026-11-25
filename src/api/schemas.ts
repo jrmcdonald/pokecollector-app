@@ -28,6 +28,16 @@ export const TokenResponseSchema = z.looseObject({
   user: UserSchema,
 });
 
+/**
+ * GET /api/health, behind the proxy but needing no login. `features` since
+ * 1.58.0; before that only `status`, `service` and `version`.
+ */
+export const HealthSchema = z.looseObject({
+  version: z.string().nullish(),
+  features: z.array(z.unknown()).nullish(),
+});
+export type Health = z.infer<typeof HealthSchema>;
+
 /** GET /api/auth/mode — answerable without a login, so it proves Access alone. */
 export const AuthModeSchema = z.looseObject({
   multi_user: z.boolean(),

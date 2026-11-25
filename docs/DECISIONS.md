@@ -1387,3 +1387,42 @@ moved and the app's did not.
   fields until it is fetched again.
 - **The set checklist** now prices with the same rule. It used
   `price_trend ?? price_market`, which let a zero trend hide a market price.
+
+## 2026-11-25 — Safe retries with Idempotency-Key
+
+Upstream 1.58.0 (Git-Romer/pokecollector#474) stores the answer to
+`POST /api/collection/`, `POST /api/wishlist/` and
+`POST /api/cards/recognize/jobs` under an `Idempotency-Key`, so a write
+whose answer was lost can be sent again without adding twice. Until now the
+app never resent a write: adding a card twice is worse than an error.
+
+- **One key per user action,** minted where the action starts: each call of
+  `addToCollection`, `addToWishlist` or `createScanJob` is one action
+  unless the caller passes a key. Every retry reuses it with the same body;
+  a different body never gets an old key. 32 characters, from
+  `crypto.getRandomValues` where Hermes has it.
+- **The client retries, not TanStack Query.** Mutations keep `retry: false`:
+  a mutation retry calls the mutation function again, which would mint a new
+  key. The client resends after a lost answer, a 5xx, a 429 (after its
+  `Retry-After`, at most 30 s, as someone is waiting on the button) and
+  upstream's 409 `idempotency_in_progress` (after 2 s), three times at most.
+  The UI sees one slower success or one error.
+- **Only to a server that honours the key.** Upstream asked for no gating,
+  and the headers are not gated: a server before 1.58.0 ignores them.
+  Resending is: such a server would add the card again. Upstream's own
+  `services/api_info.py` says a backend without `idempotency-v1` "must never
+  receive a replay", and `GET /api/health` lists that feature. The app asks
+  it only after a keyed write has failed, once per session, so the usual
+  path costs nothing. A 404 or an answer without the feature is "no", and
+  the write fails as it always did. No answer is "not yet": the client waits
+  and asks again, without resending.
+- **`X-Expected-User-Id`** is sent from the login's `user.id`, or
+  `/api/auth/me`'s when the token came from the connection test. Before
+  either, it is left out, as upstream allows. A 409 `wrong_account` says
+  "This was sent for a different account than the one signed in, so
+  nothing was changed." It cannot happen today, since each account has its
+  own client and token; it is for the queued writes to come.
+- **`Idempotent-Replayed: true`** is an ordinary 200 with the first answer:
+  the client takes it as success without looking at the header.
+- **No queued offline writes yet.** This is their foundation; see
+  `PLAN.md` §7.2.

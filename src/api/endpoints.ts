@@ -1,4 +1,5 @@
 import type { PokeCollectorClient } from './client';
+import { newIdempotencyKey } from './idempotency';
 import { NotFoundError } from './errors';
 import {
   AuthModeSchema,
@@ -61,8 +62,10 @@ export function getAuthMode(
   return client.requestAnonymous('/api/auth/mode', { schema: AuthModeSchema, ...options });
 }
 
-export function getMe(client: PokeCollectorClient): Promise<User> {
-  return client.request('/api/auth/me', { schema: UserSchema });
+export async function getMe(client: PokeCollectorClient): Promise<User> {
+  const me = await client.request('/api/auth/me', { schema: UserSchema });
+  client.rememberUser(me.id);
+  return me;
 }
 
 export function getDashboard(client: PokeCollectorClient): Promise<Dashboard> {
@@ -119,11 +122,14 @@ export interface NewCollectionItem {
 export function addToCollection(
   client: PokeCollectorClient,
   item: NewCollectionItem,
+  /** One per user action; a call is one action unless the caller says otherwise. */
+  idempotencyKey: string = newIdempotencyKey(),
 ): Promise<CollectionItem> {
   return client.request('/api/collection/', {
     method: 'POST',
     json: item,
     schema: CollectionItemSchema,
+    idempotencyKey,
   });
 }
 
@@ -150,11 +156,16 @@ export function removeFromCollection(client: PokeCollectorClient, id: number): P
 }
 
 /** Adds to the wishlist; upstream adds to the quantity if the card is already there. */
-export function addToWishlist(client: PokeCollectorClient, cardId: string): Promise<WishlistItem> {
+export function addToWishlist(
+  client: PokeCollectorClient,
+  cardId: string,
+  idempotencyKey: string = newIdempotencyKey(),
+): Promise<WishlistItem> {
   return client.request('/api/wishlist/', {
     method: 'POST',
     json: { card_id: cardId, quantity: 1 },
     schema: WishlistItemSchema,
+    idempotencyKey,
   });
 }
 
@@ -314,6 +325,8 @@ export function deleteCollectionPhoto(
 export function createScanJob(
   client: PokeCollectorClient,
   photos: readonly Blob[],
+  /** The same photos sent again are the same job: upstream keys it on their bytes. */
+  idempotencyKey: string = newIdempotencyKey(),
 ): Promise<ScanJob> {
   const form = new FormData();
   for (const photo of photos) form.append('files', photo);
@@ -321,6 +334,7 @@ export function createScanJob(
     method: 'POST',
     form,
     schema: ScanJobSchema,
+    idempotencyKey,
     // Photos over a slow uplink, through the tunnel: a minute for one, and
     // more for a batch, which upstream also re-encodes photo by photo.
     timeoutMs: Math.min(5 * 60_000, 60_000 + 6_000 * (photos.length - 1)),

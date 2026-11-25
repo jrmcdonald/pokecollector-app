@@ -448,15 +448,17 @@ function interpret<T>(
 
   const body: unknown = text ? safeParse(text) : undefined;
   const detail = describeDetail(body);
+  const raw = detailObject(body);
 
   if (status === 401 || status === 403) {
-    throw new AuthError(detail ?? 'Not signed in to PokeCollector.', status);
+    throw new AuthError(detail ?? 'Not signed in to PokeCollector.', status, raw);
   }
-  if (status === 404) throw new NotFoundError(detail ?? `${what}: not found.`, status);
-  if (status === 409) throw new ConflictError(detail ?? `${what}: conflict.`, status);
-  if (status === 422) throw new ValidationError(detail ?? `${what}: invalid request.`, status);
+  if (status === 404) throw new NotFoundError(detail ?? `${what}: not found.`, status, raw);
+  if (status === 409) throw new ConflictError(detail ?? `${what}: conflict.`, status, raw);
+  if (status === 422) throw new ValidationError(detail ?? `${what}: invalid request.`, status, raw);
   if (status >= 500) throw new ServerError(detail ?? `${what} failed with HTTP ${status}.`, status);
-  if (status >= 400) throw new ApiError(detail ?? `${what} failed with HTTP ${status}.`, status);
+  if (status >= 400)
+    throw new ApiError(detail ?? `${what} failed with HTTP ${status}.`, status, raw);
 
   if (!schema) return body as T;
   const parsed = schema.safeParse(body);
@@ -491,10 +493,47 @@ function describeDetail(body: unknown): string | undefined {
     if (first && typeof first.msg === 'string') return first.msg;
   }
   if (typeof detail === 'object' && detail !== null) {
-    const { message, product_sources } = detail as { message?: unknown; product_sources?: unknown };
-    if (typeof message === 'string') return withProductNames(message, product_sources);
+    const { message, product_sources, blockers } = detail as {
+      message?: unknown;
+      product_sources?: unknown;
+      blockers?: unknown;
+    };
+    if (typeof message === 'string') {
+      return withProductNames(withListNames(message, blockers), product_sources);
+    }
   }
   return undefined;
+}
+
+/** `detail` when upstream sent an object, as its machine-readable 409s are. */
+function detailObject(body: unknown): object | undefined {
+  if (typeof body !== 'object' || body === null || !('detail' in body)) return undefined;
+  const { detail } = body as { detail: unknown };
+  return typeof detail === 'object' && detail !== null && !Array.isArray(detail)
+    ? detail
+    : undefined;
+}
+
+/**
+ * "… Nothing was removed. In Trade binder, Charizard deck." Since 1.57.0 a
+ * copy assigned to a binder or deck cannot be removed, and each blocker lists
+ * its `assignments` with the list's name.
+ */
+function withListNames(message: string, blockers: unknown): string {
+  if (!Array.isArray(blockers)) return message;
+  const names = [
+    ...new Set(
+      blockers
+        .flatMap((blocker) => {
+          const assignments = (blocker as { assignments?: unknown } | null)?.assignments;
+          return Array.isArray(assignments) ? assignments : [];
+        })
+        .map((assignment) => (assignment as { list_name?: unknown } | null)?.list_name)
+        .filter((name): name is string => typeof name === 'string' && name.trim() !== '')
+        .map((name) => name.trim()),
+    ),
+  ];
+  return names.length ? `${message} In ${names.join(', ')}.` : message;
 }
 
 /** "… first. Linked to Booster Box, Elite Trainer Box." */

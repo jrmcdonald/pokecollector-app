@@ -1319,3 +1319,37 @@ art in the web UI. The app has its own, on a card's page only.
   same gradients and blend modes in Chromium; on the phone, check the blend
   over real art, the frame rate on the oldest iPhone to hand, and that the
   sensor stops (Xcode's energy gauge) when the page is left.
+
+## 2026-11-25 — Upstream 1.59.0
+
+`openapi/` now holds 1.59.0's spec in place of 1.56.0's, the version the
+addon's Dockerfile pins. Exported from upstream's source at the tag on
+Python 3.11 with its pinned requirements, as for 1.55.1 and 1.56.0: Docker's
+client is installed here, but no daemon runs. Exported the same way, 1.56.0
+came out byte for byte as committed. The type diff broke nothing; it adds the
+endpoints the next changes use (bulk removal, releasing assignments, product
+unlinks, the artist checklist and directory) and some the app leaves alone.
+
+- **Removing a copy in a binder or deck is now an object 409.** Since 1.57.0
+  `DELETE /api/collection/{id}` is upstream's bulk removal for one id, so
+  a copy in a collection binder or Real Deck answers
+  `collection_assignment_conflict` with its blockers and the resolutions
+  that would clear them, where it used to be a sentence. A copy linked only
+  to a product keeps `collection_product_link_conflict`. The client now
+  names the binders and decks after the message, as it already named
+  products, and keeps the whole object on the error (`ApiError.detail`), so
+  a screen can offer upstream's resolutions without the client having to
+  know about them. That is what the bulk removal and release flow will read.
+- **The fixtures are upstream's own answers,** captured by running its
+  `tests/test_bulk_removal.py` harness against SQLite, not hand-written from
+  the code, so a test of the shape is a test against what 1.59.0 sends.
+- **The persisted cache's buster stays `pokecollector-1.51.0`.** The new card
+  and set fields are optional and additive; nothing cached changed shape.
+- **Not taken up:** Web Push (`/api/push/*`; the app is not a browser),
+  `GET /api/collection/offline-manifest` (the persisted collection already
+  covers offline reading, and its image URLs go through the image proxy, a
+  request each), `GET /api/cards/{id}/valuation` (a request per card) and
+  `translated_name` on sets (shown in the web UI's set overview; worth
+  taking up with display languages).
+- **Not 1.60.0.** Upstream has released it, but the addon pins 1.59.0, and
+  the app is typed against what the addon runs.

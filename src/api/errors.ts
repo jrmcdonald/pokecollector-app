@@ -12,6 +12,12 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status?: number,
+    /**
+     * Upstream's `detail` when it was an object rather than a string, such as
+     * a 409's `{ code, message, blockers, … }`. Unvalidated: whoever reads it
+     * parses it.
+     */
+    readonly detail?: unknown,
   ) {
     super(message);
     this.name = new.target.name;

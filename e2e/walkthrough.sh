@@ -83,10 +83,35 @@ prepare() {
 }
 prepare
 
+# The app's own log, from the simulator, for the length of a walk: iOS's
+# networking (CFNetwork: when each request starts, which connection it takes,
+# how it ends) and React Native's console. Requests have stalled between the
+# app and the fake server with nothing in either side's output to say where;
+# this is the app's side of that, to read against the fake server's
+# timestamped lines. trustd too: it checks the server's certificate for the
+# app, and that check has hung. Kept in the artifact as <name>-device.log.
+app_process=$(basename "$APP_PATH" .app)
+log_pid=
+start_device_log() {
+  xcrun simctl spawn "$SIM_UDID" log stream --style compact --level info \
+    --predicate "process == \"$app_process\" OR process == \"trustd\"" \
+    > "$OUT/$name-device.log" 2>&1 &
+  log_pid=$!
+}
+stop_device_log() {
+  if [ -n "$log_pid" ]; then
+    kill "$log_pid" 2>/dev/null || true
+    wait "$log_pid" 2>/dev/null || true
+    log_pid=
+  fi
+}
+trap stop_device_log EXIT
+
 server_lines_before=$(wc -l < "$OUT/server.log")
 walk() {
   rm -rf "${OUT:?}/$name" "$OUT/$name.xcresult"
   mkdir -p "$OUT/$name"
+  start_device_log
   # A time limit, so a hang fails here, with the diagnostics below, rather
   # than when the job runs out of time. A walk takes up to about 12 minutes.
   TEST_RUNNER_APP_BUNDLE_ID="$APP_BUNDLE_ID" \
@@ -101,6 +126,9 @@ walk() {
       -default-test-execution-time-allowance 900 \
       -maximum-test-execution-time-allowance 900 \
       > "$OUT/$name.log" 2>&1
+  local result=$?
+  stop_device_log
+  return $result
 }
 set +e
 walk
@@ -119,6 +147,7 @@ if [ "$status" -ne 0 ] &&
   grep -E 'error:|Test Case .* failed' "$OUT/$name.log" || true
   # The first attempt's results stay, beside the second's.
   mv "$OUT/$name.log" "$OUT/$name-attempt1.log"
+  mv "$OUT/$name-device.log" "$OUT/$name-attempt1-device.log" 2>/dev/null || true
   rm -rf "$OUT/$name-attempt1" "$OUT/$name-attempt1.xcresult"
   mv "$OUT/$name" "$OUT/$name-attempt1"
   if [ -e "$OUT/$name.xcresult" ]; then mv "$OUT/$name.xcresult" "$OUT/$name-attempt1.xcresult"; fi
@@ -147,8 +176,24 @@ if [ "$status" -ne 0 ]; then
   echo "::group::What was on screen"
   sed -n '/^DIAGNOSE-BEGIN/,/^DIAGNOSE-END/p' "$OUT/$name.log" | head -n 600
   echo "::endgroup::"
+  # No screen dump means the walkthrough never reached a check: xcodebuild
+  # or XCUITest stopped first, and says why only in its own log.
+  if ! grep -q '^DIAGNOSE-BEGIN' "$OUT/$name.log"; then
+    echo "::group::The end of xcodebuild's log"
+    tail -n 60 "$OUT/$name.log"
+    echo "::endgroup::"
+  fi
   echo "::group::Requests to the fake server in this run"
-  tail -n "+$((server_lines_before + 1))" "$OUT/server.log" | tail -n 80
+  tail -n "+$((server_lines_before + 1))" "$OUT/server.log" | tail -n 120
+  echo "::endgroup::"
+  echo "::group::The app's network and console log, last lines"
+  grep -E 'CFNetwork|Task <|Connection [0-9]|nw_|boringssl|trustd|ReactNativeJS|error|Error' "$OUT/$name-device.log" |
+    tail -n 150 || true
+  echo "::endgroup::"
+  # The certificate check that hangs is trustd's, so all of what it logged,
+  # not just what landed in the app's last lines.
+  echo "::group::trustd's log in this walk"
+  grep -E ' trustd\[' "$OUT/$name-device.log" | tail -n 300 || true
   echo "::endgroup::"
   echo "::group::Is the fake server still answering?"
   curl -sS --max-time 10 --cacert "$CA_CERT" "$SERVER_URL/api/auth/mode" || true

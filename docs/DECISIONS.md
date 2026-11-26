@@ -1432,12 +1432,15 @@ app never resent a write: adding a card twice is worse than an error.
 TanStack Query is told about the connection by NetInfo
 (`src/session/query.tsx`). With its default network mode, `online`, a query
 or mutation started while NetInfo reports no connection is paused: it is
-never sent, and waits for NetInfo to report one again. The Simulator
-walkthrough kept failing on a screen that opened, said "Loading", and never
-asked the fake server for anything, on `main` and on every open pull
-request, at whichever screen came next. NetInfo's own documentation says the
-iOS Simulator can miss network-change notifications when its host's network
-changes, which on a CI runner it does. A phone could be left the same way.
+never sent, and waits for NetInfo to report one again. NetInfo's own
+documentation says the iOS Simulator can miss network-change notifications,
+and a phone could be left the same way.
+
+This was first made to fix a Simulator walkthrough failure, a screen that
+opened on "Loading" and never asked the fake server for anything. **It did
+not fix that**: the failure still happens with this change, so the cause is
+elsewhere (see "Logging where walkthrough requests stall" below). The change
+stays because it is the better default on its own merits.
 
 Queries and mutations now use `offlineFirst`: the first attempt is always
 sent, and only retries wait for a connection. It suits this app anyway: the
@@ -1452,3 +1455,42 @@ little about whether it answers, and sending is the only real test.
 - **Mutations:** an add while offline is sent once and fails with the
   network error, rather than sitting paused with no feedback. That is the
   behaviour the app's toasts already expect.
+
+## 2026-11-26 — Logging where walkthrough requests stall
+
+The Simulator walkthrough fails now and then because a request never
+reaches the fake server: a screen opens on "Loading" and stays there, or
+sign-in times out with nothing in the server's log. It is not TanStack
+holding the query (`offlineFirst` above rules that out), not the persisted
+cache restoring (that happens once, at launch), and not the fake server
+losing it (it logged every request it had read in full). Neither side's
+output said where the request stopped, so CI now records both ends:
+
+- **The fake server** logs each connection opening and closing, each TLS
+  handshake that succeeds or fails, and each request as soon as its headers
+  arrive as well as when it is answered. Every line has the time and the
+  client's port, so one connection can be followed from start to end.
+- **The walkthrough** streams the app's own log from the simulator
+  (`log stream`, the app's process, info level) into `<size>-device.log` in
+  the run's artifact. That includes iOS's networking: when each request
+  starts, which connection it takes, and how it ends. A failed walk prints
+  the network and console lines in its job log, after the server's.
+
+No app code changes, and nothing is logged on a phone.
+
+**What it found**, on this change's own run: the request is sent, and stalls
+in the TLS handshake on a new connection while iOS checks the fake server's
+certificate. After 20 s the app's timeout cancels it (`CERTIFICATE_VERIFY_FAILED`
+in the app's log, "certificate unknown" in the server's). Requests on
+connections already open went through, which is why the screens before it
+loaded.
+
+Keeping TLS sessions resumable for an hour (`sessionTimeout`), so that fewer
+connections need the check, did **not** stop it: the next run hung the same
+way. Right after the cancelled request the app opened a fresh connection to
+`trustd`, the process that does the check, which suggests trustd itself was
+stuck or restarting, but that is not shown yet. The walkthrough now prints
+everything trustd logged when a walk fails. Still open: why the check hangs,
+and how to keep it from hanging. This is the CI simulator trusting a throwaway
+certificate authority; a phone checks a real server's certificate against the
+system's.

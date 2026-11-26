@@ -170,6 +170,15 @@ fi
 
 grep -E '^AUDIT|^CAPTURE|error:|Test Case .* failed|\*\* TEST' "$OUT/$name.log" || true
 
+# Whether trustd updated its certificate databases during this walk, and
+# whether any handshake failed: passed walks too, so the valid.apple.com block
+# in the workflow keeps being checked, not only when a walk fails.
+echo "::group::trustd's database updates and failed handshakes in this walk"
+grep -E 'validupdate|pinningDb' "$OUT/$name-device.log" | tail -n 20 || true
+echo "\"database is locked\" lines: $(grep -c 'database is locked' "$OUT/$name-device.log" || true)"
+echo "failed TLS handshakes: $(tail -n "+$((server_lines_before + 1))" "$OUT/server.log" | grep -c 'TLS failed: [0-9A-F]' || true)"
+echo "::endgroup::"
+
 if [ "$status" -ne 0 ]; then
   # What the walkthrough saw when it stopped, and what the app asked the
   # server for, so a failure can be read from the job log alone.

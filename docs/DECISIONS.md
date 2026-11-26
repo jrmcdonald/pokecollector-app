@@ -1413,11 +1413,23 @@ connections already open went through, which is why the screens before it
 loaded.
 
 Keeping TLS sessions resumable for an hour (`sessionTimeout`), so that fewer
-connections need the check, did **not** stop it: the next run hung the same
-way. Right after the cancelled request the app opened a fresh connection to
-`trustd`, the process that does the check, which suggests trustd itself was
-stuck or restarting, but that is not shown yet. The walkthrough now prints
-everything trustd logged when a walk fails. Still open: why the check hangs,
-and how to keep it from hanging. This is the CI simulator trusting a throwaway
-certificate authority; a phone checks a real server's certificate against the
-system's.
+connections need the check, did not stop it. Printing trustd's own log found
+the cause: some minutes after boot (7 to 13 in the runs read), the freshly
+erased simulator's trustd starts downloading Apple's certificate revocation
+database from `valid.apple.com`, from scratch (`validupdate … version=0`), and
+updates its pinning database (`version 121 to version 131`). While it does,
+its database is locked (`database is locked`, hundreds of times), and every
+certificate check waits on it. Every handshake before the update succeeded;
+every new one after it failed.
+
+**The fix:** the Simulator job points `valid.apple.com` at localhost in the
+runner's `/etc/hosts` before booting the simulator, which uses the runner's
+resolver, so the download fails at once and never holds the lock. The fake
+server's certificate comes from a throwaway CA that Apple's revocation data
+does not cover, so nothing the walkthrough checks changes. Every walk prints
+trustd's update lines, the count of `database is locked`, and the count of
+failed handshakes, so the block keeps being checked. The session change stays:
+it is harmless and means fewer checks.
+
+This is the CI simulator only. A phone checks a real server's certificate
+against the system's, with its revocation data long since downloaded.

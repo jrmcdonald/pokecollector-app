@@ -6,6 +6,7 @@ import type { CardImageFields } from '@/utils/images';
 import { pick } from '@/utils/pick';
 
 import { CardImage, frameForVariant } from './card-image';
+import { Icon } from './icon';
 import { ThemedText } from './themed-text';
 
 type Props = {
@@ -34,6 +35,11 @@ type Props = {
    * grid of one column, at the accessibility text sizes (`useCardColumns`).
    */
   layout?: 'tile' | 'row';
+  /**
+   * Choosing cards to act on together: the tile becomes a checkbox, and a
+   * tap toggles it rather than opening the card.
+   */
+  selection?: { selected: boolean; onToggle(): void };
 };
 
 export type TileAction = { name: string; label: string; destructive?: boolean; onAction(): void };
@@ -50,6 +56,7 @@ export function CardTile({
   photoItemId,
   actions = [],
   layout = 'tile',
+  selection,
 }: Props) {
   const colors = useColors();
   const href = { pathname: '/card/[id]', params: { id: card.id } } as const;
@@ -78,18 +85,22 @@ export function CardTile({
   // in a list from VoiceOver (the simulator audit found binders empty).
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole={selection ? 'checkbox' : 'button'}
       accessibilityLabel={label}
-      accessibilityActions={actions.map(({ name, label: l }) => ({ name, label: l }))}
+      accessibilityState={selection ? { checked: selection.selected } : undefined}
+      accessibilityActions={
+        selection ? undefined : actions.map(({ name, label: l }) => ({ name, label: l }))
+      }
       onAccessibilityAction={(event: AccessibilityActionEvent) =>
         actions.find((a) => a.name === event.nativeEvent.actionName)?.onAction()
       }
-      onPress={() => router.push(href)}
-      onLongPress={actions.length ? showActions : undefined}
+      onPress={selection ? selection.onToggle : () => router.push(href)}
+      onLongPress={!selection && actions.length ? showActions : undefined}
       style={({ pressed }) => [
         layout === 'row' ? styles.row : styles.tile,
         pressed && styles.pressed,
       ]}>
+      {selection ? <Check selected={selection.selected} layout={layout} /> : null}
       {layout === 'row' ? (
         <>
           {image}
@@ -152,7 +163,35 @@ export function CardTile({
   );
 }
 
+/** The chosen mark: a filled check in the accent, or an empty ring. */
+function Check({ selected, layout }: { selected: boolean; layout: 'tile' | 'row' }) {
+  const colors = useColors();
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        layout === 'row' ? styles.checkRow : styles.check,
+        { backgroundColor: colors.background, borderColor: colors.outline },
+      ]}>
+      <Icon
+        name={selected ? 'checkmark.circle.fill' : 'circle'}
+        size={24}
+        color={selected ? 'accent' : 'textSecondary'}
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  check: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    zIndex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  checkRow: { borderRadius: 14 },
   tile: { flex: 1, padding: spacing.xs },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.sm },
   rowImage: { width: 64 },

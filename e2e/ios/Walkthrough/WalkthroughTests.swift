@@ -91,6 +91,13 @@ final class WalkthroughTests: XCTestCase {
     go(app.navigationBars.buttons["Show as list"], to: app.navigationBars.buttons["Show as grid"], "Collection as a list")
     wait(for: button(startingWith: "Charizard ex, 151"), "Collection as a list")
     capture("collection-list")
+    // Choosing entries to remove together (upstream 1.57.0): one chosen, and
+    // the bar with Remove. Nothing is removed; the fake server refuses writes.
+    go(app.navigationBars.buttons["Choose cards to remove"], to: app.navigationBars.buttons["Done choosing"], "Choosing cards")
+    tap(element(startingWith: "Charizard ex, 151"))
+    wait(for: element(startingWith: "1 chosen"), "One card chosen")
+    capture("collection-select")
+    go(app.navigationBars.buttons["Done choosing"], to: app.navigationBars.buttons["Choose cards to remove"], "Done choosing")
 
     go(button(startingWith: "Charizard ex"), to: app.staticTexts["Charizard ex"].firstMatch, "Card")
     capture("card")

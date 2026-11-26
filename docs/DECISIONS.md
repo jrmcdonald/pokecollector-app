@@ -1465,3 +1465,49 @@ an artist directory. The app has both.
   with it when the collection or wishlist changes.
 - **The fake server's 151 subset** now has three made-up illustrators, so
   the walkthrough shows the directory and a partly owned artist.
+
+## 2026-11-26 — Bulk removal, and freeing what blocks a removal
+
+Upstream 1.57.0 (Git-Romer/pokecollector#456) added atomic bulk removal for
+the collection, a binder and a deck, and a 409 that says exactly what holds
+a collection entry back (a collection binder, a Real Deck, a product) and
+how to free it. The app has both.
+
+- **Select, then one action.** Collection, a binder and a deck have a
+  Select button in the header, as Photos and Files do. While choosing, a tile or
+  row is a checkbox (`accessibilityRole="checkbox"`, checked or not, with a
+  check mark drawn so it never rests on colour alone), the header offers
+  Select all and Done, and a bar at the bottom says how many entries and
+  copies are chosen beside Remove (Collection) or Take out (a binder, a
+  deck). Up to 500, upstream's limit; Select all refuses past it and says
+  so. Choosing ignores cards filtered away, rather than removing ones not
+  on show.
+- **The confirmation counts entries and copies**, and says what stays:
+  "They stay in your collection" for a binder, "Your collection doesn't
+  change" for a deck. The wording follows upstream's web UI, shortened for
+  an iOS alert.
+- **One conflict sheet, app-wide.** `RemovalConflictSheet` lives in the
+  root layout, opened through a small store (`utils/removal-conflict.ts`),
+  so the bulk removal and a single copy taken to 0 on a card's page (which
+  1.57.0 refuses the same way) share it.
+  - It lists each blocked entry and what holds it.
+  - It offers upstream's own resolutions, each behind a destructive
+    confirmation: "Take out of binders and decks" sends the 409's release
+    body as it came, so upstream can tell if anything changed; "Unlink from
+    products" only when upstream's resolution says `can_execute`. A link with
+    sale or trade history gets a sentence pointing to the product instead.
+  - "Remove from collection" stays disabled until nothing holds the copies,
+    then sends the same removal again.
+  - `collection_assignments_changed` replaces the list, says it changed, and
+    asks for every confirmation again.
+  - Upstream's web UI (`useBulkRemoval.js`, `BulkRemovalToolbar.jsx`) is
+    the model for the steps.
+- **Older servers.** A plain 404 from a bulk route means the route does not
+  exist; Select is then hidden for a day, as artist pages are after theirs
+  (`use-server-feature.ts`, now shared). A 404 with an object `detail` is a
+  1.57+ server saying an entry is gone, and is shown as an error, not taken
+  for an old server. A single copy taken to 0 on an older server still gets
+  its string 409 as a toast, as before.
+- **Not the single unlink.** `DELETE /api/products/{id}/cards/{pc}` with its
+  `expected_*` guard would unlink one link; the bulk route does one as well,
+  atomically, from the same resolution body.

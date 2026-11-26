@@ -75,6 +75,7 @@ import {
   type ProductChanges,
 } from '@/api/endpoints';
 import { ApiError, ConflictError } from '@/api/errors';
+import { removalConflict } from '@/api/removal';
 import type {
   BinderCards,
   CollectionItem,
@@ -85,6 +86,7 @@ import type {
   WishlistItem,
 } from '@/api/schemas';
 import { useSession } from '@/session/session';
+import { openRemovalConflict } from '@/utils/removal-conflict';
 import { bindersOnly } from '@/utils/binders';
 import { forgetBatchPhotos, keepBatchPhotos, pruneBatchPhotos } from '@/utils/batch-photos';
 import type { DeckLine } from '@/utils/decklist';
@@ -144,8 +146,6 @@ export function useKeys() {
       artist: (name: string, missingOnly: boolean) =>
         [cacheId, 'artist', name, missingOnly] as const,
       artistAll: [cacheId, 'artist'] as const,
-      /** When this server last answered 404 to the artist pages, if it has. */
-      artistsMissing: [cacheId, 'feature', 'artists-missing'] as const,
     },
   };
 }
@@ -460,8 +460,18 @@ export function useSetQuantity() {
       );
       return { previous };
     },
-    onError: (error, _vars, context) => {
+    onError: (error, { item, quantity }, context) => {
       if (context?.previous) queryClient.setQueryData(keys.collection, context.previous);
+      // Since 1.57.0, a copy in a binder, a Real Deck or a product is refused
+      // with what holds it; the conflict sheet offers to free it first.
+      const conflict = quantity === 0 ? removalConflict(error) : null;
+      if (conflict) {
+        openRemovalConflict({
+          conflict,
+          retry: () => removeFromCollection(getClient(), item.id),
+        });
+        return;
+      }
       reportFailure('Could not update the quantity', error);
     },
     onSettled: invalidate,

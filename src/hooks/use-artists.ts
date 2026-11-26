@@ -8,47 +8,15 @@
  * meanwhile: one request finds out, and no more are spent asking. After a
  * day the entry points come back, in case the server has been updated.
  */
-import {
-  keepPreviousData,
-  useInfiniteQuery,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 
 import { getArtistChecklist, getArtists } from '@/api/endpoints';
-import { NotFoundError } from '@/api/errors';
 
 import { useKeys } from './queries';
-
-const ONE_DAY = 24 * 60 * 60 * 1000;
-
-/** A 404 is an answer, not a hiccup: asking again costs requests for nothing. */
-const retryUnlessMissing = (failureCount: number, error: unknown) =>
-  !(error instanceof NotFoundError) && failureCount < 2;
+import { retryUnlessMissing, useMarkMissingOn, useServerFeature } from './use-server-feature';
 
 /** Whether this server is not known to lack the artist pages. Costs nothing. */
-export function useArtistsAvailable(now: () => number = Date.now): boolean {
-  const { keys } = useKeys();
-  const missingSince = useQuery<number | null>({
-    queryKey: keys.artistsMissing,
-    // Only ever set from a 404; nothing to fetch.
-    queryFn: () => null,
-    enabled: false,
-    // Kept as long as the persisted cache keeps anything.
-    gcTime: 7 * ONE_DAY,
-  }).data;
-  return missingSince == null || now() - missingSince > ONE_DAY;
-}
-
-/** Records a 404 from the artist routes, which hides their entry points. */
-function useRememberMissing(error: unknown) {
-  const queryClient = useQueryClient();
-  const { keys } = useKeys();
-  useEffect(() => {
-    if (error instanceof NotFoundError) queryClient.setQueryData(keys.artistsMissing, Date.now());
-  }, [error, queryClient, keys.artistsMissing]);
-}
+export const useArtistsAvailable = () => useServerFeature('artists');
 
 /** Artists, most complete first. `q` should already be debounced. */
 export function useArtists(q: string) {
@@ -68,7 +36,7 @@ export function useArtists(q: string) {
     // The list stays while the next search loads, not a skeleton per keystroke.
     placeholderData: keepPreviousData,
   });
-  useRememberMissing(query.error);
+  useMarkMissingOn('artists', query.error);
   return query;
 }
 
@@ -88,6 +56,6 @@ export function useArtistChecklist(name: string, missingOnly: boolean) {
     // The header and its toggle stay while "Missing only" loads.
     placeholderData: keepPreviousData,
   });
-  useRememberMissing(query.error);
+  useMarkMissingOn('artists', query.error);
   return query;
 }

@@ -319,21 +319,23 @@ function Prices({ card }: { card: Card }) {
   return (
     <ThemedView background="surface" style={[styles.panel, { borderColor: colors.border }]}>
       <View
-        style={styles.trend}
         accessible
         accessibilityLabel={
           estimate
             ? `Estimated price: ${spokenQuote(estimate)}`
             : `Trend price: ${formatPrice(card.price_trend)}`
         }>
-        <ThemedText variant="overline" color="textSecondary">
-          {estimate ? 'Estimate' : 'Trend'}
-        </ThemedText>
-        <ThemedText variant="figure" style={styles.trendValue}>
-          {estimate ? formatQuote(estimate) : formatPrice(card.price_trend)}
-        </ThemedText>
+        <View style={styles.trend}>
+          <ThemedText variant="overline" color="textSecondary">
+            {estimate ? 'Estimate' : 'Trend'}
+          </ThemedText>
+          <ThemedText variant="figure" style={styles.trendValue}>
+            {estimate ? formatQuote(estimate) : formatPrice(card.price_trend)}
+          </ThemedText>
+        </View>
+        {/* Under the figure, not beside it: the row has room for the two only. */}
         {estimate ? (
-          <ThemedText variant="caption" color="textSecondary">
+          <ThemedText variant="caption" color="textSecondary" style={styles.trendSource}>
             {quoteSource(estimate)}
           </ThemedText>
         ) : null}
@@ -595,6 +597,7 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   trendValue: { fontSize: 30, lineHeight: 36 },
+  trendSource: { textAlign: 'right' },
   priceTiles: { flexDirection: 'row', gap: spacing.sm },
   stacked: { flexDirection: 'column' },
   priceTile: { flex: 1, borderRadius: radius.sm + 2, padding: spacing.sm, gap: 2 },

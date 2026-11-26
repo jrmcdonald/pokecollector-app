@@ -175,6 +175,13 @@ if [ "$status" -ne 0 ]; then
   echo "::group::What was on screen"
   sed -n '/^DIAGNOSE-BEGIN/,/^DIAGNOSE-END/p' "$OUT/$name.log" | head -n 600
   echo "::endgroup::"
+  # No screen dump means the walkthrough never reached a check: xcodebuild
+  # or XCUITest stopped first, and says why only in its own log.
+  if ! grep -q '^DIAGNOSE-BEGIN' "$OUT/$name.log"; then
+    echo "::group::The end of xcodebuild's log"
+    tail -n 60 "$OUT/$name.log"
+    echo "::endgroup::"
+  fi
   echo "::group::Requests to the fake server in this run"
   tail -n "+$((server_lines_before + 1))" "$OUT/server.log" | tail -n 120
   echo "::endgroup::"

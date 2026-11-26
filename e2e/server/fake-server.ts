@@ -10,6 +10,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:https';
+import type { Socket } from 'node:net';
 import { parseArgs } from 'node:util';
 
 import { createRouter, type Reply } from './routes.ts';
@@ -29,9 +30,18 @@ if (!values.cert || !values.key) {
 const port = Number(values.port);
 const route = createRouter(`https://localhost:${port}`);
 
+// Every line carries the time and the client's port, so a request that never
+// completes can be matched to the connection it came on, and both to the
+// device log the walkthrough keeps (`<size>-device.log`).
+const stamp = () => new Date().toISOString().slice(11, 23);
+const from = (socket: Socket) => `:${socket.remotePort ?? '?'}`;
+
 const server = createServer(
   { cert: readFileSync(values.cert), key: readFileSync(values.key) },
   (req, res) => {
+    // Headers in, body not yet: a request that stops here never gets the
+    // completion line below.
+    console.log(`${stamp()} ${from(req.socket)} > ${req.method} ${req.url}`);
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => chunks.push(chunk));
     req.on('end', () => {
@@ -53,7 +63,7 @@ const server = createServer(
         console.error(error);
         reply = { status: 500, json: { detail: String(error) } };
       }
-      console.log(`${req.method} ${req.url} ${reply.status}`);
+      console.log(`${stamp()} ${from(req.socket)} ${req.method} ${req.url} ${reply.status}`);
       if ('png' in reply) {
         res.writeHead(reply.status, {
           'content-type': 'image/png',
@@ -77,5 +87,18 @@ const server = createServer(
 // than iOS does.
 server.keepAliveTimeout = 120_000;
 server.headersTimeout = 125_000;
+
+// Connections, and the ones that fail before a request: a TLS handshake the
+// simulator gives up on never reaches the request handler at all.
+server.on('connection', (socket: Socket) => {
+  console.log(`${stamp()} ${from(socket)} connected`);
+  socket.on('close', () => console.log(`${stamp()} ${from(socket)} closed`));
+});
+server.on('secureConnection', (socket: Socket) =>
+  console.log(`${stamp()} ${from(socket)} TLS ready`),
+);
+server.on('tlsClientError', (error: Error, socket: Socket) =>
+  console.log(`${stamp()} ${from(socket)} TLS failed: ${error.message}`),
+);
 
 server.listen(port, () => console.log(`Fake PokeCollector on https://localhost:${port}`));

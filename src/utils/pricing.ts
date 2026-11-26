@@ -99,11 +99,9 @@ export function cardValue(card: PriceFields | null | undefined, variant?: string
 }
 
 const euros = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' });
-const dollars = new Intl.NumberFormat('en-GB', {
-  style: 'currency',
-  currency: 'USD',
-  currencyDisplay: 'narrowSymbol',
-});
+// en-US, not en-GB: Hermes on iOS writes en-GB dollars as "US$4.00", even
+// with narrowSymbol, where Node writes "$4.00". en-US is "$4.00" in both.
+const dollars = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const wholeEuros = new Intl.NumberFormat('en-GB', {
   style: 'currency',
   currency: 'EUR',

@@ -80,6 +80,8 @@ export default function Collection() {
   const shownIds = useMemo(() => shown.map((item) => item.id), [shown]);
   const selection = useSelection(shownIds);
   const selecting = selection.active && canSelect;
+  // Rows, or one-column tiles, hold the check beside the card, not over it.
+  const rowsGrow = layout === 'list' || columns === 1;
   const bulk = useBulkRemoval({ kind: 'collection' });
   const chosen = shown.filter((item) => selection.isSelected(item.id));
   const chosenCopies = chosen.reduce((sum, item) => sum + item.quantity, 0);
@@ -251,7 +253,10 @@ export default function Collection() {
           // that shrank, showing their old items (a set searched for "char"
           // still showed what "c" found). Unused cells now unmount instead.
           maxItemsInRecyclePool={0}
-          key={`${layout}-${columns}`}
+          // A new list when choosing starts or ends, wherever rows hold the
+          // check beside the card: it narrows the text, a name can wrap, and
+          // FlashList 2.0.2 does not re-measure the taller row in place.
+          key={`${layout}-${columns}${selecting && rowsGrow ? '-choosing' : ''}`}
           data={shown}
           extraData={selecting ? selection.selected : null}
           numColumns={layout === 'grid' ? columns : 1}

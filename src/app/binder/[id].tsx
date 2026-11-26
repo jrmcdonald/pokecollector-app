@@ -141,7 +141,9 @@ export default function BinderDetail() {
           extraData={selecting ? selection.selected : null}
           // A new list when the text size changes the columns, or editing
           // turns the tiles into rows: FlashList cannot change them in place.
-          key={isEditing ? 'editing' : columns}
+          // Likewise when choosing starts or ends in one column, where the
+          // check sits beside the card and a name can wrap onto a second line.
+          key={isEditing ? 'editing' : `${columns}${selecting && columns === 1 ? '-choosing' : ''}`}
           numColumns={isEditing ? 1 : columns}
           keyExtractor={(card) => String(card.binder_card_id)}
           contentContainerStyle={isEditing ? undefined : styles.list}

@@ -1511,6 +1511,15 @@ how to free it. The app has both.
 - **Not the single unlink.** `DELETE /api/products/{id}/cards/{pc}` with its
   `expected_*` guard would unlink one link; the bulk route does one as well,
   atomically, from the same resolution body.
+- **The list starts again when choosing starts or ends.** In a list, or
+  one-column tiles, the check sits beside the card rather than over it, so
+  the text narrows and a long name wraps. FlashList 2.0.2 did not re-measure
+  a row that grew in place: the first approved `collection-select.png` had a
+  row's price beside its name and the next row's count adrift. Collection
+  and a binder now key the list on choosing there, as the binder already
+  does for editing. The cost is that Select and Done return to the top of
+  the list. Grids are left alone: there the check covers the tile's corner
+  and nothing changes size.
 
 ## 2026-11-26 — Send every request at least once, whatever NetInfo says
 

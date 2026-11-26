@@ -34,8 +34,13 @@ workflow on macOS runners. Nothing here ships in the app.
   screen and the element. Fix them in the app. The screenshots in the run's
   `simulator-screenshots` artifact show the screen as the audit saw it.
 - **A walkthrough step failed**: that size's `simulator (…)` job log shows
-  what was on screen and what the app asked the fake server for, and its
-  `simulator-results-…` artifact has the `.xcresult`.
+  what was on screen, what reached the fake server, and the app's last
+  network and console lines, and its `simulator-results-…` artifact has the
+  `.xcresult`. A screen stuck on "Loading" is usually a request that never
+  arrived: follow it by time and client port from the fake server's
+  `server-<size>.log` (connections, TLS handshakes, requests started and
+  answered) to the app's `<size>-device.log` in the `simulator-output-…`
+  artifact.
 - **Screenshots differ**: the artifact has this run's screenshots and, under
   `diff/`, where they changed. If the change is intended, approve it.
 

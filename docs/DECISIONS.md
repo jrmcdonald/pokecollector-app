@@ -1403,5 +1403,18 @@ output said where the request stopped, so CI now records both ends:
   starts, which connection it takes, and how it ends. A failed walk prints
   the network and console lines in its job log, after the server's.
 
-No app code changes, and nothing is logged on a phone. The aim is to find
-the cause, then fix it; this section should then say what it was.
+No app code changes, and nothing is logged on a phone.
+
+**What it found**, on this change's own run: the request is sent, and stalls
+in the TLS handshake on a new connection while iOS checks the fake server's
+certificate. After 20 s the app's timeout cancels it (`CERTIFICATE_VERIFY_FAILED`
+in the app's log, "certificate unknown" in the server's). Requests on
+connections already open went through, which is why the screens before
+it loaded. The handshakes early in the walk succeeded and later ones failed:
+Node lets a TLS session be resumed for 300 s by default, and a resumed
+session skips the certificate check, so a few minutes in every new connection
+needed the check that hangs. The fake server now keeps sessions resumable
+for an hour, longer than a walk, and the device log includes `trustd`, the
+process that does the check, in case it still hangs. This is the CI
+simulator trusting a throwaway certificate authority; a phone checks a real
+server's certificate against the system's.

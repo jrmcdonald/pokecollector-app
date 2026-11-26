@@ -36,8 +36,14 @@ const route = createRouter(`https://localhost:${port}`);
 const stamp = () => new Date().toISOString().slice(11, 23);
 const from = (socket: Socket) => `:${socket.remotePort ?? '?'}`;
 
+// sessionTimeout: how long iOS may resume a TLS session instead of doing a
+// full handshake. A full handshake makes iOS check the certificate, and on
+// the CI simulator that check has hung (the app logs CERTIFICATE_VERIFY_FAILED
+// once its 20 s timeout cancels the request, and this server logs "certificate
+// unknown"). Node's default, 300 s, ran out a few minutes into each walk, and
+// every new connection after it needed that check. An hour outlasts a walk.
 const server = createServer(
-  { cert: readFileSync(values.cert), key: readFileSync(values.key) },
+  { cert: readFileSync(values.cert), key: readFileSync(values.key), sessionTimeout: 3600 },
   (req, res) => {
     // Headers in, body not yet: a request that stops here never gets the
     // completion line below.

@@ -88,12 +88,13 @@ prepare
 # how it ends) and React Native's console. Requests have stalled between the
 # app and the fake server with nothing in either side's output to say where;
 # this is the app's side of that, to read against the fake server's
-# timestamped lines. Kept in the run's artifact as <name>-device.log.
+# timestamped lines. trustd too: it checks the server's certificate for the
+# app, and that check has hung. Kept in the artifact as <name>-device.log.
 app_process=$(basename "$APP_PATH" .app)
 log_pid=
 start_device_log() {
   xcrun simctl spawn "$SIM_UDID" log stream --style compact --level info \
-    --predicate "process == \"$app_process\"" \
+    --predicate "process == \"$app_process\" OR process == \"trustd\"" \
     > "$OUT/$name-device.log" 2>&1 &
   log_pid=$!
 }
@@ -186,7 +187,7 @@ if [ "$status" -ne 0 ]; then
   tail -n "+$((server_lines_before + 1))" "$OUT/server.log" | tail -n 120
   echo "::endgroup::"
   echo "::group::The app's network and console log, last lines"
-  grep -E 'CFNetwork|Task <|Connection [0-9]|nw_|ReactNativeJS|error|Error' "$OUT/$name-device.log" |
+  grep -E 'CFNetwork|Task <|Connection [0-9]|nw_|boringssl|trustd|ReactNativeJS|error|Error' "$OUT/$name-device.log" |
     tail -n 150 || true
   echo "::endgroup::"
   echo "::group::Is the fake server still answering?"

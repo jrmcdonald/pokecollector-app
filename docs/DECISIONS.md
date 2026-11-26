@@ -1387,3 +1387,29 @@ moved and the app's did not.
   fields until it is fetched again.
 - **The set checklist** now prices with the same rule. It used
   `price_trend ?? price_market`, which let a zero trend hide a market price.
+
+## 2026-11-26 — Send every request at least once, whatever NetInfo says
+
+TanStack Query is told about the connection by NetInfo
+(`src/session/query.tsx`). With its default network mode, `online`, a query
+or mutation started while NetInfo reports no connection is paused: it is
+never sent, and waits for NetInfo to report one again. The Simulator
+walkthrough kept failing on a screen that opened, said "Loading", and never
+asked the fake server for anything, on `main` and on every open pull
+request, at whichever screen came next. NetInfo's own documentation says the
+iOS Simulator can miss network-change notifications when its host's network
+changes, which on a CI runner it does. A phone could be left the same way.
+
+Queries and mutations now use `offlineFirst`: the first attempt is always
+sent, and only retries wait for a connection. It suits this app anyway: the
+server is often on the home network, where iOS's idea of "connected" says
+little about whether it answers, and sending is the only real test.
+
+- **Requests:** no more than before. Offline, a screen costs at most the one
+  failed attempt, and its retries wait.
+- **What stays on NetInfo:** the "offline" hints that disable adding while
+  there is no connection (`useIsOnline`), and the re-probe of primary and
+  fallback addresses on a network change.
+- **Mutations:** an add while offline is sent once and fails with the
+  network error, rather than sitting paused with no feedback. That is the
+  behaviour the app's toasts already expect.

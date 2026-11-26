@@ -190,6 +190,11 @@ if [ "$status" -ne 0 ]; then
   grep -E 'CFNetwork|Task <|Connection [0-9]|nw_|boringssl|trustd|ReactNativeJS|error|Error' "$OUT/$name-device.log" |
     tail -n 150 || true
   echo "::endgroup::"
+  # The certificate check that hangs is trustd's, so all of what it logged,
+  # not just what landed in the app's last lines.
+  echo "::group::trustd's log in this walk"
+  grep -E ' trustd\[' "$OUT/$name-device.log" | tail -n 300 || true
+  echo "::endgroup::"
   echo "::group::Is the fake server still answering?"
   curl -sS --max-time 10 --cacert "$CA_CERT" "$SERVER_URL/api/auth/mode" || true
   echo

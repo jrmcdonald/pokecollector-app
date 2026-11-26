@@ -295,6 +295,70 @@ export const ChecklistSchema = z.looseObject({
 });
 export type Checklist = z.infer<typeof ChecklistSchema>;
 
+// ---------------------------------------------------------------------------
+// Artists (upstream 1.59.0, `api/cards.py`: `artists_index` and
+// `artist_checklist`). Untyped dicts in the spec; read loosely, so only what
+// the screens use is required.
+// ---------------------------------------------------------------------------
+
+/** One of an artist's most valuable cards, for the directory's row. */
+export const ArtistPreviewSchema = z.looseObject({
+  id: z.string(),
+  name: z.string().nullish(),
+  images_small: z.string().nullish(),
+  images_large: z.string().nullish(),
+});
+
+/**
+ * An artist in GET /api/cards/artists: how many distinct cards (printings of
+ * one card in several languages count once) and how many of them are owned.
+ */
+export const ArtistSummarySchema = z.looseObject({
+  name: z.string(),
+  total_count: z.number(),
+  owned_count: z.number(),
+  missing_count: z.number().nullish(),
+  progress: z.number().nullish(),
+  missing_value: z.number().nullish(),
+  preview_cards: z.array(ArtistPreviewSchema).nullish(),
+});
+export type ArtistSummary = z.infer<typeof ArtistSummarySchema>;
+
+export const ArtistIndexSchema = z.looseObject({
+  artists: z.array(ArtistSummarySchema),
+  total_count: z.number(),
+  page: z.number(),
+  page_size: z.number(),
+});
+export type ArtistIndex = z.infer<typeof ArtistIndexSchema>;
+
+/**
+ * A card in an artist's checklist: one per card, its printings folded in,
+ * with ownership summed across them. `id` is the printing shown.
+ */
+export const ArtistChecklistCardSchema = ChecklistCardSchema.extend({
+  set_name: z.string().nullish(),
+});
+export type ArtistChecklistCard = z.infer<typeof ArtistChecklistCardSchema>;
+
+/**
+ * GET /api/cards/artist-checklist. The counts describe all the artist's
+ * cards; `list_count` is how many the ownership filter leaves, which is what
+ * `page` and `page_size` page through.
+ */
+export const ArtistChecklistSchema = z.looseObject({
+  artist_query: z.string().nullish(),
+  total_count: z.number(),
+  owned_count: z.number(),
+  list_count: z.number(),
+  progress: z.number().nullish(),
+  missing_value: z.number().nullish(),
+  page: z.number(),
+  page_size: z.number(),
+  cards: z.array(ArtistChecklistCardSchema),
+});
+export type ArtistChecklist = z.infer<typeof ArtistChecklistSchema>;
+
 /**
  * Upstream's binder types. A "collection" binder holds exact collection
  * entries, so it only ever shows owned cards; a "wishlist" (planned) binder

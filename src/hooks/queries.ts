@@ -139,6 +139,13 @@ export function useKeys() {
       products: [cacheId, 'products'] as const,
       productTypes: [cacheId, 'product-types'] as const,
       holoEffects: [cacheId, 'setting', 'holo_effects_enabled'] as const,
+      artists: (q: string) => [cacheId, 'artists', q] as const,
+      artistsAll: [cacheId, 'artists'] as const,
+      artist: (name: string, missingOnly: boolean) =>
+        [cacheId, 'artist', name, missingOnly] as const,
+      artistAll: [cacheId, 'artist'] as const,
+      /** When this server last answered 404 to the artist pages, if it has. */
+      artistsMissing: [cacheId, 'feature', 'artists-missing'] as const,
     },
   };
 }
@@ -351,6 +358,8 @@ export function useInvalidateOwnership() {
         keys.searchAll,
         keys.sets,
         keys.checklistAll,
+        keys.artistsAll,
+        keys.artistAll,
         keys.binders,
         keys.binderAll,
         keys.binderContents,
@@ -538,6 +547,7 @@ export function useAddToWishlist() {
         queryClient.invalidateQueries({ queryKey: keys.wishlist }),
         queryClient.invalidateQueries({ queryKey: keys.searchAll }),
         queryClient.invalidateQueries({ queryKey: keys.checklistAll }),
+        queryClient.invalidateQueries({ queryKey: keys.artistAll }),
       ]),
   });
 }
@@ -565,6 +575,7 @@ export function useRemoveFromWishlist() {
         queryClient.invalidateQueries({ queryKey: keys.wishlist }),
         queryClient.invalidateQueries({ queryKey: keys.searchAll }),
         queryClient.invalidateQueries({ queryKey: keys.checklistAll }),
+        queryClient.invalidateQueries({ queryKey: keys.artistAll }),
       ]),
   });
 }

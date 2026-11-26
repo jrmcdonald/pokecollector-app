@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
@@ -48,11 +48,12 @@ import {
   useUpdateCopy,
 } from '@/hooks/queries';
 import { useAddCardToBinder } from '@/hooks/use-add-card-to-binder';
+import { useArtistsAvailable } from '@/hooks/use-artists';
 import { useLargeText } from '@/hooks/use-large-text';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useOwnerLabel } from '@/hooks/use-owner-label';
 import { useSetRef } from '@/hooks/use-set-ref';
-import { radius, spacing, useColors } from '@/theme';
+import { minTapTarget, radius, spacing, useColors } from '@/theme';
 import { binderKind, bindersOnly } from '@/utils/binders';
 import { CameraDeniedError, takeCardPhoto, type PhotoSource } from '@/utils/card-photo';
 import { entriesForCard } from '@/utils/collection';
@@ -151,6 +152,7 @@ export default function CardDetail() {
                   </ThemedView>
                 ))}
             </View>
+            {c.artist?.trim() ? <Illustrator name={c.artist.trim()} /> : null}
           </View>
 
           <Prices card={c} />
@@ -175,6 +177,41 @@ export default function CardDetail() {
         <GridSkeleton columns={1} rows={1} />
       )}
     </ThemedView>
+  );
+}
+
+/**
+ * Who drew the card. A link to every card they drew (upstream 1.59.0's
+ * artist checklist), or plain text on a server that has answered that it
+ * has no artist pages.
+ */
+function Illustrator({ name }: { name: string }) {
+  const available = useArtistsAvailable();
+  const colors = useColors();
+  if (!available) {
+    return (
+      <ThemedText variant="caption" color="textSecondary">
+        Illustrated by {name}
+      </ThemedText>
+    );
+  }
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={`Illustrated by ${name}`}
+      accessibilityHint="Shows every card they illustrated, and which you own"
+      onPress={() => router.push({ pathname: '/artist/[name]', params: { name } })}
+      hitSlop={spacing.sm}
+      style={({ pressed }) => [styles.illustrator, pressed && styles.pressed]}>
+      <Icon name="paintbrush.pointed" size={14} color="accent" />
+      <ThemedText variant="caption" color="textSecondary">
+        Illustrated by{' '}
+        <ThemedText variant="caption" style={{ color: colors.accent }}>
+          {name}
+        </ThemedText>
+      </ThemedText>
+      <Icon name="chevron.right" size={12} color="textSecondary" />
+    </Pressable>
   );
 }
 
@@ -541,6 +578,14 @@ const styles = StyleSheet.create({
   photo: { gap: spacing.sm },
   photoNote: { textAlign: 'center' },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2 },
+  illustrator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.xs + 2,
+    minHeight: minTapTarget,
+    alignSelf: 'flex-start',
+  },
   tag: { borderRadius: radius.sm, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs },
   panel: { padding: spacing.md, borderRadius: radius.lg - 2, borderWidth: 1, gap: spacing.sm + 4 },
   add: { gap: spacing.sm + 4 },

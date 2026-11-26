@@ -3,6 +3,8 @@
  * would reject them, the simulator tests would fail for the wrong reason.
  */
 import {
+  ArtistChecklistSchema,
+  ArtistIndexSchema,
   AuthModeSchema,
   BinderCardsSchema,
   BindersSchema,
@@ -102,6 +104,38 @@ describe('fake PokeCollector', () => {
     expect(search.data.map((c) => c.name)).toContain('Pikachu');
     const card = CardSchema.parse(json(get(`/api/cards/${encodeURIComponent('sv1-063_en')}`)));
     expect(card.name).toBe('Pikachu');
+  });
+
+  it('has artists, one partly owned, with a checklist that pages missing cards', () => {
+    const index = ArtistIndexSchema.parse(
+      json(get('/api/cards/artists?sort_by=progress&page=1&page_size=50')),
+    );
+    expect(index.artists.map((a) => a.name)).toEqual(
+      expect.arrayContaining(['Placeholder Studio', 'Sample Ink', 'Example Atelier']),
+    );
+    const sample = index.artists.find((a) => a.name === 'Sample Ink');
+    expect(sample?.owned_count).toBeGreaterThan(0);
+    expect(sample?.owned_count).toBeLessThan(sample?.total_count ?? 0);
+    const all = ArtistChecklistSchema.parse(
+      json(
+        get(
+          '/api/cards/artist-checklist?artist=Sample%20Ink&artist_match=exact&page=1&page_size=60',
+        ),
+      ),
+    );
+    const missing = ArtistChecklistSchema.parse(
+      json(
+        get(
+          '/api/cards/artist-checklist?artist=Sample%20Ink&artist_match=exact&ownership=missing&page=1&page_size=60',
+        ),
+      ),
+    );
+    expect(missing.total_count).toBe(all.total_count);
+    expect(missing.list_count).toBe(all.total_count - all.owned_count);
+    expect(missing.cards.every((c) => !c.owned)).toBe(true);
+    expect(
+      ArtistIndexSchema.parse(json(get('/api/cards/artists?q=ink&page=1&page_size=50'))).artists,
+    ).toHaveLength(1);
   });
 
   it('filters a search the way upstream does, each filter a substring', () => {

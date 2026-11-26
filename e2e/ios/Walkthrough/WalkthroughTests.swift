@@ -203,6 +203,15 @@ final class WalkthroughTests: XCTestCase {
     }
     capture("set-search")
     back(to: button(startingWith: "151, "), "Sets, again")
+
+    // Upstream 1.59.0's artist pages: the directory from Sets, then one
+    // artist's cards, owned and missing, in release and number order.
+    go(app.navigationBars.buttons["Artists"], to: button(startingWith: "Sample Ink"), "Artists")
+    capture("artists")
+    go(button(startingWith: "Sample Ink"), to: button(startingWith: "Venusaur ex"), "An artist")
+    capture("artist")
+    back(to: button(startingWith: "Sample Ink"), "Artists, again")
+    back(to: button(startingWith: "151, "), "Sets, again")
     back(to: button(startingWith: "Decks"), "More, again")
 
     // A planned deck with cards missing, and the paste screen for adding a

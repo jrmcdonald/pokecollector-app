@@ -2,6 +2,8 @@ import type { PokeCollectorClient } from './client';
 import { newIdempotencyKey } from './idempotency';
 import { NotFoundError } from './errors';
 import {
+  ArtistChecklistSchema,
+  ArtistIndexSchema,
   AuthModeSchema,
   BinderCardsSchema,
   BinderSchema,
@@ -31,6 +33,8 @@ import {
   WishlistItemSchema,
   WishlistSchema,
   settingFlag,
+  type ArtistChecklist,
+  type ArtistIndex,
   type AuthMode,
   type Binder,
   type BinderCards,
@@ -632,4 +636,47 @@ export function updateProduct(
 /** Upstream refuses (409) once a product has pulls or sales, so their history is kept. */
 export function deleteProduct(client: PokeCollectorClient, productId: number): Promise<unknown> {
   return client.request(`/api/products/${productId}`, { method: 'DELETE' });
+}
+
+/** The artist directory's page size, upstream's default. */
+export const ARTISTS_PAGE_SIZE = 50;
+/** An artist checklist's page size, as the web UI asks. */
+export const ARTIST_CHECKLIST_PAGE_SIZE = 60;
+
+/**
+ * Artists, most complete first (upstream 1.59.0). `q` is a case- and
+ * accent-insensitive substring of the name; empty lists every artist.
+ */
+export function getArtists(
+  client: PokeCollectorClient,
+  { q, page }: { q: string; page: number },
+): Promise<ArtistIndex> {
+  return client.request('/api/cards/artists', {
+    query: { q, sort_by: 'progress', page, page_size: ARTISTS_PAGE_SIZE },
+    schema: ArtistIndexSchema,
+  });
+}
+
+/**
+ * One artist's cards, in release and number order (upstream 1.59.0). The
+ * name matches exactly, as it was read from a card or the directory.
+ * `missingOnly` is filtered upstream, so only missing cards are paged.
+ */
+export function getArtistChecklist(
+  client: PokeCollectorClient,
+  { artist, missingOnly, page }: { artist: string; missingOnly: boolean; page: number },
+): Promise<ArtistChecklist> {
+  return client.request('/api/cards/artist-checklist', {
+    query: {
+      artist,
+      artist_match: 'exact',
+      ownership: missingOnly ? 'missing' : undefined,
+      page,
+      page_size: ARTIST_CHECKLIST_PAGE_SIZE,
+      sort_by: 'number',
+    },
+    schema: ArtistChecklistSchema,
+    // A prolific artist is thousands of catalogue rows, grouped upstream.
+    timeoutMs: 60_000,
+  });
 }

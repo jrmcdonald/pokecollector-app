@@ -1426,3 +1426,42 @@ app never resent a write: adding a card twice is worse than an error.
   the client takes it as success without looking at the header.
 - **No queued offline writes yet.** This is their foundation; see
   `PLAN.md` §7.2.
+
+## 2026-11-26 — Artist pages
+
+Upstream 1.59.0 (Git-Romer/pokecollector#472) added an artist checklist and
+an artist directory. The app has both.
+
+- **Where they are reached.** The illustrator, new on a card's page ("Illustrated by
+  …", a link), opens that artist's checklist; Sets has an Artists button
+  for the directory. Not Search: its header already carries the filters,
+  and Sets is where checklists live.
+- **The checklist is the set checklist's grid,** with the same tiles, owned
+  and missing, the artist's progress and what the missing cards would cost.
+  "Missing only" is a segmented control like the set's, but sent upstream
+  (`ownership=missing`) rather than filtered on the phone, because an
+  artist's list is paged: a prolific illustrator has hundreds of cards.
+  Pages of 60 load as the grid nears its end (`useInfiniteQuery`), and the
+  previous answer stays up while the other filter loads, so the toggle
+  does not vanish under the finger.
+- **Exact names.** The checklist asks with `artist_match=exact`, since the
+  name came from a card or the directory; `contains` would fold "Ken
+  Sugimori" into "Ken Sugimori, Kagemaru Himeno".
+- **The directory searches upstream**, 400 ms after typing stops, as the
+  catalogue search does, most complete first, 50 a page. Each row shows the
+  artist's most valuable card from `preview_cards`, loaded from TCGdex like
+  every other card image.
+- **Zod at the boundary.** Both answers are untyped dicts in the spec. The
+  schemas were checked against upstream's own answers, captured from its
+  `tests/test_artist_index.py` catalogue (`src/api/__tests__/artist-fixtures.ts`).
+- **On an older server** the first 404 is remembered for a day, per account,
+  in the persisted cache (`useArtistsAvailable`). Meanwhile the illustrator
+  is plain text and Sets has no Artists button, so no request is spent
+  finding out again; the queries never retry a 404. A day later the links
+  return, in case the server has been updated. Asking `GET /api/health` for
+  the version first would cost a request on every launch to save one on an
+  old server.
+- **Cache.** Thirty minutes stale, like a set's checklist, and invalidated
+  with it when the collection or wishlist changes.
+- **The fake server's 151 subset** now has three made-up illustrators, so
+  the walkthrough shows the directory and a partly owned artist.

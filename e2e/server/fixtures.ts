@@ -10,6 +10,9 @@
  * does.
  */
 import type {
+  ArtistChecklist,
+  ArtistIndex,
+  ArtistSummary,
   Binder,
   BinderCard,
   BinderCards,
@@ -102,6 +105,8 @@ type CardInfo = {
    * upstream 1.58.4 values it from this, converted at `USD_TO_EUR`.
    */
   tcgplayer?: number;
+  /** Made up, as all of this is; most cards are Placeholder Studio's. */
+  artist?: string;
 };
 
 /** The rate upstream saves with a card's TCGplayer prices. */
@@ -144,6 +149,8 @@ const CARD_INFO: CardInfo[] = [
     price: name.endsWith(' ex') ? 18.5 + i : 0.1 + (i % 5) * 0.05,
     reverse: true,
     holo: name.endsWith(' ex'),
+    // Three made-up illustrators share the 151 subset, for the artist pages.
+    artist: ['Placeholder Studio', 'Sample Ink', 'Example Atelier'][Math.floor(i / 2) % 3],
   })),
   { set: 'sv1', number: '063', name: 'Pikachu', rarity: 'Common', price: 0.25, reverse: true },
   { set: 'sv1', number: '198', name: 'Miraidon ex', rarity: 'Hyper Rare', price: 64.9, holo: true },
@@ -192,7 +199,7 @@ export function buildFixtures(origin: string) {
     number: c.number,
     rarity: c.rarity,
     supertype: 'Pokémon',
-    artist: 'Placeholder Studio',
+    artist: c.artist ?? 'Placeholder Studio',
     images_small: c.noImage ? null : image(cardId(c), 'small'),
     images_large: c.noImage ? null : image(cardId(c), 'large'),
     set_ref: setRef(c.set),
@@ -332,6 +339,83 @@ export function buildFixtures(origin: string) {
       // cards these fixtures know about, against the printed total.
       total_count: setId === 'sv3pt5' ? inSet.length : info.total,
       progress: owned / (setId === 'sv3pt5' ? inSet.length : info.total),
+    };
+  };
+
+  const setRank = (id: string | null | undefined) => SET_INFO.findIndex((info) => info.id === id);
+
+  /** GET /api/cards/artists: most complete first, as the app asks. */
+  const artists = (q: string, page: number, pageSize: number): ArtistIndex => {
+    const term = q.trim().toLowerCase();
+    const names = [...new Set(cards.map((c) => c.artist ?? ''))].filter(
+      (name) => name && name.toLowerCase().includes(term),
+    );
+    const all: ArtistSummary[] = names.map((name) => {
+      const theirs = cards.filter((c) => c.artist === name);
+      const owned = theirs.filter((c) => ownedIds.has(c.id)).length;
+      const missing = theirs.filter((c) => !ownedIds.has(c.id));
+      return {
+        name,
+        total_count: theirs.length,
+        owned_count: owned,
+        missing_count: missing.length,
+        progress: Math.round((owned / theirs.length) * 1000) / 10,
+        missing_value:
+          Math.round(missing.reduce((sum, c) => sum + (c.price_trend ?? 0), 0) * 100) / 100,
+        preview_cards: [...theirs]
+          .sort((a, b) => (b.price_trend ?? 0) - (a.price_trend ?? 0))
+          .slice(0, 3)
+          .map(({ id, name: cardName, images_small, images_large }) => ({
+            id,
+            name: cardName,
+            images_small,
+            images_large,
+          })),
+      };
+    });
+    all.sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0) || a.name.localeCompare(b.name));
+    return {
+      artists: all.slice((page - 1) * pageSize, page * pageSize),
+      total_count: all.length,
+      page,
+      page_size: pageSize,
+    };
+  };
+
+  /** GET /api/cards/artist-checklist, by exact name, oldest set first. */
+  const artistChecklist = (
+    artist: string,
+    ownership: string | null,
+    page: number,
+    pageSize: number,
+  ): ArtistChecklist => {
+    const theirs = cards
+      .filter((c) => c.artist === artist)
+      .sort(
+        (a, b) =>
+          setRank(b.set_id) - setRank(a.set_id) || Number(a.number ?? 0) - Number(b.number ?? 0),
+      )
+      .map((c) => ({ ...withOwnership(c), set_name: c.set_ref?.name ?? null }));
+    const listed =
+      ownership === 'missing'
+        ? theirs.filter((c) => !c.owned)
+        : ownership === 'owned'
+          ? theirs.filter((c) => c.owned)
+          : theirs;
+    const owned = theirs.filter((c) => c.owned).length;
+    return {
+      artist_query: artist,
+      total_count: theirs.length,
+      owned_count: owned,
+      list_count: listed.length,
+      progress: theirs.length ? Math.round((owned / theirs.length) * 1000) / 10 : 0,
+      missing_value:
+        Math.round(
+          theirs.filter((c) => !c.owned).reduce((sum, c) => sum + (c.price_trend ?? 0), 0) * 100,
+        ) / 100,
+      page,
+      page_size: pageSize,
+      cards: listed.slice((page - 1) * pageSize, page * pageSize),
     };
   };
 
@@ -728,6 +812,8 @@ export function buildFixtures(origin: string) {
     dashboard,
     sets,
     checklist,
+    artists,
+    artistChecklist,
     binders,
     binderCards,
     decks,

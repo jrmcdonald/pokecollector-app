@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
@@ -11,6 +11,7 @@ import { EmptyState, ErrorState, ListSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useSets } from '@/hooks/queries';
+import { useArtistsAvailable } from '@/hooks/use-artists';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { spacing, useColors } from '@/theme';
 import { completion, filterSets } from '@/utils/sets';
@@ -28,8 +29,27 @@ export default function Sets() {
     [sets.data, query, show],
   );
 
+  const artistsAvailable = useArtistsAvailable();
+
   return (
     <ThemedView style={styles.fill}>
+      <Stack.Screen
+        options={{
+          // Hidden once the server has said it has no artist pages (before 1.59.0).
+          unstable_headerRightItems: () =>
+            artistsAvailable
+              ? [
+                  {
+                    type: 'button',
+                    label: 'Artists',
+                    accessibilityLabel: 'Artists',
+                    icon: { type: 'sfSymbol', name: 'paintbrush.pointed' },
+                    onPress: () => router.push('/artists'),
+                  },
+                ]
+              : [],
+        }}
+      />
       <View style={styles.controls}>
         <SearchField value={query} onChangeText={setQuery} placeholder="Set name or series" />
         <Segmented<Show>

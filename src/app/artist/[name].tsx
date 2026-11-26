@@ -13,7 +13,7 @@ import { useArtistChecklist } from '@/hooks/use-artists';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useCardColumns } from '@/hooks/use-large-text';
 import { spacing, useColors } from '@/theme';
-import { formatTotal } from '@/utils/pricing';
+import { formatPrice } from '@/utils/pricing';
 import { completion } from '@/utils/sets';
 
 type Show = 'all' | 'missing';
@@ -53,9 +53,10 @@ export default function ArtistChecklist() {
         </ThemedText>
       </View>
       <ProgressBar value={completion(first.owned_count, first.total_count)} height={8} decorative />
-      {first.missing_value ? (
+      {/* In cents: a few cheap commons would round to "€0". */}
+      {first.missing_value && first.missing_value > 0 && first.owned_count < first.total_count ? (
         <ThemedText variant="caption" color="textSecondary">
-          {formatTotal(first.missing_value)} for the missing cards, at today’s prices.
+          {formatPrice(first.missing_value)} for the missing cards, at today’s prices.
         </ThemedText>
       ) : null}
       <Segmented<Show>

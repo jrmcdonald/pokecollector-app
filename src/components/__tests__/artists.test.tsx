@@ -124,6 +124,7 @@ describe("an artist's checklist", () => {
   it('shows the artist’s progress and every card, owned or missing', async () => {
     await show(<ArtistChecklist />);
     expect(await screen.findByLabelText('1 of 4 cards owned, 25 percent')).toBeOnTheScreen();
+    expect(screen.getByText('€11.50 for the missing cards, at today’s prices.')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: /^Mew, missing/ })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: /^Pikachu ex, 2 owned/ })).toBeOnTheScreen();
   });

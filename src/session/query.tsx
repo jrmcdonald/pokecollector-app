@@ -18,11 +18,25 @@ onlineManager.setEventListener((setOnline) =>
   NetInfo.addEventListener((state) => setOnline(state.isConnected !== false)),
 );
 
+/**
+ * Every request is sent at least once, whatever NetInfo says; only retries
+ * wait for a connection. With TanStack's default ("online"), a query or
+ * mutation started while NetInfo reports no connection is paused without
+ * ever being sent, and stays paused until NetInfo reports one again. iOS can
+ * miss that notification (the Simulator does when its host's network
+ * changes), which left screens on "Loading" for good. And the server is often
+ * on the home network, where iOS's idea of "connected" is beside the point:
+ * sending is the only real test. A failed send while offline pauses the
+ * retries, so being offline still costs at most one request.
+ */
+export const NETWORK_MODE = 'offlineFirst';
+
 const ONE_DAY = 24 * 60 * 60 * 1000;
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      networkMode: NETWORK_MODE,
       staleTime: 5 * 60 * 1000,
       gcTime: 7 * ONE_DAY,
       refetchOnWindowFocus: false,
@@ -37,7 +51,7 @@ export const queryClient = new QueryClient({
           ? error.retryAfter * 1000
           : Math.min(1000 * 2 ** attempt, 15_000),
     },
-    mutations: { retry: false },
+    mutations: { networkMode: NETWORK_MODE, retry: false },
   },
 });
 

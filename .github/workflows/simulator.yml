@@ -260,25 +260,32 @@ jobs:
       # repository, and the next step writes into it.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      # A freshly erased simulator's trustd downloads Apple's certificate
-      # revocation database from valid.apple.com some minutes after boot, from
-      # scratch ("validupdate ... version=0"). While it writes, its database is
-      # locked and every certificate check waits: new connections to the fake
-      # server stalled until the app's 20 s timeout, and walks failed on a
-      # screen left "Loading". The simulator uses the runner's resolver, so the
-      # download now fails at once. The fake server's certificate comes from a
-      # throwaway CA that the revocation data does not cover. See
+      # Some minutes after boot, a freshly erased simulator's trustd fetches a
+      # trust store update (the PKITrustSupplementals asset, from Apple's asset
+      # servers) and moves its pinning database from version 121 to 131. From
+      # then on, the app rejected the fake server's certificate on every new
+      # connection ("certificate unknown"), and walks failed on a screen left
+      # "Loading". It also downloads the revocation database from
+      # valid.apple.com, which locks trustd's database while it writes. The
+      # simulator uses the runner's resolver, so pointing these hosts at
+      # localhost makes both downloads fail. The fake server's certificate
+      # comes from a throwaway CA that neither update covers. See
       # docs/DECISIONS.md, "Logging where walkthrough requests stall".
-      - name: Keep trustd from downloading the revocation database
+      - name: Keep trustd from updating its certificate databases
         run: |
-          printf '127.0.0.1 valid.apple.com\n::1 valid.apple.com\n' | sudo tee -a /etc/hosts
+          hosts="valid.apple.com mesu.apple.com gdmf.apple.com updates.cdn-apple.com appldnld.apple.com"
+          for host in ${hosts}; do
+            printf '127.0.0.1 %s\n::1 %s\n' "${host}" "${host}" | sudo tee -a /etc/hosts
+          done
           sudo dscacheutil -flushcache
           sudo killall -HUP mDNSResponder || true
-          if curl -sS --max-time 5 -o /dev/null https://valid.apple.com/ 2>/dev/null; then
-            echo "::error::valid.apple.com is still reachable"
-            exit 1
-          fi
-          echo "valid.apple.com is blocked"
+          for host in ${hosts}; do
+            if curl -sS --max-time 5 -o /dev/null "https://${host}/" 2>/dev/null; then
+              echo "::error::${host} is still reachable"
+              exit 1
+            fi
+          done
+          echo "Blocked: ${hosts}"
 
       # The pinned device on the pinned iOS, booted before anything else: a
       # runner's first boot does one-off work that stalled the app for up to a

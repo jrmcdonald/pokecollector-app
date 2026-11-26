@@ -1414,22 +1414,31 @@ loaded.
 
 Keeping TLS sessions resumable for an hour (`sessionTimeout`), so that fewer
 connections need the check, did not stop it. Printing trustd's own log found
-the cause: some minutes after boot (7 to 13 in the runs read), the freshly
-erased simulator's trustd starts downloading Apple's certificate revocation
-database from `valid.apple.com`, from scratch (`validupdate … version=0`), and
-updates its pinning database (`version 121 to version 131`). While it does,
-its database is locked (`database is locked`, hundreds of times), and every
-certificate check waits on it. Every handshake before the update succeeded;
-every new one after it failed.
+when it starts: some minutes after boot (7 to 13 in the runs read), the
+freshly erased simulator's trustd fetches a trust store update from Apple's
+asset servers (the `PKITrustSupplementals` asset) and moves its pinning
+database from version 121 to 131 (`Pinning database should update`). Every
+handshake before the update succeeded; from about a minute after it, every
+new one failed with "certificate unknown", to the end of the walk. Each failed
+walk read shows that sequence. The same trustd also downloads Apple's
+revocation database from `valid.apple.com`, from scratch
+(`validupdate … version=0`), and in some runs its database was locked while
+it wrote (`database is locked`), which delays checks further.
 
-**The fix:** the Simulator job points `valid.apple.com` at localhost in the
+**The fix:** the Simulator job points the update hosts at localhost in the
 runner's `/etc/hosts` before booting the simulator, which uses the runner's
-resolver, so the download fails at once and never holds the lock. The fake
-server's certificate comes from a throwaway CA that Apple's revocation data
-does not cover, so nothing the walkthrough checks changes. Every walk prints
-trustd's update lines, the count of `database is locked`, and the count of
-failed handshakes, so the block keeps being checked. The session change stays:
-it is harmless and means fewer checks.
+resolver, so both downloads fail: `valid.apple.com` for the revocation data,
+and `mesu.apple.com`, `gdmf.apple.com`, `updates.cdn-apple.com` and
+`appldnld.apple.com` for the asset. The fake server's certificate comes from
+a throwaway CA that neither update covers, so nothing the walkthrough checks
+changes. Every walk prints trustd's update lines and counts the pinning
+database updates, the `database is locked` lines and the failed handshakes, so
+the block keeps being checked.
+
+Blocking `valid.apple.com` alone was tried first. One run passed, with no
+asset download in either walk; on the next, the asset arrived, the pinning
+database updated, and the walk failed the same way, with no locked database.
+The session change stays: it is harmless and means fewer checks.
 
 This is the CI simulator only. A phone checks a real server's certificate
 against the system's, with its revocation data long since downloaded.

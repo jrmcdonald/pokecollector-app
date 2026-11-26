@@ -171,10 +171,11 @@ fi
 grep -E '^AUDIT|^CAPTURE|error:|Test Case .* failed|\*\* TEST' "$OUT/$name.log" || true
 
 # Whether trustd updated its certificate databases during this walk, and
-# whether any handshake failed: passed walks too, so the valid.apple.com block
-# in the workflow keeps being checked, not only when a walk fails.
+# whether any handshake failed: passed walks too, so the workflow's block on
+# Apple's update hosts keeps being checked, not only when a walk fails.
 echo "::group::trustd's database updates and failed handshakes in this walk"
-grep -E 'validupdate|pinningDb' "$OUT/$name-device.log" | tail -n 20 || true
+grep -E 'validupdate|pinningDb|PKITrustSupplementals' "$OUT/$name-device.log" | tail -n 20 || true
+echo "pinning database updates: $(grep -c 'Pinning database should update' "$OUT/$name-device.log" || true)"
 echo "\"database is locked\" lines: $(grep -c 'database is locked' "$OUT/$name-device.log" || true)"
 echo "failed TLS handshakes: $(tail -n "+$((server_lines_before + 1))" "$OUT/server.log" | grep -c 'TLS failed: [0-9A-F]' || true)"
 echo "::endgroup::"

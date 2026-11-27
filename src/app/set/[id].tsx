@@ -59,125 +59,136 @@ export default function SetChecklist() {
     <ThemedView style={styles.fill}>
       <Stack.Screen options={{ title: data?.set.name ?? name ?? '' }} />
       {data ? (
-        // React Native's FlatList, not FlashList: FlashList 2.0.2 can leave
-        // cells from before a search narrowed the list on screen, even with no
-        // recycle pool (a set searched for "char" still showed Caterpie and
-        // Raticate, what "c" found). FlatList renders each row from the data
-        // it is given, and a set is a few hundred cards at most.
-        <FlatList
-          data={shown}
-          // A new list when the text size changes the columns: FlatList
-          // cannot change them in place.
-          key={columns}
-          numColumns={columns}
-          keyExtractor={(card) => card.id}
-          contentContainerStyle={styles.list}
-          contentInsetAdjustmentBehavior="automatic"
-          keyboardDismissMode="on-drag"
-          keyboardShouldPersistTaps="handled"
-          refreshControl={
-            <RefreshControl
-              refreshing={pull.refreshing}
-              onRefresh={pull.onRefresh}
-              tintColor={colors.textSecondary}
+        <>
+          {/* The search stays above the list, not in its header: the list
+              starts again with each letter, and a field inside it would lose
+              the keyboard. Rarity and Show scroll with the list, so at the
+              largest text size the cards keep most of the screen. */}
+          <View style={styles.controls}>
+            <SearchField
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Name or number"
+              accessibilityLabel="Search this set"
             />
-          }
-          ListHeaderComponent={
-            <View style={styles.header}>
-              <View
-                style={styles.progress}
-                accessible
-                accessibilityLabel={`${data.owned_count} of ${data.total_count} owned, ${Math.round(completion(data.owned_count, data.total_count) * 100)} percent`}>
-                <ThemedText variant="figure">
-                  {data.owned_count}
-                  <ThemedText variant="figureSmall" color="textSecondary">
-                    {' '}
-                    / {data.total_count}
+          </View>
+          <FlatList
+            data={shown}
+            // A new list for each search, and when the text size changes the
+            // columns (FlatList cannot change them in place). On
+            // the simulator, a list that narrowed in place has kept rows it
+            // had dropped: a set searched for "char" still held Caterpie,
+            // which "c" found, though the list was given only the Char cards.
+            // That was so with FlashList and then FlatList, and not in Jest,
+            // so it is in the native views; a list removed whole takes every
+            // row with it. A set is a few hundred cards at most. Not for Show
+            // or Rarity: they are in the header, which would start again too
+            // and take VoiceOver's focus off the control just chosen.
+            key={`${columns}|${query.trim()}`}
+            numColumns={columns}
+            keyExtractor={(card) => card.id}
+            contentContainerStyle={styles.list}
+            contentInsetAdjustmentBehavior="automatic"
+            keyboardDismissMode="on-drag"
+            keyboardShouldPersistTaps="handled"
+            refreshControl={
+              <RefreshControl
+                refreshing={pull.refreshing}
+                onRefresh={pull.onRefresh}
+                tintColor={colors.textSecondary}
+              />
+            }
+            ListHeaderComponent={
+              <View style={styles.header}>
+                <View
+                  style={styles.progress}
+                  accessible
+                  accessibilityLabel={`${data.owned_count} of ${data.total_count} owned, ${Math.round(completion(data.owned_count, data.total_count) * 100)} percent`}>
+                  <ThemedText variant="figure">
+                    {data.owned_count}
+                    <ThemedText variant="figureSmall" color="textSecondary">
+                      {' '}
+                      / {data.total_count}
+                    </ThemedText>
                   </ThemedText>
-                </ThemedText>
-                <ThemedText variant="figureSmall" color="textSecondary">
-                  {Math.round(completion(data.owned_count, data.total_count) * 100)}%
-                </ThemedText>
-              </View>
-              <ProgressBar
-                value={completion(data.owned_count, data.total_count)}
-                height={8}
-                decorative
-              />
-              <SearchField
-                value={query}
-                onChangeText={setQuery}
-                placeholder="Name or number"
-                accessibilityLabel="Search this set"
-              />
-              {rarities.length > 1 ? (
-                <View style={styles.buttons}>
-                  <FilterButton
-                    name="Rarity"
-                    label={rarity ? rarityLabel(rarity) : 'Rarity'}
-                    active={!!rarity}
-                    onPress={chooseRarity}
-                  />
+                  <ThemedText variant="figureSmall" color="textSecondary">
+                    {Math.round(completion(data.owned_count, data.total_count) * 100)}%
+                  </ThemedText>
                 </View>
-              ) : null}
-              <Segmented<ChecklistShow>
-                label="Show"
-                options={[
-                  { value: 'all', label: 'All' },
-                  { value: 'missing', label: 'Missing' },
-                  { value: 'owned', label: 'Owned' },
-                ]}
-                value={show}
-                onChange={setShow}
-              />
-            </View>
-          }
-          renderItem={({ item: card }) => (
-            // A fixed share of the row, so a short last row keeps the grid's
-            // column widths instead of stretching.
-            <View style={{ width: `${100 / columns}%` }}>
-              <CardTile
-                layout={columns === 1 ? 'row' : 'tile'}
-                card={card}
-                detail={[card.number, formatQuote(priceQuote(card))].filter(Boolean).join(' · ')}
-                detailLabel={[card.number, spokenQuote(priceQuote(card))]
-                  .filter(Boolean)
-                  .join(', ')}
-                quantity={card.owned_quantity ?? 0}
-                missing={!isOwned(card)}
-              />
-            </View>
-          )}
-          ListEmptyComponent={
-            searching ? (
-              <EmptyState
-                title="No matches"
-                message={
-                  show === 'all'
-                    ? 'No card in this set matches.'
-                    : `No ${show} card in this set matches.`
-                }
-                action={{
-                  title: 'Clear filters',
-                  onPress: () => {
-                    setQuery('');
-                    setRarity(null);
-                    setShow('all');
-                  },
-                }}
-              />
-            ) : (
-              <EmptyState
-                title={show === 'missing' ? 'Set complete' : 'Nothing owned yet'}
-                message={
-                  show === 'missing'
-                    ? 'You own every card in this set.'
-                    : 'Cards you own from this set show up here.'
-                }
-              />
-            )
-          }
-        />
+                <ProgressBar
+                  value={completion(data.owned_count, data.total_count)}
+                  height={8}
+                  decorative
+                />
+                {rarities.length > 1 ? (
+                  <View style={styles.buttons}>
+                    <FilterButton
+                      name="Rarity"
+                      label={rarity ? rarityLabel(rarity) : 'Rarity'}
+                      active={!!rarity}
+                      onPress={chooseRarity}
+                    />
+                  </View>
+                ) : null}
+                <Segmented<ChecklistShow>
+                  label="Show"
+                  options={[
+                    { value: 'all', label: 'All' },
+                    { value: 'missing', label: 'Missing' },
+                    { value: 'owned', label: 'Owned' },
+                  ]}
+                  value={show}
+                  onChange={setShow}
+                />
+              </View>
+            }
+            renderItem={({ item: card }) => (
+              // A fixed share of the row, so a short last row keeps the grid's
+              // column widths instead of stretching.
+              <View style={{ width: `${100 / columns}%` }}>
+                <CardTile
+                  layout={columns === 1 ? 'row' : 'tile'}
+                  card={card}
+                  detail={[card.number, formatQuote(priceQuote(card))].filter(Boolean).join(' · ')}
+                  detailLabel={[card.number, spokenQuote(priceQuote(card))]
+                    .filter(Boolean)
+                    .join(', ')}
+                  quantity={card.owned_quantity ?? 0}
+                  missing={!isOwned(card)}
+                />
+              </View>
+            )}
+            ListEmptyComponent={
+              searching ? (
+                <EmptyState
+                  title="No matches"
+                  message={
+                    show === 'all'
+                      ? 'No card in this set matches.'
+                      : `No ${show} card in this set matches.`
+                  }
+                  action={{
+                    title: 'Clear filters',
+                    onPress: () => {
+                      setQuery('');
+                      setRarity(null);
+                      setShow('all');
+                    },
+                  }}
+                />
+              ) : (
+                <EmptyState
+                  title={show === 'missing' ? 'Set complete' : 'Nothing owned yet'}
+                  message={
+                    show === 'missing'
+                      ? 'You own every card in this set.'
+                      : 'Cards you own from this set show up here.'
+                  }
+                />
+              )
+            }
+          />
+        </>
       ) : checklist.error ? (
         <ErrorState error={checklist.error} onRetry={() => checklist.refetch()} />
       ) : (
@@ -190,6 +201,7 @@ export default function SetChecklist() {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   list: { padding: spacing.sm },
+  controls: { padding: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm + 4 },
   header: { padding: spacing.sm, paddingBottom: spacing.md, gap: spacing.sm + 4 },
   progress: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

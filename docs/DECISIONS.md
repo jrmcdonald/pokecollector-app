@@ -1642,3 +1642,32 @@ local run (`jest --ci --cacheDirectory=<new dir>`) failed it once in four.
 
 `testTimeout` is 15000 in `package.json`. A test that really hangs still
 fails, ten seconds later.
+
+## 2026-11-27 — A set's search sits above its list, and each search starts a new list
+
+FlatList did not end the stale rows ("A set's checklist is a FlatList",
+2026-10-03). An approval walkthrough at the largest text size again found
+Caterpie after "char", a row below the three Char cards, though the field read
+"char" and the list's data held only those three. A screen test typing "c",
+"ch", "cha", "char" leaves only the Char cards, so React's side is right; with
+FlashList and FlatList alike, the native views kept a row the list had
+removed. That cannot be debugged without a simulator to hand.
+
+- **The list starts again for each search.** Its `key` holds the columns and
+  the trimmed search, so a new search removes the old list whole, every
+  native row with it, instead of narrowing it in place. A set is a few
+  hundred cards at most, and the first screenful renders at once. A search
+  also goes back to the top of the set, where its matches start.
+- **So the search field sits above the list,** not in its header: in a list
+  that starts again, the field would be made again with each letter and lose
+  the keyboard.
+- **Rarity, Show and the progress stay in the header** and scroll away. With
+  all three fixed above the list as well, the largest text size left the
+  cards about 40% of the screen. Show and Rarity are not in the key: the
+  header would start again with the list and take VoiceOver's focus off the
+  control just chosen. They still narrow the list in place, which has not
+  been seen to leave a row; if it does, they need another way.
+- **The walkthrough still waits for Caterpie to go** after "char", and
+  `set-checklist.test.tsx` covers the search and filters by role and name.
+  If the leftover comes back with a list that starts again, the cause is not
+  in how a list narrows.

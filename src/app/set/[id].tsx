@@ -60,9 +60,10 @@ export default function SetChecklist() {
       <Stack.Screen options={{ title: data?.set.name ?? name ?? '' }} />
       {data ? (
         <>
-          {/* The search and filters stay above the list, not in its header:
-              the list starts again whenever they change, and a field inside
-              it would lose its focus each letter. */}
+          {/* The search stays above the list, not in its header: the list
+              starts again with each letter, and a field inside it would lose
+              the keyboard. Rarity and Show scroll with the list, so at the
+              largest text size the cards keep most of the screen. */}
           <View style={styles.controls}>
             <SearchField
               value={query}
@@ -70,38 +71,20 @@ export default function SetChecklist() {
               placeholder="Name or number"
               accessibilityLabel="Search this set"
             />
-            {rarities.length > 1 ? (
-              <View style={styles.buttons}>
-                <FilterButton
-                  name="Rarity"
-                  label={rarity ? rarityLabel(rarity) : 'Rarity'}
-                  active={!!rarity}
-                  onPress={chooseRarity}
-                />
-              </View>
-            ) : null}
-            <Segmented<ChecklistShow>
-              label="Show"
-              options={[
-                { value: 'all', label: 'All' },
-                { value: 'missing', label: 'Missing' },
-                { value: 'owned', label: 'Owned' },
-              ]}
-              value={show}
-              onChange={setShow}
-            />
           </View>
           <FlatList
             data={shown}
-            // A new list for each search and filter, and when the text size
-            // changes the columns (FlatList cannot change them in place). On
+            // A new list for each search, and when the text size changes the
+            // columns (FlatList cannot change them in place). On
             // the simulator, a list that narrowed in place has kept rows it
             // had dropped: a set searched for "char" still held Caterpie,
             // which "c" found, though the list was given only the Char cards.
             // That was so with FlashList and then FlatList, and not in Jest,
             // so it is in the native views; a list removed whole takes every
-            // row with it. A set is a few hundred cards at most.
-            key={`${columns}|${show}|${rarity ?? ''}|${query.trim()}`}
+            // row with it. A set is a few hundred cards at most. Not for Show
+            // or Rarity: they are in the header, which would start again too
+            // and take VoiceOver's focus off the control just chosen.
+            key={`${columns}|${query.trim()}`}
             numColumns={columns}
             keyExtractor={(card) => card.id}
             contentContainerStyle={styles.list}
@@ -136,6 +119,26 @@ export default function SetChecklist() {
                   value={completion(data.owned_count, data.total_count)}
                   height={8}
                   decorative
+                />
+                {rarities.length > 1 ? (
+                  <View style={styles.buttons}>
+                    <FilterButton
+                      name="Rarity"
+                      label={rarity ? rarityLabel(rarity) : 'Rarity'}
+                      active={!!rarity}
+                      onPress={chooseRarity}
+                    />
+                  </View>
+                ) : null}
+                <Segmented<ChecklistShow>
+                  label="Show"
+                  options={[
+                    { value: 'all', label: 'All' },
+                    { value: 'missing', label: 'Missing' },
+                    { value: 'owned', label: 'Owned' },
+                  ]}
+                  value={show}
+                  onChange={setShow}
                 />
               </View>
             }

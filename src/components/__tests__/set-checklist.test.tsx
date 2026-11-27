@@ -1,7 +1,7 @@
 /**
  * A set's checklist, searched and filtered over its one response. The
  * search sits above the list, which starts again for each search, so typing
- * keeps the field and its focus, and only what matches is left.
+ * keeps the field, and only what matches is left.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react-native';

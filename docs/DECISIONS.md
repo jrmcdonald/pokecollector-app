@@ -1629,3 +1629,16 @@ Two walkthrough failures that were not the app's:
   away by 80 points, then back by 80 plus the error, so whatever a drag loses
   before the scroll view takes it cancels out. It stops within a quarter of a
   point, and logs where the heading ended (`CAPTURE bringToTop`).
+
+## 2026-11-27 — Jest's test timeout is 15 seconds
+
+CI failed `deck-edit.test.tsx`, "edits the copies of a card, and saves them",
+on Jest's default 5 s timeout, three times on one branch and never locally. It
+was not a hang. The first test in a file to render a screen also compiles every
+module that screen pulls in, and CI's Jest cache is always empty: on a cold
+cache that one test takes about 3.9 s on its own (3.8 s on `main` too), against
+0.7 s warm, and with every worker compiling at once it went past 5 s. A cold
+local run (`jest --ci --cacheDirectory=<new dir>`) failed it once in four.
+
+`testTimeout` is 15000 in `package.json`. A test that really hangs still
+fails, ten seconds later.

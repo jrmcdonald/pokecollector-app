@@ -1442,3 +1442,23 @@ The session change stays: it is harmless and means fewer checks.
 
 This is the CI simulator only. A phone checks a real server's certificate
 against the system's, with its revocation data long since downloaded.
+
+## 2026-11-27 — Walkthrough: focus by label, and a price history that lands in place
+
+Two walkthrough failures that were not the app's:
+
+- **Typing stopped after one character.** `type()` retries a field one
+  character at a time and checks before each that the field still has the
+  keyboard. `hasFocus()` matched the focused field to the field by frame.
+  While the keyboard opens, the form scrolls, and two queries a moment apart
+  disagree on the frame, so every retry stopped after the first character:
+  the username held "a" and was still focused. It now matches by label, which
+  is unique on every form; a field without one falls back to the frame.
+- **`card-price-history.png` moved from run to run.** `bringToTop()` drags the
+  "Price history" heading under the bar and holds, but a drag landed a few
+  points apart each time, and the comparison allows 0.1% of pixels to change.
+  Approved captures on three branches were each at a different offset. After
+  the drag it now measures the heading and corrects with pairs of drags:
+  away by 80 points, then back by 80 plus the error, so whatever a drag loses
+  before the scroll view takes it cancels out. It stops within a quarter of a
+  point, and logs where the heading ended (`CAPTURE bringToTop`).

@@ -13,7 +13,7 @@ import { useOwnerLabel } from '@/hooks/use-owner-label';
 import { useSetRef } from '@/hooks/use-set-ref';
 import { radius, spacing, useColors } from '@/theme';
 import { entriesForCard } from '@/utils/collection';
-import { cardValue, formatPrice } from '@/utils/pricing';
+import { formatPrice, formatQuote, priceQuote, quoteSource, spokenQuote } from '@/utils/pricing';
 
 import { MatchSummary } from './scan-confirm';
 
@@ -103,16 +103,26 @@ function Price({ cardId }: { cardId: string }) {
     ['Market', c.price_market],
     ['30-day', c.price_avg30],
   ];
-  const value = cardValue(c);
+  const quote = priceQuote(c);
+  const estimate = quote.source === 'tcgplayer';
   return (
     <ThemedView background="surface" style={[styles.panel, { borderColor: colors.border }]}>
       <View
         accessible
-        accessibilityLabel={`Trend price: ${formatPrice(value)}, Cardmarket, in euros`}>
+        accessibilityLabel={
+          estimate
+            ? `Estimated price: ${spokenQuote(quote)}`
+            : `Trend price: ${formatPrice(quote.amount)}, Cardmarket, in euros`
+        }>
         <ThemedText variant="overline" color="textSecondary">
-          Trend · Cardmarket, €
+          {estimate ? 'Estimate · TCGplayer' : 'Trend · Cardmarket, €'}
         </ThemedText>
-        <ThemedText variant="figure">{formatPrice(value)}</ThemedText>
+        <ThemedText variant="figure">{formatQuote(quote)}</ThemedText>
+        {estimate ? (
+          <ThemedText variant="caption" color="textSecondary">
+            {quoteSource(quote)}
+          </ThemedText>
+        ) : null}
       </View>
       <View
         accessible

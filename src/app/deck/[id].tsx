@@ -1,12 +1,13 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, RefreshControl, StyleSheet, View } from 'react-native';
 
 import type { Deck } from '@/api/schemas';
 import { Button } from '@/components/button';
 import { CardPickerSheet } from '@/components/card-picker-sheet';
 import { DeckEntryRow, EditableDeckEntryRow } from '@/components/deck-entry-row';
+import { SelectionBar } from '@/components/selection-bar';
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -19,7 +20,9 @@ import {
   useRenameDeck,
   useSetDeckEntryQuantity,
 } from '@/hooks/queries';
+import { useBulkRemoval, useBulkRemovalAvailable } from '@/hooks/use-bulk-removal';
 import { useOwnerLabel } from '@/hooks/use-owner-label';
+import { useSelection } from '@/hooks/use-selection';
 import { usePrefetchCardImages } from '@/hooks/use-prefetch-card-images';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { spacing, useColors } from '@/theme';
@@ -46,22 +49,57 @@ export default function DeckDetail() {
   const data = deck.data;
   const isEditing = editing && online;
 
+  // Choosing cards to take out together (upstream 1.57.0). A Real Deck's
+  // copies are released, not removed. Hidden for a day after a 404.
+  const canSelect = useBulkRemovalAvailable() && online && !isEditing;
+  const entries = useMemo(() => data?.entries ?? [], [data]);
+  const entryIds = useMemo(() => entries.map((e) => e.id), [entries]);
+  const selection = useSelection(entryIds);
+  const selecting = selection.active && canSelect;
+  const bulk = useBulkRemoval({ kind: 'deck', id: deckId });
+  const chosen = entries.filter((e) => selection.isSelected(e.id));
+  const chosenCopies = chosen.reduce((sum, e) => sum + e.required_quantity, 0);
+
   return (
     <ThemedView style={styles.fill}>
       <Stack.Screen
         options={{
           title: data?.name ?? name ?? '',
           unstable_headerRightItems: () =>
-            data && online
+            selecting
               ? [
                   {
                     type: 'button',
-                    label: isEditing ? 'Done' : 'Edit',
-                    accessibilityLabel: isEditing ? 'Done editing' : 'Edit this deck',
-                    onPress: () => setEditing(!isEditing),
+                    label: selection.allSelected ? 'Deselect all' : 'Select all',
+                    onPress: selection.allSelected ? selection.clear : selection.selectAll,
+                  },
+                  {
+                    type: 'button',
+                    label: 'Done',
+                    accessibilityLabel: 'Done choosing',
+                    onPress: selection.cancel,
                   },
                 ]
-              : [],
+              : data && online
+                ? [
+                    ...(canSelect && entries.length
+                      ? [
+                          {
+                            type: 'button' as const,
+                            label: 'Select',
+                            accessibilityLabel: 'Choose cards to take out',
+                            onPress: selection.enter,
+                          },
+                        ]
+                      : []),
+                    {
+                      type: 'button',
+                      label: isEditing ? 'Done' : 'Edit',
+                      accessibilityLabel: isEditing ? 'Done editing' : 'Edit this deck',
+                      onPress: () => setEditing(!isEditing),
+                    },
+                  ]
+                : [],
         }}
       />
       {data ? (
@@ -70,6 +108,7 @@ export default function DeckDetail() {
           // recycled cell would carry them over to another card.
           maxItemsInRecyclePool={0}
           data={data.entries ?? []}
+          extraData={selecting ? selection.selected : null}
           keyExtractor={(entry) => String(entry.id)}
           refreshControl={
             <RefreshControl
@@ -93,7 +132,18 @@ export default function DeckDetail() {
                 onChange={(quantity) => setQuantity.mutate({ entryId: item.id, quantity })}
               />
             ) : (
-              <DeckEntryRow deck={data} entry={item} />
+              <DeckEntryRow
+                deck={data}
+                entry={item}
+                selection={
+                  selecting
+                    ? {
+                        selected: selection.isSelected(item.id),
+                        onToggle: () => selection.toggle(item.id),
+                      }
+                    : undefined
+                }
+              />
             )
           }
           ListEmptyComponent={
@@ -110,6 +160,21 @@ export default function DeckDetail() {
         <ListSkeleton />
       )}
       {data ? <AddCardSheet deck={data} visible={adding} onClose={() => setAdding(false)} /> : null}
+      {selecting ? (
+        <SelectionBar
+          count={chosen.length}
+          copies={chosenCopies}
+          action="Take out"
+          busy={bulk.busy}
+          onAction={() =>
+            bulk.remove(
+              chosen.map((e) => e.id),
+              chosenCopies,
+              selection.cancel,
+            )
+          }
+        />
+      ) : null}
     </ThemedView>
   );
 }

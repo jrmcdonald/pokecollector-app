@@ -391,6 +391,13 @@ a revoked service token.
       connection; the UI disables them offline and says why. Queued offline
       mutations need each one registered with `setMutationDefaults` to survive a
       restart, plus conflict handling, which is not worth it for one user yet.
+      Upstream 1.58.0's `Idempotency-Key` is now the foundation for them:
+      the three adding writes already carry a key minted per action and are
+      resent safely after a lost answer (`src/api/idempotency.ts`). A queued
+      write would persist its key with its body and replay both, as
+      upstream's own offline outbox does, gated on `GET /api/health`'s
+      `idempotency-v1`; `X-Expected-User-Id` already stops a write queued
+      under one account landing in another.
 - [x] A small "offline" indicator.
 
 ### 7.3 UX quality bar

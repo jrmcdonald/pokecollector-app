@@ -75,6 +75,7 @@ import {
   type ProductChanges,
 } from '@/api/endpoints';
 import { ApiError, ConflictError } from '@/api/errors';
+import { removalConflict } from '@/api/removal';
 import type {
   BinderCards,
   CollectionItem,
@@ -85,6 +86,7 @@ import type {
   WishlistItem,
 } from '@/api/schemas';
 import { useSession } from '@/session/session';
+import { openRemovalConflict } from '@/utils/removal-conflict';
 import { bindersOnly } from '@/utils/binders';
 import { forgetBatchPhotos, keepBatchPhotos, pruneBatchPhotos } from '@/utils/batch-photos';
 import type { DeckLine } from '@/utils/decklist';
@@ -139,6 +141,11 @@ export function useKeys() {
       products: [cacheId, 'products'] as const,
       productTypes: [cacheId, 'product-types'] as const,
       holoEffects: [cacheId, 'setting', 'holo_effects_enabled'] as const,
+      artists: (q: string) => [cacheId, 'artists', q] as const,
+      artistsAll: [cacheId, 'artists'] as const,
+      artist: (name: string, missingOnly: boolean) =>
+        [cacheId, 'artist', name, missingOnly] as const,
+      artistAll: [cacheId, 'artist'] as const,
     },
   };
 }
@@ -351,6 +358,8 @@ export function useInvalidateOwnership() {
         keys.searchAll,
         keys.sets,
         keys.checklistAll,
+        keys.artistsAll,
+        keys.artistAll,
         keys.binders,
         keys.binderAll,
         keys.binderContents,
@@ -451,8 +460,18 @@ export function useSetQuantity() {
       );
       return { previous };
     },
-    onError: (error, _vars, context) => {
+    onError: (error, { item, quantity }, context) => {
       if (context?.previous) queryClient.setQueryData(keys.collection, context.previous);
+      // Since 1.57.0, a copy in a binder, a Real Deck or a product is refused
+      // with what holds it; the conflict sheet offers to free it first.
+      const conflict = quantity === 0 ? removalConflict(error) : null;
+      if (conflict) {
+        openRemovalConflict({
+          conflict,
+          retry: () => removeFromCollection(getClient(), item.id),
+        });
+        return;
+      }
       reportFailure('Could not update the quantity', error);
     },
     onSettled: invalidate,
@@ -538,6 +557,7 @@ export function useAddToWishlist() {
         queryClient.invalidateQueries({ queryKey: keys.wishlist }),
         queryClient.invalidateQueries({ queryKey: keys.searchAll }),
         queryClient.invalidateQueries({ queryKey: keys.checklistAll }),
+        queryClient.invalidateQueries({ queryKey: keys.artistAll }),
       ]),
   });
 }
@@ -565,6 +585,7 @@ export function useRemoveFromWishlist() {
         queryClient.invalidateQueries({ queryKey: keys.wishlist }),
         queryClient.invalidateQueries({ queryKey: keys.searchAll }),
         queryClient.invalidateQueries({ queryKey: keys.checklistAll }),
+        queryClient.invalidateQueries({ queryKey: keys.artistAll }),
       ]),
   });
 }

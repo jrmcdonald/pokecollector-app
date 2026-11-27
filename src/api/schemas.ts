@@ -28,6 +28,16 @@ export const TokenResponseSchema = z.looseObject({
   user: UserSchema,
 });
 
+/**
+ * GET /api/health, behind the proxy but needing no login. `features` since
+ * 1.58.0; before that only `status`, `service` and `version`.
+ */
+export const HealthSchema = z.looseObject({
+  version: z.string().nullish(),
+  features: z.array(z.unknown()).nullish(),
+});
+export type Health = z.infer<typeof HealthSchema>;
+
 /** GET /api/auth/mode — answerable without a login, so it proves Access alone. */
 export const AuthModeSchema = z.looseObject({
   multi_user: z.boolean(),
@@ -41,6 +51,12 @@ export type AuthMode = z.infer<typeof AuthModeSchema>;
 // ---------------------------------------------------------------------------
 
 const price = z.number().nullish();
+
+/** A number, or null for anything else: for fields the app can do without. */
+const lenientPrice = z
+  .unknown()
+  .transform((value) => (typeof value === 'number' && Number.isFinite(value) ? value : null))
+  .optional();
 
 export const SetRefSchema = z.looseObject({
   id: z.string(),
@@ -81,6 +97,24 @@ export const CardSchema = z.looseObject({
   variants_reverse: z.boolean().nullish(),
   variants_holo: z.boolean().nullish(),
   variants_first_edition: z.boolean().nullish(),
+  /** The catalogue language, `en`, `de`, …; decides whether TCGplayer may value it. */
+  lang: z.string().nullish(),
+  /**
+   * TCGplayer's market prices in dollars, and the USD→EUR rate upstream
+   * saved with them (1.58.4). Only a fallback for a card Cardmarket has no
+   * price for; see `priceQuote`. Read leniently: a value that is not a
+   * number is no price, never a card that fails to load.
+   */
+  price_tcg_normal_market: lenientPrice,
+  price_tcg_holo_market: lenientPrice,
+  price_tcg_reverse_market: lenientPrice,
+  price_tcg_first_edition_market: lenientPrice,
+  price_tcg_usd_to_eur: lenientPrice,
+  /** Whether a `de` card may be valued from TCGplayer: the server's setting. */
+  tcgplayer_fallback_allowed: z
+    .unknown()
+    .transform((value) => value === true)
+    .optional(),
   /**
    * TCGdex's Cardmarket product ids, each `{ product_id, variant, foil }`.
    * Unchecked rows: `cardmarketUrl` reads what it can and skips the rest.
@@ -260,6 +294,70 @@ export const ChecklistSchema = z.looseObject({
   progress: z.number().nullish(),
 });
 export type Checklist = z.infer<typeof ChecklistSchema>;
+
+// ---------------------------------------------------------------------------
+// Artists (upstream 1.59.0, `api/cards.py`: `artists_index` and
+// `artist_checklist`). Untyped dicts in the spec; read loosely, so only what
+// the screens use is required.
+// ---------------------------------------------------------------------------
+
+/** One of an artist's most valuable cards, for the directory's row. */
+export const ArtistPreviewSchema = z.looseObject({
+  id: z.string(),
+  name: z.string().nullish(),
+  images_small: z.string().nullish(),
+  images_large: z.string().nullish(),
+});
+
+/**
+ * An artist in GET /api/cards/artists: how many distinct cards (printings of
+ * one card in several languages count once) and how many of them are owned.
+ */
+export const ArtistSummarySchema = z.looseObject({
+  name: z.string(),
+  total_count: z.number(),
+  owned_count: z.number(),
+  missing_count: z.number().nullish(),
+  progress: z.number().nullish(),
+  missing_value: z.number().nullish(),
+  preview_cards: z.array(ArtistPreviewSchema).nullish(),
+});
+export type ArtistSummary = z.infer<typeof ArtistSummarySchema>;
+
+export const ArtistIndexSchema = z.looseObject({
+  artists: z.array(ArtistSummarySchema),
+  total_count: z.number(),
+  page: z.number(),
+  page_size: z.number(),
+});
+export type ArtistIndex = z.infer<typeof ArtistIndexSchema>;
+
+/**
+ * A card in an artist's checklist: one per card, its printings folded in,
+ * with ownership summed across them. `id` is the printing shown.
+ */
+export const ArtistChecklistCardSchema = ChecklistCardSchema.extend({
+  set_name: z.string().nullish(),
+});
+export type ArtistChecklistCard = z.infer<typeof ArtistChecklistCardSchema>;
+
+/**
+ * GET /api/cards/artist-checklist. The counts describe all the artist's
+ * cards; `list_count` is how many the ownership filter leaves, which is what
+ * `page` and `page_size` page through.
+ */
+export const ArtistChecklistSchema = z.looseObject({
+  artist_query: z.string().nullish(),
+  total_count: z.number(),
+  owned_count: z.number(),
+  list_count: z.number(),
+  progress: z.number().nullish(),
+  missing_value: z.number().nullish(),
+  page: z.number(),
+  page_size: z.number(),
+  cards: z.array(ArtistChecklistCardSchema),
+});
+export type ArtistChecklist = z.infer<typeof ArtistChecklistSchema>;
 
 /**
  * Upstream's binder types. A "collection" binder holds exact collection

@@ -5,6 +5,7 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { QueryProvider } from '@/session/query';
+import { RemovalConflictSheet } from '@/components/removal-conflict-sheet';
 import { ToastHost } from '@/components/toast-host';
 import { SessionProvider, useSession } from '@/session/session';
 import { fonts, forceDarkAppearance, useColors } from '@/theme';
@@ -32,6 +33,7 @@ export default function RootLayout() {
         <SessionProvider>
           <QueryProvider>
             <RootStack />
+            <RemovalConflictSheet />
             <ToastHost />
           </QueryProvider>
         </SessionProvider>
@@ -77,6 +79,8 @@ function RootStack() {
         <Stack.Screen name="wishlist" options={{ title: 'Wishlist' }} />
         <Stack.Screen name="sets" options={{ title: 'Sets' }} />
         <Stack.Screen name="set/[id]" options={{ title: '' }} />
+        <Stack.Screen name="artists" options={{ title: 'Artists' }} />
+        <Stack.Screen name="artist/[name]" options={{ title: '' }} />
         <Stack.Screen name="binder/[id]" options={{ title: '' }} />
         <Stack.Screen name="binder-new" options={{ title: 'New binder' }} />
         <Stack.Screen name="decks" options={{ title: 'Decks' }} />

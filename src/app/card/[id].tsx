@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
@@ -48,11 +48,12 @@ import {
   useUpdateCopy,
 } from '@/hooks/queries';
 import { useAddCardToBinder } from '@/hooks/use-add-card-to-binder';
+import { useArtistsAvailable } from '@/hooks/use-artists';
 import { useLargeText } from '@/hooks/use-large-text';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useOwnerLabel } from '@/hooks/use-owner-label';
 import { useSetRef } from '@/hooks/use-set-ref';
-import { radius, spacing, useColors } from '@/theme';
+import { minTapTarget, radius, spacing, useColors } from '@/theme';
 import { binderKind, bindersOnly } from '@/utils/binders';
 import { CameraDeniedError, takeCardPhoto, type PhotoSource } from '@/utils/card-photo';
 import { entriesForCard } from '@/utils/collection';
@@ -60,7 +61,7 @@ import { holoStyleFor } from '@/utils/holo';
 import { hasCatalogueImage } from '@/utils/images';
 import { pick } from '@/utils/pick';
 import { showToast } from '@/utils/toast';
-import { cardValue, formatPrice } from '@/utils/pricing';
+import { formatPrice, formatQuote, priceQuote, quoteSource, spokenQuote } from '@/utils/pricing';
 import { defaultVariant } from '@/utils/variants';
 
 export default function CardDetail() {
@@ -151,6 +152,7 @@ export default function CardDetail() {
                   </ThemedView>
                 ))}
             </View>
+            {c.artist?.trim() ? <Illustrator name={c.artist.trim()} /> : null}
           </View>
 
           <Prices card={c} />
@@ -175,6 +177,41 @@ export default function CardDetail() {
         <GridSkeleton columns={1} rows={1} />
       )}
     </ThemedView>
+  );
+}
+
+/**
+ * Who drew the card. A link to every card they drew (upstream 1.59.0's
+ * artist checklist), or plain text on a server that has answered that it
+ * has no artist pages.
+ */
+function Illustrator({ name }: { name: string }) {
+  const available = useArtistsAvailable();
+  const colors = useColors();
+  if (!available) {
+    return (
+      <ThemedText variant="caption" color="textSecondary">
+        Illustrated by {name}
+      </ThemedText>
+    );
+  }
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={`Illustrated by ${name}`}
+      accessibilityHint="Shows every card they illustrated, and which you own"
+      onPress={() => router.push({ pathname: '/artist/[name]', params: { name } })}
+      hitSlop={spacing.sm}
+      style={({ pressed }) => [styles.illustrator, pressed && styles.pressed]}>
+      <Icon name="paintbrush.pointed" size={14} color="accent" />
+      <ThemedText variant="caption" color="textSecondary">
+        Illustrated by{' '}
+        <ThemedText variant="caption" style={{ color: colors.accent }}>
+          {name}
+        </ThemedText>
+      </ThemedText>
+      <Icon name="chevron.right" size={12} color="textSecondary" />
+    </Pressable>
   );
 }
 
@@ -275,18 +312,33 @@ function Prices({ card }: { card: Card }) {
   if (card.variants_reverse || card.price_trend_holo) {
     rows.push(['Reverse', card.price_trend_holo]);
   }
+  // Upstream 1.58.4: with nothing from Cardmarket, TCGplayer's price for the
+  // card's usual printing, converted, as the web UI shows it.
+  const quote = priceQuote(card);
+  const estimate = quote.source === 'tcgplayer' ? quote : null;
   return (
     <ThemedView background="surface" style={[styles.panel, { borderColor: colors.border }]}>
       <View
-        style={styles.trend}
         accessible
-        accessibilityLabel={`Trend price: ${formatPrice(card.price_trend)}`}>
-        <ThemedText variant="overline" color="textSecondary">
-          Trend
-        </ThemedText>
-        <ThemedText variant="figure" style={styles.trendValue}>
-          {formatPrice(card.price_trend)}
-        </ThemedText>
+        accessibilityLabel={
+          estimate
+            ? `Estimated price: ${spokenQuote(estimate)}`
+            : `Trend price: ${formatPrice(card.price_trend)}`
+        }>
+        <View style={styles.trend}>
+          <ThemedText variant="overline" color="textSecondary">
+            {estimate ? 'Estimate' : 'Trend'}
+          </ThemedText>
+          <ThemedText variant="figure" style={styles.trendValue}>
+            {estimate ? formatQuote(estimate) : formatPrice(card.price_trend)}
+          </ThemedText>
+        </View>
+        {/* Under the figure, not beside it: the row has room for the two only. */}
+        {estimate ? (
+          <ThemedText variant="caption" color="textSecondary" style={styles.trendSource}>
+            {quoteSource(estimate)}
+          </ThemedText>
+        ) : null}
       </View>
       <View style={[styles.priceTiles, largeText && styles.stacked]}>
         {rows.map(([label, value]) => (
@@ -306,7 +358,9 @@ function Prices({ card }: { card: Card }) {
         ))}
       </View>
       <ThemedText variant="caption" color="textSecondary">
-        Cardmarket, in euros.
+        {estimate
+          ? 'Cardmarket has no price for this card, so it is valued from TCGplayer’s English market, in dollars converted to euros.'
+          : 'Cardmarket, in euros.'}
       </ThemedText>
     </ThemedView>
   );
@@ -344,6 +398,8 @@ function Owned({ entries, disabled }: { entries: CollectionItem[]; disabled: boo
       {entries.map((item) => {
         const details = (item.printing_details ?? []).map((d) => d.name);
         const open = editing === item.id;
+        const quote = priceQuote(item.card, item.variant);
+        const source = quoteSource(quote);
         return (
           <View key={item.id} style={styles.entry}>
             <View style={styles.ownedRow}>
@@ -361,9 +417,13 @@ function Owned({ entries, disabled }: { entries: CollectionItem[]; disabled: boo
                   <Icon name={open ? 'chevron.up' : 'pencil'} size={13} color="accent" />
                 </View>
                 <ThemedText variant="caption" color="textSecondary">
-                  {[item.condition, ...details].join(' · ')} ·{' '}
-                  {formatPrice(cardValue(item.card, item.variant))} each
+                  {[item.condition, ...details].join(' · ')} · {formatQuote(quote)} each
                 </ThemedText>
+                {source ? (
+                  <ThemedText variant="caption" color="textSecondary">
+                    {source}
+                  </ThemedText>
+                ) : null}
               </Pressable>
               <QuantityStepper
                 label={`${item.variant ?? 'Normal'} ${item.condition}`}
@@ -520,6 +580,14 @@ const styles = StyleSheet.create({
   photo: { gap: spacing.sm },
   photoNote: { textAlign: 'center' },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2 },
+  illustrator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.xs + 2,
+    minHeight: minTapTarget,
+    alignSelf: 'flex-start',
+  },
   tag: { borderRadius: radius.sm, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs },
   panel: { padding: spacing.md, borderRadius: radius.lg - 2, borderWidth: 1, gap: spacing.sm + 4 },
   add: { gap: spacing.sm + 4 },
@@ -529,6 +597,7 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   trendValue: { fontSize: 30, lineHeight: 36 },
+  trendSource: { textAlign: 'right' },
   priceTiles: { flexDirection: 'row', gap: spacing.sm },
   stacked: { flexDirection: 'column' },
   priceTile: { flex: 1, borderRadius: radius.sm + 2, padding: spacing.sm, gap: 2 },

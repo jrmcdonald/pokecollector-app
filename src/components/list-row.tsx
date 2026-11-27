@@ -23,6 +23,11 @@ type Props = {
   kind?: 'navigate' | 'action' | 'destructive';
   /** For a row that is one of a set of choices: whether it is the chosen one. */
   selected?: boolean;
+  /**
+   * Choosing rows to act on together: the row is a checkbox, with a check
+   * before it, and no chevron.
+   */
+  checked?: boolean;
   accessibilityLabel?: string;
 };
 
@@ -36,14 +41,17 @@ export function ListRow({
   onPress,
   kind = 'navigate',
   selected,
+  checked,
   accessibilityLabel,
 }: Props) {
   const colors = useColors();
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole={checked === undefined ? 'button' : 'checkbox'}
       accessibilityLabel={accessibilityLabel ?? [title, subtitle].filter(Boolean).join(', ')}
-      accessibilityState={selected === undefined ? undefined : { selected }}
+      accessibilityState={
+        checked !== undefined ? { checked } : selected === undefined ? undefined : { selected }
+      }
       onPress={onPress}
       disabled={!onPress}
       style={({ pressed }) => [
@@ -51,6 +59,13 @@ export function ListRow({
         { borderBottomColor: colors.border },
         pressed && { backgroundColor: colors.surface },
       ]}>
+      {checked === undefined ? null : (
+        <Icon
+          name={checked ? 'checkmark.circle.fill' : 'circle'}
+          size={24}
+          color={checked ? 'accent' : 'textSecondary'}
+        />
+      )}
       {leading}
       <View style={styles.body}>
         <View style={styles.line}>
@@ -68,7 +83,7 @@ export function ListRow({
             ) : null}
           </View>
           {trailing}
-          {onPress && kind === 'navigate' ? (
+          {onPress && kind === 'navigate' && checked === undefined ? (
             <Icon name="chevron.right" size={14} color="textSecondary" />
           ) : null}
         </View>

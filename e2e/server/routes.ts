@@ -88,6 +88,26 @@ export function createRouter(origin: string) {
     // Upstream 1.56.0's default; the walkthrough's screenshots show no shimmer.
     if (path === '/api/settings/holo_effects_enabled')
       return ok({ key: 'holo_effects_enabled', value: 'false' });
+    // Upstream 1.59.0's artist directory and checklist.
+    if (path === '/api/cards/artists') {
+      return ok(
+        fixtures.artists(
+          url.searchParams.get('q') ?? '',
+          Number(url.searchParams.get('page') ?? '1') || 1,
+          Number(url.searchParams.get('page_size') ?? '50') || 50,
+        ),
+      );
+    }
+    if (path === '/api/cards/artist-checklist') {
+      return ok(
+        fixtures.artistChecklist(
+          url.searchParams.get('artist') ?? '',
+          url.searchParams.get('ownership'),
+          Number(url.searchParams.get('page') ?? '1') || 1,
+          Number(url.searchParams.get('page_size') ?? '60') || 60,
+        ),
+      );
+    }
     if (path === '/api/cards/search') {
       const page = Number(url.searchParams.get('page') ?? '1') || 1;
       const pageSize = Number(url.searchParams.get('page_size') ?? '30') || 30;

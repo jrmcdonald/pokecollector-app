@@ -1354,6 +1354,173 @@ unlinks, the artist checklist and directory) and some the app leaves alone.
 - **Not 1.60.0.** Upstream has released it, but the addon pins 1.59.0, and
   the app is typed against what the addon runs.
 
+## 2026-11-25 — TCGplayer prices when Cardmarket has none
+
+Upstream 1.58.4 (Git-Romer/pokecollector#476) values a card from
+TCGplayer's market price when Cardmarket has none, so the web UI's totals
+moved and the app's did not.
+
+- **The same rule, in the app's own code.** `priceQuote` in
+  `src/utils/pricing.ts` is upstream's `effective_price_quote` at 1.59.0:
+  Cardmarket first, unchanged; then, for an English card, or a German one
+  the server allows, the matching variant's dollar price times the rate
+  upstream saved with it. No borrowing between editions or finishes, and no
+  rate means no price, never dollars read as euros. Upstream's
+  `TcgplayerValuationTests` are ported case for case
+  (`src/utils/__tests__/pricing.test.ts`). `cardValue` now returns its
+  amount, so every total the app sums (collection, wishlist, sorting by
+  value) moved with it.
+- **Not `GET /api/cards/{id}/valuation`.** It answers the same question with
+  a request per card, which a grid of cards cannot afford.
+- **Labelled wherever it shows.** A TCGplayer price is an English-market
+  estimate, not a Cardmarket price. Where there is room (a card's page, its
+  owned copies, a scan look-up) it says "TCGplayer, converted from $4.00";
+  on a tile or a row, which have no room, it reads "≈€3.60". VoiceOver hears
+  "€3.60, a TCGplayer estimate converted from $4.00" rather than "almost
+  equal to". The web UI's equivalent is FallbackBadges' amber
+  "Price TCGplayer (EN)"; amber is the app's accent and action colour, so
+  the app uses words, not a colour.
+- **On an older server nothing changes.** The fields are absent and read as
+  no price. They are read leniently, since a card failing to parse over a
+  fallback price would hide it.
+- **The persisted cache's buster stays.** A cached card simply lacks the new
+  fields until it is fetched again.
+- **The set checklist** now prices with the same rule. It used
+  `price_trend ?? price_market`, which let a zero trend hide a market price.
+
+## 2026-11-25 — Safe retries with Idempotency-Key
+
+Upstream 1.58.0 (Git-Romer/pokecollector#474) stores the answer to
+`POST /api/collection/`, `POST /api/wishlist/` and
+`POST /api/cards/recognize/jobs` under an `Idempotency-Key`, so a write
+whose answer was lost can be sent again without adding twice. Until now the
+app never resent a write: adding a card twice is worse than an error.
+
+- **One key per user action,** minted where the action starts: each call of
+  `addToCollection`, `addToWishlist` or `createScanJob` is one action
+  unless the caller passes a key. Every retry reuses it with the same body;
+  a different body never gets an old key. 32 characters, from
+  `crypto.getRandomValues` where Hermes has it.
+- **The client retries, not TanStack Query.** Mutations keep `retry: false`:
+  a mutation retry calls the mutation function again, which would mint a new
+  key. The client resends after a lost answer, a 5xx, a 429 (after its
+  `Retry-After`, at most 30 s, as someone is waiting on the button) and
+  upstream's 409 `idempotency_in_progress` (after 2 s), three times at most.
+  The UI sees one slower success or one error.
+- **Only to a server that honours the key.** Upstream asked for no gating,
+  and the headers are not gated: a server before 1.58.0 ignores them.
+  Resending is: such a server would add the card again. Upstream's own
+  `services/api_info.py` says a backend without `idempotency-v1` "must never
+  receive a replay", and `GET /api/health` lists that feature. The app asks
+  it only after a keyed write has failed, once per session, so the usual
+  path costs nothing. A 404 or an answer without the feature is "no", and
+  the write fails as it always did. No answer is "not yet": the client waits
+  and asks again, without resending.
+- **`X-Expected-User-Id`** is sent from the login's `user.id`, or
+  `/api/auth/me`'s when the token came from the connection test. Before
+  either, it is left out, as upstream allows. A 409 `wrong_account` says
+  "This was sent for a different account than the one signed in, so
+  nothing was changed." It cannot happen today, since each account has its
+  own client and token; it is for the queued writes to come.
+- **`Idempotent-Replayed: true`** is an ordinary 200 with the first answer:
+  the client takes it as success without looking at the header.
+- **No queued offline writes yet.** This is their foundation; see
+  `PLAN.md` §7.2.
+
+## 2026-11-26 — Artist pages
+
+Upstream 1.59.0 (Git-Romer/pokecollector#472) added an artist checklist and
+an artist directory. The app has both.
+
+- **Where they are reached.** The illustrator, new on a card's page ("Illustrated by
+  …", a link), opens that artist's checklist; Sets has an Artists button
+  for the directory. Not Search: its header already carries the filters,
+  and Sets is where checklists live.
+- **The checklist is the set checklist's grid,** with the same tiles, owned
+  and missing, the artist's progress and what the missing cards would cost.
+  "Missing only" is a segmented control like the set's, but sent upstream
+  (`ownership=missing`) rather than filtered on the phone, because an
+  artist's list is paged: a prolific illustrator has hundreds of cards.
+  Pages of 60 load as the grid nears its end (`useInfiniteQuery`), and the
+  previous answer stays up while the other filter loads, so the toggle
+  does not vanish under the finger.
+- **Exact names.** The checklist asks with `artist_match=exact`, since the
+  name came from a card or the directory; `contains` would fold "Ken
+  Sugimori" into "Ken Sugimori, Kagemaru Himeno".
+- **The directory searches upstream**, 400 ms after typing stops, as the
+  catalogue search does, most complete first, 50 a page. Each row shows the
+  artist's most valuable card from `preview_cards`, loaded from TCGdex like
+  every other card image.
+- **Zod at the boundary.** Both answers are untyped dicts in the spec. The
+  schemas were checked against upstream's own answers, captured from its
+  `tests/test_artist_index.py` catalogue (`src/api/__tests__/artist-fixtures.ts`).
+- **On an older server** the first 404 is remembered for a day, per account,
+  in the persisted cache (`useArtistsAvailable`). Meanwhile the illustrator
+  is plain text and Sets has no Artists button, so no request is spent
+  finding out again; the queries never retry a 404. A day later the links
+  return, in case the server has been updated. Asking `GET /api/health` for
+  the version first would cost a request on every launch to save one on an
+  old server.
+- **Cache.** Thirty minutes stale, like a set's checklist, and invalidated
+  with it when the collection or wishlist changes.
+- **The fake server's 151 subset** now has three made-up illustrators, so
+  the walkthrough shows the directory and a partly owned artist.
+
+## 2026-11-26 — Bulk removal, and freeing what blocks a removal
+
+Upstream 1.57.0 (Git-Romer/pokecollector#456) added atomic bulk removal for
+the collection, a binder and a deck, and a 409 that says exactly what holds
+a collection entry back (a collection binder, a Real Deck, a product) and
+how to free it. The app has both.
+
+- **Select, then one action.** Collection, a binder and a deck have a
+  Select button in the header, as Photos and Files do. While choosing, a tile or
+  row is a checkbox (`accessibilityRole="checkbox"`, checked or not, with a
+  check mark drawn so it never rests on colour alone), the header offers
+  Select all and Done, and a bar at the bottom says how many entries and
+  copies are chosen beside Remove (Collection) or Take out (a binder, a
+  deck). Up to 500, upstream's limit; Select all refuses past it and says
+  so. Choosing ignores cards filtered away, rather than removing ones not
+  on show.
+- **The confirmation counts entries and copies**, and says what stays:
+  "They stay in your collection" for a binder, "Your collection doesn't
+  change" for a deck. The wording follows upstream's web UI, shortened for
+  an iOS alert.
+- **One conflict sheet, app-wide.** `RemovalConflictSheet` lives in the
+  root layout, opened through a small store (`utils/removal-conflict.ts`),
+  so the bulk removal and a single copy taken to 0 on a card's page (which
+  1.57.0 refuses the same way) share it.
+  - It lists each blocked entry and what holds it.
+  - It offers upstream's own resolutions, each behind a destructive
+    confirmation: "Take out of binders and decks" sends the 409's release
+    body as it came, so upstream can tell if anything changed; "Unlink from
+    products" only when upstream's resolution says `can_execute`. A link with
+    sale or trade history gets a sentence pointing to the product instead.
+  - "Remove from collection" stays disabled until nothing holds the copies,
+    then sends the same removal again.
+  - `collection_assignments_changed` replaces the list, says it changed, and
+    asks for every confirmation again.
+  - Upstream's web UI (`useBulkRemoval.js`, `BulkRemovalToolbar.jsx`) is
+    the model for the steps.
+- **Older servers.** A plain 404 from a bulk route means the route does not
+  exist; Select is then hidden for a day, as artist pages are after theirs
+  (`use-server-feature.ts`, now shared). A 404 with an object `detail` is a
+  1.57+ server saying an entry is gone, and is shown as an error, not taken
+  for an old server. A single copy taken to 0 on an older server still gets
+  its string 409 as a toast, as before.
+- **Not the single unlink.** `DELETE /api/products/{id}/cards/{pc}` with its
+  `expected_*` guard would unlink one link; the bulk route does one as well,
+  atomically, from the same resolution body.
+- **The list starts again when choosing starts or ends.** In a list, or
+  one-column tiles, the check sits beside the card rather than over it, so
+  the text narrows and a long name wraps. FlashList 2.0.2 did not re-measure
+  a row that grew in place: the first approved `collection-select.png` had a
+  row's price beside its name and the next row's count adrift. Collection
+  and a binder now key the list on choosing there, as the binder already
+  does for editing. The cost is that Select and Done return to the top of
+  the list. Grids are left alone: there the check covers the tile's corner
+  and nothing changes size.
+
 ## 2026-11-26 — Send every request at least once, whatever NetInfo says
 
 TanStack Query is told about the connection by NetInfo
@@ -1462,3 +1629,16 @@ Two walkthrough failures that were not the app's:
   away by 80 points, then back by 80 plus the error, so whatever a drag loses
   before the scroll view takes it cancels out. It stops within a quarter of a
   point, and logs where the heading ended (`CAPTURE bringToTop`).
+
+## 2026-11-27 — Jest's test timeout is 15 seconds
+
+CI failed `deck-edit.test.tsx`, "edits the copies of a card, and saves them",
+on Jest's default 5 s timeout, three times on one branch and never locally. It
+was not a hang. The first test in a file to render a screen also compiles every
+module that screen pulls in, and CI's Jest cache is always empty: on a cold
+cache that one test takes about 3.9 s on its own (3.8 s on `main` too), against
+0.7 s warm, and with every worker compiling at once it went past 5 s. A cold
+local run (`jest --ci --cacheDirectory=<new dir>`) failed it once in four.
+
+`testTimeout` is 15000 in `package.json`. A test that really hangs still
+fails, ten seconds later.

@@ -18,9 +18,12 @@ export { SAVE_DELAY_MS } from './editable-card-row';
 export function DeckEntryRow({
   deck,
   entry,
+  selection,
 }: {
   deck: Pick<Deck, 'binder_type'>;
   entry: DeckEntry;
+  /** Choosing cards to take out together: a tap toggles the row. */
+  selection?: { selected: boolean; onToggle(): void };
 }) {
   const card = entry.card ?? { id: entry.card_id, name: entry.card_id };
   const code = entryCode(entry);
@@ -41,7 +44,12 @@ export function DeckEntryRow({
       accessibilityLabel={[card.name, code, copies, missing > 0 ? `${missing} missing` : null]
         .filter(Boolean)
         .join(', ')}
-      onPress={() => router.push({ pathname: '/card/[id]', params: { id: entry.card_id } })}
+      checked={selection?.selected}
+      onPress={
+        selection
+          ? selection.onToggle
+          : () => router.push({ pathname: '/card/[id]', params: { id: entry.card_id } })
+      }
     />
   );
 }

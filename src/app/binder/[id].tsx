@@ -1,6 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, RefreshControl, StyleSheet, View } from 'react-native';
 
 import type { Binder, BinderCard, BinderCards } from '@/api/schemas';
@@ -9,6 +9,7 @@ import { CardPickerSheet } from '@/components/card-picker-sheet';
 import { CardTile } from '@/components/card-tile';
 import { EditableCardRow } from '@/components/editable-card-row';
 import { ProgressBar } from '@/components/progress-bar';
+import { SelectionBar } from '@/components/selection-bar';
 import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -22,6 +23,8 @@ import {
   useUpdateBinder,
 } from '@/hooks/queries';
 import { useAddCardToBinder } from '@/hooks/use-add-card-to-binder';
+import { useBulkRemoval, useBulkRemovalAvailable } from '@/hooks/use-bulk-removal';
+import { useSelection } from '@/hooks/use-selection';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useCardColumns } from '@/hooks/use-large-text';
 import { spacing, useColors } from '@/theme';
@@ -55,6 +58,16 @@ export default function BinderDetail() {
   const planned = data ? isPlanned(data.binder) : false;
   const isEditing = editing && online;
 
+  // Choosing entries to take out together (upstream 1.57.0); copies stay in
+  // the collection. Hidden for a day after an older server answers 404.
+  const canSelect = useBulkRemovalAvailable() && online && !isEditing;
+  const entryIds = useMemo(() => (data?.cards ?? []).map((c) => c.binder_card_id), [data]);
+  const selection = useSelection(entryIds);
+  const selecting = selection.active && canSelect;
+  const bulk = useBulkRemoval({ kind: 'binder', id: binderId });
+  const chosen = (data?.cards ?? []).filter((c) => selection.isSelected(c.binder_card_id));
+  const chosenCopies = chosen.reduce((sum, c) => sum + (c.required_quantity ?? 1), 0);
+
   // Chosen from the long-press sheet, which is already the deliberate second
   // step, so no confirmation: the copy stays in the collection either way.
   function removeCard(card: BinderCard) {
@@ -81,16 +94,40 @@ export default function BinderDetail() {
         options={{
           title: data?.binder.name ?? name ?? '',
           unstable_headerRightItems: () =>
-            data && online
+            selecting
               ? [
                   {
                     type: 'button',
-                    label: isEditing ? 'Done' : 'Edit',
-                    accessibilityLabel: isEditing ? 'Done editing' : 'Edit this binder',
-                    onPress: () => setEditing(!isEditing),
+                    label: selection.allSelected ? 'Deselect all' : 'Select all',
+                    onPress: selection.allSelected ? selection.clear : selection.selectAll,
+                  },
+                  {
+                    type: 'button',
+                    label: 'Done',
+                    accessibilityLabel: 'Done choosing',
+                    onPress: selection.cancel,
                   },
                 ]
-              : [],
+              : data && online
+                ? [
+                    ...(canSelect && data.cards.length
+                      ? [
+                          {
+                            type: 'button' as const,
+                            label: 'Select',
+                            accessibilityLabel: 'Choose cards to take out',
+                            onPress: selection.enter,
+                          },
+                        ]
+                      : []),
+                    {
+                      type: 'button',
+                      label: isEditing ? 'Done' : 'Edit',
+                      accessibilityLabel: isEditing ? 'Done editing' : 'Edit this binder',
+                      onPress: () => setEditing(!isEditing),
+                    },
+                  ]
+                : [],
         }}
       />
       {data ? (
@@ -101,9 +138,12 @@ export default function BinderDetail() {
           // yet saved, which a recycled cell would carry over to another card.
           maxItemsInRecyclePool={0}
           data={data.cards}
+          extraData={selecting ? selection.selected : null}
           // A new list when the text size changes the columns, or editing
           // turns the tiles into rows: FlashList cannot change them in place.
-          key={isEditing ? 'editing' : columns}
+          // Likewise when choosing starts or ends in one column, where the
+          // check sits beside the card and a name can wrap onto a second line.
+          key={isEditing ? 'editing' : `${columns}${selecting && columns === 1 ? '-choosing' : ''}`}
           numColumns={isEditing ? 1 : columns}
           keyExtractor={(card) => String(card.binder_card_id)}
           contentContainerStyle={isEditing ? undefined : styles.list}
@@ -150,6 +190,14 @@ export default function BinderDetail() {
                 missing={planned && !card.owned}
                 variant={card.variant}
                 photoItemId={card.has_scan_photo ? card.collection_item_id : null}
+                selection={
+                  selecting
+                    ? {
+                        selected: selection.isSelected(card.binder_card_id),
+                        onToggle: () => selection.toggle(card.binder_card_id),
+                      }
+                    : undefined
+                }
                 actions={[
                   {
                     name: 'remove',
@@ -180,6 +228,21 @@ export default function BinderDetail() {
       )}
       {data ? (
         <AddCardSheet binder={data.binder} visible={adding} onClose={() => setAdding(false)} />
+      ) : null}
+      {selecting ? (
+        <SelectionBar
+          count={chosen.length}
+          copies={chosenCopies}
+          action="Take out"
+          busy={bulk.busy}
+          onAction={() =>
+            bulk.remove(
+              chosen.map((c) => c.binder_card_id),
+              chosenCopies,
+              selection.cancel,
+            )
+          }
+        />
       ) : null}
     </ThemedView>
   );

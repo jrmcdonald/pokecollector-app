@@ -91,6 +91,13 @@ final class WalkthroughTests: XCTestCase {
     go(app.navigationBars.buttons["Show as list"], to: app.navigationBars.buttons["Show as grid"], "Collection as a list")
     wait(for: button(startingWith: "Charizard ex, 151"), "Collection as a list")
     capture("collection-list")
+    // Choosing entries to remove together (upstream 1.57.0): one chosen, and
+    // the bar with Remove. Nothing is removed; the fake server refuses writes.
+    go(app.navigationBars.buttons["Choose cards to remove"], to: app.navigationBars.buttons["Done choosing"], "Choosing cards")
+    tap(element(startingWith: "Charizard ex, 151"))
+    wait(for: element(startingWith: "1 chosen"), "One card chosen")
+    capture("collection-select")
+    go(app.navigationBars.buttons["Done choosing"], to: app.navigationBars.buttons["Choose cards to remove"], "Done choosing")
 
     go(button(startingWith: "Charizard ex"), to: app.staticTexts["Charizard ex"].firstMatch, "Card")
     capture("card")
@@ -202,6 +209,15 @@ final class WalkthroughTests: XCTestCase {
       XCTFail("The set search left Caterpie in, from \"c\"")
     }
     capture("set-search")
+    back(to: button(startingWith: "151, "), "Sets, again")
+
+    // Upstream 1.59.0's artist pages: the directory from Sets, then one
+    // artist's cards, owned and missing, in release and number order.
+    go(app.navigationBars.buttons["Artists"], to: button(startingWith: "Sample Ink"), "Artists")
+    capture("artists")
+    go(button(startingWith: "Sample Ink"), to: button(startingWith: "Venusaur ex"), "An artist")
+    capture("artist")
+    back(to: button(startingWith: "Sample Ink"), "Artists, again")
     back(to: button(startingWith: "151, "), "Sets, again")
     back(to: button(startingWith: "Decks"), "More, again")
 

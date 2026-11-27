@@ -6,13 +6,17 @@ import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import type { CollectionItem } from '@/api/schemas';
 import { CardImage, frameForVariant } from '@/components/card-image';
 import { CardTile } from '@/components/card-tile';
+import { Icon } from '@/components/icon';
+import { SelectionBar } from '@/components/selection-bar';
 import { ToggleChip } from '@/components/chips';
 import { FilterButton } from '@/components/filter-button';
 import { SearchField } from '@/components/search-field';
 import { EmptyState, ErrorState, GridSkeleton } from '@/components/states';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useBinderContents, useCollection, useDeckContents } from '@/hooks/queries';
+import { useBinderContents, useCollection, useDeckContents, useIsOnline } from '@/hooks/queries';
+import { useBulkRemoval, useBulkRemovalAvailable } from '@/hooks/use-bulk-removal';
+import { useSelection, type Selection } from '@/hooks/use-selection';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useCardColumns } from '@/hooks/use-large-text';
 import { minTapTarget, spacing, useColors } from '@/theme';
@@ -31,7 +35,7 @@ import {
   type FilterOption,
 } from '@/utils/collection';
 import { pick } from '@/utils/pick';
-import { cardValue, formatPrice } from '@/utils/pricing';
+import { formatQuote, priceQuote, spokenQuote } from '@/utils/pricing';
 
 const SORTS = Object.keys(SORT_LABELS) as CollectionSort[];
 
@@ -69,6 +73,19 @@ export default function Collection() {
   // Nothing to show yet rather than everything, while the index loads.
   const ready = !unplaced || !!placed;
 
+  // Choosing entries to remove together (upstream 1.57.0). Hidden offline,
+  // and for a day after a server too old for it answers 404.
+  const online = useIsOnline();
+  const canSelect = useBulkRemovalAvailable() && online;
+  const shownIds = useMemo(() => shown.map((item) => item.id), [shown]);
+  const selection = useSelection(shownIds);
+  const selecting = selection.active && canSelect;
+  // Rows, or one-column tiles, hold the check beside the card, not over it.
+  const rowsGrow = layout === 'list' || columns === 1;
+  const bulk = useBulkRemoval({ kind: 'collection' });
+  const chosen = shown.filter((item) => selection.isSelected(item.id));
+  const chosenCopies = chosen.reduce((sum, item) => sum + item.quantity, 0);
+
   async function choose(title: string, list: FilterOption[], key: 'setId' | 'rarity' | 'variant') {
     const index = await pick(title, ['All', ...list.map((o) => `${o.label} (${o.count})`)]);
     if (index === null) return;
@@ -88,43 +105,68 @@ export default function Collection() {
           title: 'Collection',
           // A native bar button rather than a custom view: iOS lays it out
           // (and gives it the system background) the way it expects.
-          unstable_headerRightItems: () => [
-            {
-              type: 'button',
-              label: 'Filters',
-              accessibilityLabel: `${filtersOpen ? 'Hide' : 'Show'} filters and sort${active ? `, ${active} on` : ''}`,
-              icon: {
-                type: 'sfSymbol',
-                // Filled while a filter is on, open or not, as Mail and Files do.
-                name: active
-                  ? 'line.3.horizontal.decrease.circle.fill'
-                  : 'line.3.horizontal.decrease.circle',
-              },
-              selected: filtersOpen,
-              // iOS 26 and later; before, the filled symbol alone says so. In
-              // the accent: iOS's own white on red nearly fails the contrast
-              // audit at the largest text size.
-              ...(active
-                ? {
-                    badge: {
-                      value: active,
-                      style: { color: colors.onAccent, backgroundColor: colors.accent },
+          unstable_headerRightItems: () =>
+            selecting
+              ? [
+                  {
+                    type: 'button',
+                    label: selection.allSelected ? 'Deselect all' : 'Select all',
+                    onPress: selection.allSelected ? selection.clear : selection.selectAll,
+                  },
+                  {
+                    type: 'button',
+                    label: 'Done',
+                    accessibilityLabel: 'Done choosing',
+                    onPress: selection.cancel,
+                  },
+                ]
+              : [
+                  {
+                    type: 'button',
+                    label: 'Filters',
+                    accessibilityLabel: `${filtersOpen ? 'Hide' : 'Show'} filters and sort${active ? `, ${active} on` : ''}`,
+                    icon: {
+                      type: 'sfSymbol',
+                      // Filled while a filter is on, open or not, as Mail and Files do.
+                      name: active
+                        ? 'line.3.horizontal.decrease.circle.fill'
+                        : 'line.3.horizontal.decrease.circle',
                     },
-                  }
-                : {}),
-              onPress: () => setFiltersOpen((open) => !open),
-            },
-            {
-              type: 'button',
-              label: layout === 'grid' ? 'List' : 'Grid',
-              accessibilityLabel: layout === 'grid' ? 'Show as list' : 'Show as grid',
-              icon: {
-                type: 'sfSymbol',
-                name: layout === 'grid' ? 'list.bullet' : 'square.grid.3x3',
-              },
-              onPress: () => setLayout((l) => (l === 'grid' ? 'list' : 'grid')),
-            },
-          ],
+                    selected: filtersOpen,
+                    // iOS 26 and later; before, the filled symbol alone says so. In
+                    // the accent: iOS's own white on red nearly fails the contrast
+                    // audit at the largest text size.
+                    ...(active
+                      ? {
+                          badge: {
+                            value: active,
+                            style: { color: colors.onAccent, backgroundColor: colors.accent },
+                          },
+                        }
+                      : {}),
+                    onPress: () => setFiltersOpen((open) => !open),
+                  },
+                  {
+                    type: 'button',
+                    label: layout === 'grid' ? 'List' : 'Grid',
+                    accessibilityLabel: layout === 'grid' ? 'Show as list' : 'Show as grid',
+                    icon: {
+                      type: 'sfSymbol',
+                      name: layout === 'grid' ? 'list.bullet' : 'square.grid.3x3',
+                    },
+                    onPress: () => setLayout((l) => (l === 'grid' ? 'list' : 'grid')),
+                  },
+                  ...(canSelect && items?.length
+                    ? [
+                        {
+                          type: 'button' as const,
+                          label: 'Select',
+                          accessibilityLabel: 'Choose cards to remove',
+                          onPress: selection.enter,
+                        },
+                      ]
+                    : []),
+                ],
         }}
       />
       <View style={styles.controls}>
@@ -211,8 +253,12 @@ export default function Collection() {
           // that shrank, showing their old items (a set searched for "char"
           // still showed what "c" found). Unused cells now unmount instead.
           maxItemsInRecyclePool={0}
-          key={`${layout}-${columns}`}
+          // A new list when choosing starts or ends, wherever rows hold the
+          // check beside the card: it narrows the text, a name can wrap, and
+          // FlashList 2.0.2 does not re-measure the taller row in place.
+          key={`${layout}-${columns}${selecting && rowsGrow ? '-choosing' : ''}`}
           data={shown}
+          extraData={selecting ? selection.selected : null}
           numColumns={layout === 'grid' ? columns : 1}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
@@ -229,13 +275,22 @@ export default function Collection() {
               <CardTile
                 layout={columns === 1 ? 'row' : 'tile'}
                 card={item.card ?? { id: item.card_id, name: item.card_id }}
-                detail={formatPrice(cardValue(item.card, item.variant))}
+                detail={formatQuote(priceQuote(item.card, item.variant))}
+                detailLabel={spokenQuote(priceQuote(item.card, item.variant))}
                 quantity={item.quantity}
                 variant={item.variant}
                 photoItemId={item.has_scan_photo ? item.id : null}
+                selection={
+                  selecting
+                    ? {
+                        selected: selection.isSelected(item.id),
+                        onToggle: () => selection.toggle(item.id),
+                      }
+                    : undefined
+                }
               />
             ) : (
-              <CollectionRow item={item} />
+              <CollectionRow item={item} selection={selecting ? selection : undefined} />
             )
           }
           ListEmptyComponent={
@@ -264,21 +319,48 @@ export default function Collection() {
       ) : (
         <GridSkeleton />
       )}
+      {selecting ? (
+        <SelectionBar
+          count={chosen.length}
+          copies={chosenCopies}
+          action="Remove"
+          busy={bulk.busy}
+          onAction={() =>
+            bulk.remove(
+              chosen.map((item) => item.id),
+              chosenCopies,
+              selection.cancel,
+            )
+          }
+        />
+      ) : null}
     </ThemedView>
   );
 }
 
-function CollectionRow({ item }: { item: CollectionItem }) {
+function CollectionRow({ item, selection }: { item: CollectionItem; selection?: Selection }) {
   const card = item.card ?? { id: item.card_id, name: item.card_id };
-  const value = cardValue(item.card, item.variant);
+  const quote = priceQuote(item.card, item.variant);
   const where = [setNameOf(item), item.card?.number].filter(Boolean).join(' · ');
   const what = [item.variant ?? 'Normal', item.condition].join(' · ');
   return (
     <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${card.name}, ${where}, ${what}, ${item.quantity} owned, ${formatPrice(value * item.quantity)}`}
-      onPress={() => router.push({ pathname: '/card/[id]', params: { id: item.card_id } })}
+      accessibilityRole={selection ? 'checkbox' : 'button'}
+      accessibilityState={selection ? { checked: selection.isSelected(item.id) } : undefined}
+      accessibilityLabel={`${card.name}, ${where}, ${what}, ${item.quantity} owned, ${spokenQuote(quote, item.quantity)}`}
+      onPress={
+        selection
+          ? () => selection.toggle(item.id)
+          : () => router.push({ pathname: '/card/[id]', params: { id: item.card_id } })
+      }
       style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}>
+      {selection ? (
+        <Icon
+          name={selection.isSelected(item.id) ? 'checkmark.circle.fill' : 'circle'}
+          size={24}
+          color={selection.isSelected(item.id) ? 'accent' : 'textSecondary'}
+        />
+      ) : null}
       <CardImage
         card={card}
         size="small"
@@ -300,7 +382,7 @@ function CollectionRow({ item }: { item: CollectionItem }) {
       <View style={styles.rowRight}>
         {item.quantity > 1 ? <ThemedText variant="figureSmall">×{item.quantity}</ThemedText> : null}
         <ThemedText variant="figureSmall" color="textSecondary">
-          {formatPrice(value * item.quantity)}
+          {formatQuote(quote, item.quantity)}
         </ThemedText>
       </View>
     </Pressable>

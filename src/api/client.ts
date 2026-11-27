@@ -32,8 +32,15 @@ import {
   ServerError,
   ValidationError,
 } from './errors';
+import {
+  EXPECTED_USER_HEADER,
+  IDEMPOTENCY_FEATURE,
+  IDEMPOTENCY_HEADER,
+  KEY_PATTERN,
+  retryDelayMs,
+} from './idempotency';
 import { proxyHeaders, proxyRejection, type ProxyAuth } from './proxy';
-import { AuthModeSchema, TokenResponseSchema } from './schemas';
+import { AuthModeSchema, HealthSchema, TokenResponseSchema } from './schemas';
 
 export interface ServerCredentials {
   /** Origin only, e.g. https://pokecollector.home.example — tried first. */
@@ -76,7 +83,18 @@ export interface RequestOptions<T> {
   /** Validates the body. Required for anything the app reads from. */
   schema?: z.ZodType<T>;
   timeoutMs?: number;
+  /**
+   * Makes a write safe to send again (`idempotency.ts`): sent as
+   * `Idempotency-Key`, with `X-Expected-User-Id`, and the request is retried
+   * with the same key and body after a lost answer, a 5xx, a 429 or
+   * upstream's "still in progress". Without one, a write is sent once.
+   */
+  idempotencyKey?: string;
 }
+
+/** Waits; replaceable so tests need not. */
+export type Sleep = (ms: number) => Promise<void>;
+const realSleep: Sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 
@@ -103,14 +121,37 @@ export class PokeCollectorClient {
   /** Bumped by invalidateRoute, so a probe started before it cannot set the route after it. */
   private generation = 0;
   private readonly routeListeners = new Set<() => void>();
+  /** Upstream's id for this account, from the login or `/api/auth/me`. */
+  private userId: number | null = null;
+  /** Whether the server honours Idempotency-Key, once `GET /api/health` has said. */
+  private idempotency: boolean | null = null;
+  private readonly sleep: Sleep;
 
   constructor(
     private readonly credentials: ServerCredentials,
     private readonly fetchImpl: FetchLike,
-    /** A token already obtained for these credentials, e.g. by the connection test. */
-    options: { token?: string } = {},
+    options: {
+      /** A token already obtained for these credentials, e.g. by the connection test. */
+      token?: string;
+      sleep?: Sleep;
+    } = {},
   ) {
     this.token = options.token ?? null;
+    this.sleep = options.sleep ?? realSleep;
+  }
+
+  /** The account's upstream id, once a login or `/api/auth/me` has said it. */
+  get knownUserId(): number | null {
+    return this.userId;
+  }
+
+  /**
+   * Records whose account this client is signed in to, sent as
+   * `X-Expected-User-Id` with idempotent writes. Upstream refuses such a write
+   * made under another account (409 `wrong_account`).
+   */
+  rememberUser(id: number): void {
+    this.userId = id;
   }
 
   /** The current PokeCollector JWT, if signed in. Never persisted by this class. */
@@ -169,7 +210,53 @@ export class PokeCollectorClient {
   }
 
   async request<T>(path: string, options: RequestOptions<T> = {}): Promise<T> {
-    return this.onRoute(options, (base) => this.authenticated(base, path, options));
+    const send = () => this.onRoute(options, (base) => this.authenticated(base, path, options));
+    if (!options.idempotencyKey) return send();
+    if (!KEY_PATTERN.test(options.idempotencyKey)) {
+      throw new Error(`Not a valid Idempotency-Key: ${options.idempotencyKey}`);
+    }
+    // The same key and body every time: upstream adds once, and answers a
+    // repeat of a write that landed with the stored answer. A write is sent
+    // again only to a server known to honour the key; while that is not yet
+    // known (the check got no answer either), each wait uses up a retry.
+    let retry = 0;
+    for (;;) {
+      let failure: unknown;
+      try {
+        return await send();
+      } catch (error) {
+        failure = error;
+      }
+      for (;;) {
+        const delay = retryDelayMs(failure, retry);
+        if (delay === null) throw failure;
+        retry += 1;
+        await this.sleep(delay);
+        const honoured = await this.honoursIdempotency();
+        if (honoured === false) throw failure;
+        if (honoured === true) break;
+      }
+    }
+  }
+
+  /**
+   * Whether the server stores answers under Idempotency-Key (1.58.0 on),
+   * from `GET /api/health`'s `features`: asked only when a write needs
+   * resending, and remembered once answered. Null when the check got no
+   * answer, so it is asked again.
+   */
+  private async honoursIdempotency(): Promise<boolean | null> {
+    if (this.idempotency !== null) return this.idempotency;
+    try {
+      const health = await this.requestAnonymous('/api/health', { schema: HealthSchema });
+      this.idempotency = (health.features ?? []).includes(IDEMPOTENCY_FEATURE);
+    } catch (error) {
+      if (error instanceof NetworkError || error instanceof ServerError) return null;
+      if (error instanceof RateLimitError) return null;
+      // Anything else is an answer: a server without the route says no.
+      this.idempotency = false;
+    }
+    return this.idempotency;
   }
 
   /**
@@ -189,6 +276,8 @@ export class PokeCollectorClient {
     } catch (error) {
       if (!(error instanceof NetworkError) || !this.credentials.fallbackUrl) throw error;
       this.invalidateRoute();
+      // A write with an idempotency key is resent by `request`, once the
+      // server is known to honour the key; the next send probes again.
       if ((options.method ?? 'GET') !== 'GET') throw error;
       const next = await this.resolveRoute();
       if (next === route) throw error;
@@ -339,6 +428,7 @@ export class PokeCollectorClient {
       throw error;
     }
     this.token = body.access_token;
+    this.userId = body.user.id;
     return body.access_token;
   }
 
@@ -356,6 +446,10 @@ export class PokeCollectorClient {
       Accept: 'application/json',
     };
     if (token) headers.Authorization = `Bearer ${token}`;
+    if (options.idempotencyKey) {
+      headers[IDEMPOTENCY_HEADER] = options.idempotencyKey;
+      if (this.userId !== null) headers[EXPECTED_USER_HEADER] = String(this.userId);
+    }
 
     let body: string | FormData | undefined;
     if (raw) {
@@ -498,6 +592,9 @@ function describeDetail(body: unknown): string | undefined {
       product_sources?: unknown;
       blockers?: unknown;
     };
+    if ((detail as { code?: unknown }).code === 'wrong_account') {
+      return 'This was sent for a different account than the one signed in, so nothing was changed.';
+    }
     if (typeof message === 'string') {
       return withProductNames(withListNames(message, blockers), product_sources);
     }

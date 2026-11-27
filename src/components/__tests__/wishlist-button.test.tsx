@@ -56,6 +56,8 @@ describe('WishlistButton', () => {
       method: 'POST',
       json: { card_id: 'sv1-025_en', quantity: 1 },
       schema: expect.anything(),
+      // Safe to resend: upstream 1.58.0 adds once per key.
+      idempotencyKey: expect.stringMatching(/^[A-Za-z0-9_-]{32}$/),
     });
     await user.press(await screen.findByRole('button', { name: 'Remove from wishlist' }));
     expect(mockRequest).toHaveBeenCalledWith('/api/wishlist/3', { method: 'DELETE' });

@@ -168,7 +168,7 @@ if [ "$status" -ne 0 ] &&
   set -e
 fi
 
-grep -E '^AUDIT|^CAPTURE|error:|Test Case .* failed|\*\* TEST' "$OUT/$name.log" || true
+grep -E '^AUDIT|^CAPTURE|^(TYPE|FOREGROUND|KEYBOARD|SIGNIN)[[:space:]]|error:|Test Case .* failed|\*\* TEST' "$OUT/$name.log" || true
 
 # Whether trustd updated its certificate databases during this walk, and
 # whether any handshake failed: passed walks too, so the workflow's block on

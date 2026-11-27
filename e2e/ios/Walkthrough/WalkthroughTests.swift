@@ -283,7 +283,10 @@ final class WalkthroughTests: XCTestCase {
     type(serverURL, into: primary)
     type(username, into: app.textFields["PokeCollector username"])
     type(password, into: app.secureTextFields["PokeCollector password"])
-    tap(app.buttons["Connect"])
+    closeKeyboard()
+    let connect = app.buttons["Connect"]
+    tap(connect)
+    var tapped = Date()
     // The first connection on a freshly booted simulator can outlast the
     // app's eight-second connection test; try again, as a person would.
     let unreachable = element(startingWith: "Could not reach the server")
@@ -291,12 +294,24 @@ final class WalkthroughTests: XCTestCase {
     let signedIn = Date().addingTimeInterval(60)
     while Date() < signedIn, !tabs.exists {
       dismissSystemSheets()
+      ensureForeground("signing in")
       if unreachable.exists, retries < 2 {
         retries += 1
-        tap(app.buttons["Connect"])
+        tap(connect)
+        tapped = Date()
         // The message stays up while the next test runs; wait for it to go,
         // so one failure is not counted again and the retry gets its chance.
         _ = unreachable.waitForNonExistence(timeout: 10)
+      } else if retries < 2, Date().timeIntervalSince(tapped) > 15, connect.exists,
+        connect.isEnabled, !unreachable.exists
+      {
+        // Still on the form, with no message, well past the app's eight-
+        // second connection test: the tap did not reach Connect.
+        print("SIGNIN\tstill on the form \(Int(Date().timeIntervalSince(tapped))) s after Connect; again")
+        retries += 1
+        closeKeyboard()
+        tap(connect)
+        tapped = Date()
       }
       Thread.sleep(forTimeInterval: 0.5)
     }
@@ -537,7 +552,7 @@ final class WalkthroughTests: XCTestCase {
     var swipes = 0
     while !element.isHittable, swipes < 6 {
       dismissSystemSheets()
-      app.swipeUp(velocity: .slow)
+      scrollUp()
       swipes += 1
     }
     if !element.isHittable {
@@ -546,6 +561,58 @@ final class WalkthroughTests: XCTestCase {
       return
     }
     element.tap()
+  }
+
+  /// Scrolls the content up by dragging inside what is visible above the
+  /// keyboard, if one is open. Not `app.swipeUp()`: that swipes over the
+  /// whole screen, keyboard and all, and a slow upward swipe low on the
+  /// screen is the system's gesture for the App Switcher. One walkthrough
+  /// was found typing into a sign-in form shown as a card in the switcher,
+  /// the username holding "a" and the keyboard gone; the step before had
+  /// swiped to bring the username field out from under the keyboard.
+  private func scrollUp() {
+    let frame = app.frame
+    let keyboard = app.keyboards.firstMatch
+    let bottom = keyboard.exists ? keyboard.frame.minY : frame.maxY
+    let from = min(bottom - 60, frame.minY + frame.height * 0.7)
+    let to = frame.minY + frame.height * 0.2
+    guard from - to > 40 else { return }
+    let origin = app.coordinate(withNormalizedOffset: .zero)
+    let start = origin.withOffset(CGVector(dx: frame.midX, dy: from))
+    let end = origin.withOffset(CGVector(dx: frame.midX, dy: to))
+    start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.3)
+  }
+
+  /// Brings the app back if something put it in the background or the App
+  /// Switcher, and says so in the log.
+  private func ensureForeground(_ step: String) {
+    guard app.state != .runningForeground else { return }
+    print("FOREGROUND\t\(step)\tapp state \(app.state.rawValue); activating")
+    app.activate()
+    _ = app.wait(for: .runningForeground, timeout: 10)
+  }
+
+  /// Closes the keyboard and waits for it to go, so a tap meant for what it
+  /// covered (Connect, under the password field) does not land on it or on
+  /// the Passwords bar above it. One sign-in sat with every field filled
+  /// in and the keyboard still up: the Return that type() sends had not
+  /// closed it, and Connect was never pressed.
+  private func closeKeyboard() {
+    let keyboard = app.keyboards.firstMatch
+    for attempt in 1...3 {
+      guard keyboard.exists else { return }
+      let focused = app.descendants(matching: .any)
+        .matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
+      if focused.exists { focused.typeText("\n") }
+      if keyboard.waitForNonExistence(timeout: 3) { return }
+      print("KEYBOARD\tstill open after Return, attempt \(attempt)")
+    }
+    // A tap on some text, away from every control, ends editing too.
+    let text = app.staticTexts.allElementsBoundByIndex.first { $0.isHittable }
+    text?.tap()
+    if !keyboard.waitForNonExistence(timeout: 3) {
+      print("KEYBOARD\tstill open; tapping on regardless")
+    }
   }
 
   /// Types into a field and checks it took. On a fresh simulator the first
@@ -557,6 +624,7 @@ final class WalkthroughTests: XCTestCase {
   private func type(_ text: String, into field: XCUIElement, slowly: Bool = false) {
     let secure = field.elementType == .secureTextField
     for attempt in 1...3 {
+      ensureForeground("typing into \(field.label)")
       focus(field)
       _ = app.keyboards.firstMatch.waitForExistence(timeout: 5)
       clear(field)
@@ -577,6 +645,13 @@ final class WalkthroughTests: XCTestCase {
         }
       }
       if typed && (secure || (field.value as? String) == text) { break }
+      // What went wrong, for the next time this fails.
+      let value = secure ? "(secure)" : String(describing: field.value ?? "nothing")
+      let outcome = typed ? "value \(value)" : "focus lost"
+      let keyboardOpen = app.keyboards.firstMatch.exists
+      print(
+        "TYPE\t\(field.label)\tattempt \(attempt): \(outcome), app state \(app.state.rawValue), keyboard \(keyboardOpen)"
+      )
       if attempt == 3 {
         diagnose("Typing into \(field) gave \(field.value ?? "nothing")")
         XCTFail("Could not type into \(field)")
@@ -607,10 +682,11 @@ final class WalkthroughTests: XCTestCase {
 
   /// Found the way capture() finds what has focus, by a query, and matched
   /// to the field by its label, which is unique on every form here. Not by
-  /// its frame: while the keyboard opens the form scrolls, the two queries
-  /// resolve a moment apart, and their frames disagree. That once stopped
-  /// every retry after the first character, the field holding "a" and still
-  /// focused. A field without a label falls back to the frame.
+  /// its frame: while the keyboard opens the form scrolls, and two queries
+  /// a moment apart can disagree on the frame. A field without a label
+  /// falls back to the frame. (A username left at "a" was first put down
+  /// to the frames; the next one turned out to be the App Switcher, which
+  /// scrollUp() now avoids.)
   private func hasFocus(_ field: XCUIElement) -> Bool {
     let focused = app.descendants(matching: field.elementType)
       .matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch

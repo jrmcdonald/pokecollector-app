@@ -590,11 +590,17 @@ final class WalkthroughTests: XCTestCase {
   }
 
   /// Found the way capture() finds what has focus, by a query, and matched
-  /// to the field by its frame.
+  /// to the field by its label, which is unique on every form here. Not by
+  /// its frame: while the keyboard opens the form scrolls, the two queries
+  /// resolve a moment apart, and their frames disagree. That once stopped
+  /// every retry after the first character, the field holding "a" and still
+  /// focused. A field without a label falls back to the frame.
   private func hasFocus(_ field: XCUIElement) -> Bool {
     let focused = app.descendants(matching: field.elementType)
       .matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
-    return focused.exists && focused.frame == field.frame
+    guard focused.exists else { return false }
+    let label = field.label
+    return label.isEmpty ? focused.frame == field.frame : focused.label == label
   }
 
   /// Deletes what a field holds. An empty field reports its placeholder as
@@ -639,6 +645,14 @@ final class WalkthroughTests: XCTestCase {
   /// there and holding, so it stops where it was dropped: a fling would
   /// stop somewhere different each run. Below the fold, as at the largest
   /// text sizes, it is swiped into view first.
+  ///
+  /// A drag alone still landed a few points apart from run to run (most
+  /// likely the few points a touch moves before the scroll view takes it),
+  /// and the screenshot comparison allows almost no pixels to move. It then
+  /// measures where the element is and corrects in pairs of drags: away by a
+  /// fixed amount, then back by that amount plus the error. Each drag loses
+  /// the same few points, so the pair moves the content by the error alone.
+  /// It stops within a quarter of a point, under one pixel at 3x.
   private func bringToTop(_ element: XCUIElement) {
     wait(for: element, "\(element)")
     var swipes = 0
@@ -649,6 +663,26 @@ final class WalkthroughTests: XCTestCase {
     let start = element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
     let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.16))
     start.press(forDuration: 0.1, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.5)
+
+    let target = app.frame.minY + app.frame.height * 0.16
+    let away: CGFloat = 80
+    for _ in 0..<5 {
+      let error = element.frame.midY - target
+      if abs(error) < 0.25 { break }
+      // Positive error: the element is too low, so the content moves up.
+      drag(by: away)
+      drag(by: -(away + error))
+    }
+    print("CAPTURE\tbringToTop\t\(element.label) at \(element.frame.midY), target \(target)")
+  }
+
+  /// Drags the screen's middle down by `distance` points (up if negative),
+  /// holding at the end so it does not fling.
+  private func drag(by distance: CGFloat) {
+    let middle = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+    middle.press(
+      forDuration: 0.1, thenDragTo: middle.withOffset(CGVector(dx: 0, dy: distance)),
+      withVelocity: .slow, thenHoldForDuration: 0.5)
   }
 
   /// Scrolls until the screen stops moving, so a scrolled screenshot is of

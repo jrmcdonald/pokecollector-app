@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.10.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.9.0...v1.10.0) (2026-11-28)
+
+
+### Features
+
+* artist pages, from a card's illustrator and from Sets ([928bba5](https://github.com/jrmcdonald/pokecollector-app/commit/928bba51c743added6bf2f506fea922f9a85212c))
+* remove several cards at once, and free what holds a copy back ([e78fb23](https://github.com/jrmcdonald/pokecollector-app/commit/e78fb23cd46f811776f4740c6fcad4bbbe23d8de))
+* remove several cards at once, and free what holds a copy back ([afd6137](https://github.com/jrmcdonald/pokecollector-app/commit/afd61376edecd3c58eaccd37ef89668d41773f78))
+* resend an add whose answer was lost, without adding twice ([16833a3](https://github.com/jrmcdonald/pokecollector-app/commit/16833a328af4fde929f574c01aeadb2ba70001a9))
+* value cards from TCGplayer when Cardmarket has no price ([c73806a](https://github.com/jrmcdonald/pokecollector-app/commit/c73806a1bdf81ed8b10898e62c108944d99a5956))
+
+
+### Bug fixes
+
+* filter a set's search once typing pauses ([864c75e](https://github.com/jrmcdonald/pokecollector-app/commit/864c75ea848ec4c73c0ef515d1fd40aefa5044e1))
+* filter a set's search once typing pauses ([bdbc696](https://github.com/jrmcdonald/pokecollector-app/commit/bdbc696764030647bcba28c3eaa03c245dd33623))
+* keep only the set's search above its list ([b7c7e2c](https://github.com/jrmcdonald/pokecollector-app/commit/b7c7e2c4322d74b836137e31c92225a2db6744ff))
+* lay rows out again when choosing cards to remove ([c196472](https://github.com/jrmcdonald/pokecollector-app/commit/c1964722b791bb9fbb04d0532c1abce4587ddf09))
+* name the binders and decks that keep a copy from being removed ([636eb3b](https://github.com/jrmcdonald/pokecollector-app/commit/636eb3b6fa2acd31d773316aacc12a9a91c9123c))
+* put a TCGplayer estimate's source under the price, and write dollars as $ ([dba9887](https://github.com/jrmcdonald/pokecollector-app/commit/dba98873a0f49b0382c0d78c9cf75245e1079afc))
+* send every request at least once, even when iOS reports no connection ([4d5e5a0](https://github.com/jrmcdonald/pokecollector-app/commit/4d5e5a0464c1d68cefc74e9b7e4ac078de632867))
+* send every request at least once, even when iOS reports no connection ([3f1e133](https://github.com/jrmcdonald/pokecollector-app/commit/3f1e133992da23734fb7f6b2ff1e2b8de4176b00))
+* show what an artist's missing cards cost in cents ([1634aad](https://github.com/jrmcdonald/pokecollector-app/commit/1634aadd19c32681b0e4993bbd1c275298d87f05))
+* start a set's list again for each search, so no old card stays ([9dc7ba1](https://github.com/jrmcdonald/pokecollector-app/commit/9dc7ba11d7ec26565cf268dba72cc6cd85cd5790))
+* start a set's list again for each search, so no old card stays ([6de3f02](https://github.com/jrmcdonald/pokecollector-app/commit/6de3f029a3c716953b942af628bfa22f620f7446))
+
 ## [1.9.0](https://github.com/jrmcdonald/pokecollector-app/compare/v1.8.1...v1.9.0) (2026-11-13)
 
 

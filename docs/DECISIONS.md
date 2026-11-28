@@ -1698,3 +1698,19 @@ Two sign-in failures were left after "focus by label" (above):
 `type()` also logs each failed attempt (`TYPE`: the value it read back, the
 app's state, whether a keyboard was open), and the walkthrough's summary
 prints these lines with `CAPTURE` and `AUDIT`.
+
+## 2026-11-27 — A set's search filters once typing pauses
+
+With the list starting again for each search ("A set's search sits above
+its list", above), every letter refiltered the set and rebuilt its list. One
+walkthrough typing "char" in one go left the field at "c": the other letters
+were lost while the app worked. The walkthrough retried and passed, and a
+person types far slower than it does, but a slow phone and a quick typist
+can meet the same thing.
+
+The field still shows every letter as it is typed; the filter, and with it
+the new list, waits until typing has paused for 200 ms
+(`useDebouncedValue`, as the catalogue and artist searches use at 400 ms,
+shorter here because nothing is fetched). Typing "char" then builds one list,
+not four. Clear filters and Show or Rarity are unchanged, apart from the
+search's own 200 ms.

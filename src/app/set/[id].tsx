@@ -12,6 +12,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useSetChecklist } from '@/hooks/queries';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useCardColumns } from '@/hooks/use-large-text';
 import { spacing, useColors } from '@/theme';
 import { pick } from '@/utils/pick';
@@ -26,6 +27,15 @@ import {
 } from '@/utils/sets';
 
 /**
+ * How long the search waits for typing to pause before it filters. The list
+ * starts again for each search, which is work enough to fall behind a quick
+ * typist (the walkthrough, typing "char" at once, once left the field at
+ * "c"), so it is done once per pause, not once per letter. Shorter than the
+ * catalogue search's 400 ms: nothing is fetched.
+ */
+const SEARCH_PAUSE_MS = 200;
+
+/**
  * A set's checklist: every card in number order, missing ones marked. The
  * search and filters work over the one response, so they cost no requests.
  */
@@ -37,14 +47,15 @@ export default function SetChecklist() {
   const pull = usePullToRefresh(() => checklist.refetch());
   const [show, setShow] = useState<ChecklistShow>('all');
   const [query, setQuery] = useState('');
+  const search = useDebouncedValue(query.trim(), SEARCH_PAUSE_MS);
   const [rarity, setRarity] = useState<string | null>(null);
   const data = checklist.data;
   const shown = useMemo(
-    () => filterChecklist(data?.cards ?? [], { show, query, rarity }),
-    [data, show, query, rarity],
+    () => filterChecklist(data?.cards ?? [], { show, query: search, rarity }),
+    [data, show, search, rarity],
   );
   const rarities = useMemo(() => checklistRarities(data?.cards ?? []), [data]);
-  const searching = !!query.trim() || !!rarity;
+  const searching = !!search || !!rarity;
 
   async function chooseRarity() {
     const index = await pick('Rarity', [
@@ -84,7 +95,7 @@ export default function SetChecklist() {
             // row with it. A set is a few hundred cards at most. Not for Show
             // or Rarity: they are in the header, which would start again too
             // and take VoiceOver's focus off the control just chosen.
-            key={`${columns}|${query.trim()}`}
+            key={`${columns}|${search}`}
             numColumns={columns}
             keyExtractor={(card) => card.id}
             contentContainerStyle={styles.list}

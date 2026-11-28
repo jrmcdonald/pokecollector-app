@@ -1,10 +1,10 @@
 /**
  * A set's checklist, searched and filtered over its one response. The
  * search sits above the list, which starts again for each search, so typing
- * keeps the field, and only what matches is left.
+ * keeps the field, and only what matches is left once typing pauses.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import SetChecklist from '@/app/set/[id]';
 
@@ -62,7 +62,9 @@ it('leaves only what the whole search finds, typed a letter at a time', async ()
   const field = await open();
   expect(shownNames()).toEqual(NAMES);
   for (const text of ['c', 'ch', 'cha', 'char']) await fireEvent.changeText(field, text);
-  expect(shownNames()).toEqual(['Charmander', 'Charmeleon', 'Charizard ex']);
+  // Not filtered yet, while typing; then only what "char" finds.
+  expect(shownNames()).toEqual(NAMES);
+  await waitFor(() => expect(shownNames()).toEqual(['Charmander', 'Charmeleon', 'Charizard ex']));
   // The field is the same one, still holding what was typed.
   expect(screen.getByLabelText('Search this set')).toBe(field);
   expect(field.props.value).toBe('char');
@@ -73,8 +75,8 @@ it('narrows by what is owned, and says so when nothing matches', async () => {
   await fireEvent.press(screen.getByRole('radio', { name: /^Missing/ }));
   expect(shownNames()).toEqual(['Charmander', 'Charizard ex', 'Raticate']);
   await fireEvent.changeText(field, 'bulba');
-  expect(screen.getByText('No missing card in this set matches.')).toBeOnTheScreen();
+  expect(await screen.findByText('No missing card in this set matches.')).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: 'Clear filters' }));
-  expect(shownNames()).toEqual(NAMES);
+  await waitFor(() => expect(shownNames()).toEqual(NAMES));
   expect(field.props.value).toBe('');
 });

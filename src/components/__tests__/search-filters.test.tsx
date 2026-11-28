@@ -191,9 +191,12 @@ describe('Searching a set', () => {
     const field = await screen.findByLabelText('Search this set');
 
     await userEvent.type(field, 'saur');
+    // The search filters once typing pauses.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /^Charmander/ })).not.toBeOnTheScreen(),
+    );
     expect(screen.getByRole('button', { name: /^Bulbasaur/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /^Venusaur ex/ })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /^Charmander/ })).not.toBeOnTheScreen();
 
     await userEvent.press(screen.getByRole('radio', { name: 'Missing, 2 of 3' }));
     expect(screen.queryByRole('button', { name: /^Bulbasaur/ })).not.toBeOnTheScreen();
@@ -202,8 +205,10 @@ describe('Searching a set', () => {
     await userEvent.clear(field);
     await userEvent.press(screen.getByRole('radio', { name: 'All, 1 of 3' }));
     await userEvent.type(field, '4');
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /^Bulbasaur/ })).not.toBeOnTheScreen(),
+    );
     expect(screen.getByRole('button', { name: /^Charmander/ })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /^Bulbasaur/ })).not.toBeOnTheScreen();
     // All of it on the phone: one request, for the checklist.
     expect(mockRequest).toHaveBeenCalledTimes(1);
   });
@@ -216,11 +221,13 @@ describe('Searching a set', () => {
 
     // "v" finds Ivysaur and Venusaur ex; "ve", Venusaur ex alone.
     await userEvent.type(field, 'v');
-    expect(tiles()).toHaveLength(2);
+    await waitFor(() => expect(tiles()).toHaveLength(2));
     await userEvent.type(field, 'e');
-    expect(tiles().map((tile) => tile.props.accessibilityLabel)).toEqual([
-      expect.stringMatching(/^Venusaur ex/),
-    ]);
+    await waitFor(() =>
+      expect(tiles().map((tile) => tile.props.accessibilityLabel)).toEqual([
+        expect.stringMatching(/^Venusaur ex/),
+      ]),
+    );
   });
 
   it('filters by the set’s own rarities, and says when nothing matches', async () => {
@@ -237,9 +244,9 @@ describe('Searching a set', () => {
     expect(screen.queryByRole('button', { name: /^Bulbasaur/ })).not.toBeOnTheScreen();
 
     await userEvent.type(screen.getByLabelText('Search this set'), 'pikachu');
-    expect(screen.getByText('No matches')).toBeTruthy();
+    expect(await screen.findByText('No matches')).toBeTruthy();
     await userEvent.press(screen.getByRole('button', { name: 'Clear filters' }));
-    expect(screen.getByRole('button', { name: /^Bulbasaur/ })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /^Bulbasaur/ })).toBeTruthy();
     expect(screen.getByLabelText('Search this set')).toHaveDisplayValue('');
     expect(screen.getByRole('button', { name: 'Rarity: all' })).toBeTruthy();
   });

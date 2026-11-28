@@ -1672,6 +1672,33 @@ removed. That cannot be debugged without a simulator to hand.
   If the leftover comes back with a list that starts again, the cause is not
   in how a list narrows.
 
+## 2026-11-27 — Walkthrough: no swipes under the keyboard, and Connect pressed for sure
+
+Two sign-in failures were left after "focus by label" (above):
+
+- **The username held "a", focused, with no keyboard.** The system UI's
+  tree showed the App Switcher open, with the app as a card in it. The
+  walkthrough's `tap()` scrolled a covered field into view with
+  `app.swipeUp(velocity: .slow)`, a swipe over the whole screen; with the
+  keyboard open over the username field, that slow upward swipe low on the
+  screen is the system's App Switcher gesture. `tap()` now scrolls with
+  `scrollUp()`, a drag inside what is visible above the keyboard, and
+  `type()` brings the app back to the foreground first if it has left it,
+  logging `FOREGROUND` when it does. `bringToTop()` and `scrollToEnd()` keep
+  `app.swipeUp()`: no keyboard is open there, and changing them would move
+  approved screenshots.
+- **Every field filled in, the keyboard still up, Connect never pressed.**
+  The Return that `type()` sends after the password had not closed the
+  keyboard, and the tap on Connect, just under it, did not reach the
+  button. Sign-in now closes the keyboard and waits for it to go before
+  tapping Connect, and if the form is still there, idle and with no message
+  15 seconds after a tap, taps it again (`SIGNIN` in the log), within the
+  same two retries a "Could not reach the server" gets.
+
+`type()` also logs each failed attempt (`TYPE`: the value it read back, the
+app's state, whether a keyboard was open), and the walkthrough's summary
+prints these lines with `CAPTURE` and `AUDIT`.
+
 ## 2026-11-27 — A set's search filters once typing pauses
 
 With the list starting again for each search ("A set's search sits above
